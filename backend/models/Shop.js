@@ -66,6 +66,9 @@ const shopSchema = new mongoose.Schema({
     enableLoyalty: { type: Boolean, default: false },
     loyaltyPointsPerAmount: { type: Number, default: 100 }, // points per 100 currency
     loyaltyRedeemRate: { type: Number, default: 1 }, // 1 point = 1 currency
+    barcodePrefix: { type: String, default: '' },
+    barcodeSymbology: { type: String, enum: ['CODE128', 'EAN13', 'UPC', 'CODE39'], default: 'CODE128' },
+    autoGenerateBarcode: { type: Boolean, default: false },
   },
 }, {
   timestamps: true,

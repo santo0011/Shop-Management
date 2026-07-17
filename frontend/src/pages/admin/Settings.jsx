@@ -1,146 +1,390 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
+import Swal from 'sweetalert2';
 import { updateProfile } from '../../redux/slices/authSlice';
-import { setTheme } from '../../redux/slices/themeSlice';
 import api from '../../services/api';
-import { BiSave, BiDollar, BiReceipt, BiTag, BiNote, BiStore } from 'react-icons/bi';
 import { showToast } from '../../utils/toast';
+import {
+  BiSave, BiTag, BiReceipt, BiStore, BiBarcode, BiCloudDownload, BiCloudUpload,
+  BiShieldQuarter, BiUserCircle, BiLockAlt, BiEnvelope, BiPhone, BiImage,
+} from 'react-icons/bi';
+
+const SECTIONS = [
+  { key: 'shop', label: 'Shop Information', icon: BiStore },
+  { key: 'tax', label: 'Tax & VAT', icon: BiTag },
+  { key: 'invoice', label: 'Invoice & Print', icon: BiReceipt },
+  { key: 'barcode', label: 'Barcode Settings', icon: BiBarcode },
+  { key: 'backup', label: 'Backup & Restore', icon: BiCloudDownload },
+  { key: 'security', label: 'Security', icon: BiShieldQuarter },
+  { key: 'profile', label: 'Profile', icon: BiUserCircle },
+  { key: 'password', label: 'Change Password', icon: BiLockAlt },
+];
+
+const BARCODE_FORMATS = [
+  { value: 'CODE128', label: 'CODE128' },
+  { value: 'EAN13', label: 'EAN-13' },
+  { value: 'UPC', label: 'UPC' },
+  { value: 'CODE39', label: 'CODE39' },
+];
+
+const emptyAddress = { street: '', city: '', state: '', zipCode: '', country: '' };
 
 const Settings = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
-  const { mode } = useSelector((state) => state.theme);
-  const [form, setForm] = useState({ name: '', phone: '', language: 'bn', theme: 'light' });
-  const [shopSettings, setShopSettings] = useState({
-    taxRate: 0,
-    taxName: 'VAT',
-    receiptFooter: 'Thank you for your purchase!',
-  });
+
+  const [activeSection, setActiveSection] = useState('shop');
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      setForm({ name: user.name || '', phone: user.phone || '', language: user.language || 'bn', theme: user.theme || 'light' });
-    }
-    loadShopSettings();
-  }, [user]);
+  const [shop, setShop] = useState(null);
+  const [shopForm, setShopForm] = useState({ name: '', email: '', phone: '', logo: '', address: emptyAddress });
+  const [taxForm, setTaxForm] = useState({ taxRate: 0, taxName: 'VAT' });
+  const [invoiceForm, setInvoiceForm] = useState({ invoicePrefix: '', receiptFooter: '' });
+  const [barcodeForm, setBarcodeForm] = useState({ barcodePrefix: '', barcodeSymbology: 'CODE128', autoGenerateBarcode: false });
 
-  const loadShopSettings = async () => {
+  const [profileData, setProfileData] = useState(null);
+  const [profileForm, setProfileForm] = useState({ name: '', phone: '', avatar: '' });
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const [restoreFile, setRestoreFile] = useState(null);
+  const [restoring, setRestoring] = useState(false);
+
+  useEffect(() => { loadAll(); }, []);
+
+  const loadAll = async () => {
     try {
-      const { data } = await api.get('/shops/my');
-      const shop = data.shop || data;
-      if (shop?.settings) {
-        setShopSettings({
-          taxRate: shop.settings.taxRate ?? 0,
-          taxName: shop.settings.taxName || 'VAT',
-          receiptFooter: shop.settings.receiptFooter || 'Thank you for your purchase!',
-        });
-      }
+      const [{ data: shopData }, { data: profile }] = await Promise.all([
+        api.get('/shops/my'),
+        api.get('/auth/profile'),
+      ]);
+      const s = shopData.shop || shopData;
+      setShop(s);
+      setShopForm({
+        name: s.name || '',
+        email: s.email || '',
+        phone: s.phone || '',
+        logo: s.logo || '',
+        address: {
+          street: s.address?.street || '',
+          city: s.address?.city || '',
+          state: s.address?.state || '',
+          zipCode: s.address?.zipCode || '',
+          country: s.address?.country || '',
+        },
+      });
+      setTaxForm({ taxRate: s.settings?.taxRate ?? 0, taxName: s.settings?.taxName || 'VAT' });
+      setInvoiceForm({ invoicePrefix: s.settings?.invoicePrefix || 'INV-', receiptFooter: s.settings?.receiptFooter || '' });
+      setBarcodeForm({
+        barcodePrefix: s.settings?.barcodePrefix || '',
+        barcodeSymbology: s.settings?.barcodeSymbology || 'CODE128',
+        autoGenerateBarcode: !!s.settings?.autoGenerateBarcode,
+      });
+      setProfileData(profile);
+      setProfileForm({ name: profile.name || '', phone: profile.phone || '', avatar: profile.avatar || '' });
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleProfileSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const { data } = await api.put('/auth/profile', form);
-      dispatch(updateProfile(data));
-      i18n.changeLanguage(form.language);
-      dispatch(setTheme(form.theme));
-      showToast.success('Profile saved!');
-    } catch (err) {
-      showToast.error('Failed to save profile');
-    }
-  };
-
-  const handleShopSubmit = async (e) => {
-    e.preventDefault();
+  // ─── Shop-level settings (tax / invoice / barcode) share one endpoint ────
+  const saveShopSettings = async (fields, successMsg) => {
     setSaving(true);
     try {
-      await api.put('/shops/settings', shopSettings);
-      showToast.success('Shop settings saved!');
+      const { data } = await api.put('/shops/settings', fields);
+      setShop(data);
+      showToast.success(successMsg);
     } catch (err) {
-      showToast.error('Failed to save shop settings');
+      showToast.error(err.response?.data?.message || 'Failed to save settings');
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="row g-4">
-      {/* Profile Settings */}
-      <div className="col-lg-6">
-        <div className="table-container">
-          <div className="table-header">
-            <h5>Profile Settings</h5>
-          </div>
-          <div className="p-4">
-            <form onSubmit={handleProfileSubmit}>
-              <div className="mb-3">
-                <label className="form-label">{t('auth.name')}</label>
-                <input className="form-control" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-              </div>
-              <div className="mb-3">
-                <label className="form-label">{t('auth.phone')}</label>
-                <input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
-              </div>
-              <div className="mb-3">
-                <label className="form-label">{t('settings.language')}</label>
-                <select className="form-select" value={form.language} onChange={e => setForm({...form, language: e.target.value})}>
-                  <option value="bn">বাংলা</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-              <div className="mb-3">
-                <label className="form-label">{t('settings.theme')}</label>
-                <select className="form-select" value={form.theme} onChange={e => setForm({...form, theme: e.target.value})}>
-                  <option value="light">{t('settings.light')}</option>
-                  <option value="dark">{t('settings.dark')}</option>
-                </select>
-              </div>
-              <button type="submit" className="btn-premium btn-premium-primary">
-                <BiSave /> {t('common.save')}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
+  const handleSaveShop = async () => {
+    if (!shop?._id) return;
+    setSaving(true);
+    try {
+      const { data } = await api.put(`/shops/${shop._id}`, {
+        name: shopForm.name,
+        email: shopForm.email,
+        phone: shopForm.phone,
+        logo: shopForm.logo,
+        address: shopForm.address,
+      });
+      setShop(data);
+      showToast.success('Shop information saved');
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to save shop information');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-      {/* Shop Settings */}
-      <div className="col-lg-6">
-        <div className="table-container">
-          <div className="table-header">
-            <h5><BiStore /> Shop Settings</h5>
+  const handleSaveTax = () => saveShopSettings(
+    { taxRate: taxForm.taxRate, taxName: taxForm.taxName },
+    'Tax settings saved'
+  );
+
+  const handleSaveInvoice = () => saveShopSettings(
+    { invoicePrefix: invoiceForm.invoicePrefix, receiptFooter: invoiceForm.receiptFooter },
+    'Invoice settings saved'
+  );
+
+  const handleSaveBarcode = () => saveShopSettings(
+    { barcodePrefix: barcodeForm.barcodePrefix, barcodeSymbology: barcodeForm.barcodeSymbology, autoGenerateBarcode: barcodeForm.autoGenerateBarcode },
+    'Barcode settings saved'
+  );
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    try {
+      const { data } = await api.put('/auth/profile', {
+        name: profileForm.name,
+        phone: profileForm.phone,
+        avatar: profileForm.avatar,
+      });
+      dispatch(updateProfile(data));
+      setProfileData(prev => ({ ...prev, ...data }));
+      showToast.success('Profile saved');
+    } catch (err) {
+      showToast.error('Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      showToast.error('Please fill in all password fields');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      showToast.error('New password must be at least 6 characters');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showToast.error('New password and confirmation do not match');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.put('/auth/update-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      showToast.success('Password updated successfully');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to update password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ─── Backup & Restore ────────────────────────────────────────────────
+  const handleDownloadBackup = async () => {
+    setDownloadingBackup(true);
+    try {
+      const { data } = await api.get('/shops/backup');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shop-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast.success('Backup downloaded');
+    } catch (err) {
+      showToast.error('Failed to generate backup');
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
+
+  const handleRestoreFileChange = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        setRestoreFile({ name: file.name, data: parsed });
+      } catch (err) {
+        showToast.error('Invalid backup file');
+        setRestoreFile(null);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleRestore = () => {
+    if (!restoreFile) return;
+    Swal.fire({
+      title: 'Restore from backup?',
+      text: `This will overwrite any existing products, categories, suppliers, and customers that match records in "${restoreFile.name}". This cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#FF6B6B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, restore',
+      cancelButtonText: 'Cancel',
+      background: 'var(--bg-card)',
+      color: 'var(--text-primary)',
+      reverseButtons: true,
+    }).then(async (result) => {
+      if (!result.isConfirmed) return;
+      setRestoring(true);
+      try {
+        const { products, categories, suppliers, customers } = restoreFile.data || {};
+        const { data } = await api.post('/shops/restore', { products, categories, suppliers, customers });
+        showToast.success(
+          `Restored ${data.products.restored} products, ${data.categories.restored} categories, ${data.suppliers.restored} suppliers, ${data.customers.restored} customers`
+        );
+        setRestoreFile(null);
+      } catch (err) {
+        showToast.error('Restore failed');
+      } finally {
+        setRestoring(false);
+      }
+    });
+  };
+
+  // ─── Security ────────────────────────────────────────────────────────
+  const handleSignOutAllDevices = () => {
+    Swal.fire({
+      title: 'Sign out from all devices?',
+      text: 'You will be signed out here and on every other device. You will need to log in again.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#FF6B6B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, sign out everywhere',
+      cancelButtonText: 'Cancel',
+      background: 'var(--bg-card)',
+      color: 'var(--text-primary)',
+      reverseButtons: true,
+    }).then(async (result) => {
+      if (!result.isConfirmed) return;
+      try {
+        await api.post('/auth/logout');
+      } catch (err) {
+        // Still clear the local session even if the server call fails.
+      } finally {
+        localStorage.clear();
+        window.location.href = '/login';
+      }
+    });
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    return new Date(value).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const SAVE_ACTIONS = {
+    shop: { label: 'Save Shop Information', onSave: handleSaveShop },
+    tax: { label: 'Save Tax Settings', onSave: handleSaveTax },
+    invoice: { label: 'Save Invoice Settings', onSave: handleSaveInvoice },
+    barcode: { label: 'Save Barcode Settings', onSave: handleSaveBarcode },
+    profile: { label: 'Save Profile', onSave: handleSaveProfile },
+    password: { label: 'Update Password', onSave: handleChangePassword },
+  };
+
+  if (loading) {
+    return (
+      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '50vh' }}>
+        <span className="spinner-border" style={{ color: 'var(--primary)' }} />
+      </div>
+    );
+  }
+
+  const renderSection = () => {
+    switch (activeSection) {
+      case 'shop':
+        return (
+          <div className="table-container">
+            <div className="table-header"><h5><BiStore /> Shop Information</h5></div>
+            <div className="p-4">
+              <div className="settings-field-row">
+                <div className="mb-3">
+                  <label className="form-label">Shop Name</label>
+                  <input className="form-control" value={shopForm.name} onChange={e => setShopForm({ ...shopForm, name: e.target.value })} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label"><BiEnvelope style={{ marginRight: 4 }} /> Email</label>
+                  <input type="email" className="form-control" value={shopForm.email} onChange={e => setShopForm({ ...shopForm, email: e.target.value })} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label"><BiPhone style={{ marginRight: 4 }} /> Phone</label>
+                  <input className="form-control" value={shopForm.phone} onChange={e => setShopForm({ ...shopForm, phone: e.target.value })} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label"><BiImage style={{ marginRight: 4 }} /> Logo URL</label>
+                  <input className="form-control" value={shopForm.logo} onChange={e => setShopForm({ ...shopForm, logo: e.target.value })} placeholder="https://..." />
+                </div>
+              </div>
+              {shopForm.logo && (
+                <div className="mb-3">
+                  <img src={shopForm.logo} alt="Shop logo preview" style={{ height: 56, width: 56, objectFit: 'cover', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)' }} />
+                </div>
+              )}
+              <hr style={{ borderColor: 'var(--border-color)' }} />
+              <label className="form-label">Address</label>
+              <div className="settings-field-row">
+                <div className="mb-3">
+                  <input className="form-control" placeholder="Street" value={shopForm.address.street} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, street: e.target.value } })} />
+                </div>
+                <div className="mb-3">
+                  <input className="form-control" placeholder="City" value={shopForm.address.city} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, city: e.target.value } })} />
+                </div>
+                <div className="mb-3">
+                  <input className="form-control" placeholder="State" value={shopForm.address.state} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, state: e.target.value } })} />
+                </div>
+                <div className="mb-3">
+                  <input className="form-control" placeholder="ZIP / Postal Code" value={shopForm.address.zipCode} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, zipCode: e.target.value } })} />
+                </div>
+                <div className="mb-3">
+                  <input className="form-control" placeholder="Country" value={shopForm.address.country} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, country: e.target.value } })} />
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="p-4">
-            <form onSubmit={handleShopSubmit}>
-              {/* Tax Rate */}
+        );
+
+      case 'tax':
+        return (
+          <div className="table-container">
+            <div className="table-header"><h5><BiTag /> {t('settings.taxSettings')}</h5></div>
+            <div className="p-4">
               <div className="mb-3">
-                <label className="form-label">
-                  <BiTag style={{ marginRight: 4 }} /> Tax Rate (%)
-                </label>
-                <div className="d-flex gap-2 align-items-center">
+                <label className="form-label">Tax Rate (%)</label>
+                <div className="d-flex gap-2 align-items-center flex-wrap">
                   <input
                     type="number"
                     className="form-control"
                     style={{ maxWidth: '120px' }}
-                    value={shopSettings.taxRate}
-                    onChange={e => setShopSettings({...shopSettings, taxRate: Math.max(0, Math.min(100, Number(e.target.value)))})}
+                    value={taxForm.taxRate}
+                    onChange={e => setTaxForm({ ...taxForm, taxRate: Math.max(0, Math.min(100, Number(e.target.value))) })}
                     min="0"
                     max="100"
                     step="0.5"
                   />
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>%</span>
-                  <div className="d-flex gap-1 ms-2">
+                  <div className="d-flex gap-1 ms-2 flex-wrap">
                     {[0, 5, 10, 15].map(val => (
                       <button
                         key={val}
                         type="button"
-                        className={`btn-premium btn-premium-sm ${shopSettings.taxRate === val ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
-                        onClick={() => setShopSettings({...shopSettings, taxRate: val})}
+                        className={`btn-premium btn-premium-sm ${taxForm.taxRate === val ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
+                        onClick={() => setTaxForm({ ...taxForm, taxRate: val })}
                       >
                         {val === 0 ? 'No Tax' : `${val}%`}
                       </button>
@@ -148,46 +392,252 @@ const Settings = () => {
                   </div>
                 </div>
                 <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: 4, display: 'block' }}>
-                  Set 0% for no tax. This will be used on all POS invoices.
+                  Set 0% for no tax. This is applied on all POS invoices.
                 </small>
               </div>
-
-              {/* Tax Name */}
               <div className="mb-3">
-                <label className="form-label">
-                  <BiDollar style={{ marginRight: 4 }} /> Tax Name
-                </label>
+                <label className="form-label">Tax Name</label>
                 <input
                   className="form-control"
-                  style={{ maxWidth: '200px' }}
-                  value={shopSettings.taxName}
-                  onChange={e => setShopSettings({...shopSettings, taxName: e.target.value})}
+                  style={{ maxWidth: '220px' }}
+                  value={taxForm.taxName}
+                  onChange={e => setTaxForm({ ...taxForm, taxName: e.target.value })}
                   placeholder="e.g. VAT, GST, Sales Tax"
                 />
               </div>
+            </div>
+          </div>
+        );
 
-              {/* Invoice Footer */}
+      case 'invoice':
+        return (
+          <div className="table-container">
+            <div className="table-header"><h5><BiReceipt /> {t('settings.invoiceSettings')}</h5></div>
+            <div className="p-4">
               <div className="mb-3">
-                <label className="form-label">
-                  <BiNote style={{ marginRight: 4 }} /> Invoice Footer Message
-                </label>
+                <label className="form-label">Invoice Number Prefix</label>
+                <input
+                  className="form-control"
+                  style={{ maxWidth: '220px' }}
+                  value={invoiceForm.invoicePrefix}
+                  onChange={e => setInvoiceForm({ ...invoiceForm, invoicePrefix: e.target.value })}
+                  placeholder="e.g. INV-"
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Invoice Footer Message</label>
                 <textarea
                   className="form-control"
                   rows="3"
-                  value={shopSettings.receiptFooter}
-                  onChange={e => setShopSettings({...shopSettings, receiptFooter: e.target.value})}
+                  value={invoiceForm.receiptFooter}
+                  onChange={e => setInvoiceForm({ ...invoiceForm, receiptFooter: e.target.value })}
                   placeholder="Thank you for shopping with us."
                 />
                 <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: 4, display: 'block' }}>
-                  This message will appear at the bottom of every invoice.
+                  This message appears at the bottom of every invoice and receipt.
                 </small>
               </div>
-
-              <button type="submit" className="btn-premium btn-premium-primary" disabled={saving}>
-                {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiSave /> Save Shop Settings</>}
-              </button>
-            </form>
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>
+                Paper size and template (A4 / 58mm / 80mm) can be chosen from the Printer Settings button on the POS and Sales pages.
+              </small>
+            </div>
           </div>
+        );
+
+      case 'barcode':
+        return (
+          <div className="table-container">
+            <div className="table-header"><h5><BiBarcode /> Barcode Settings</h5></div>
+            <div className="p-4">
+              <div className="settings-field-row">
+                <div className="mb-3">
+                  <label className="form-label">Barcode Format</label>
+                  <select className="form-select" value={barcodeForm.barcodeSymbology} onChange={e => setBarcodeForm({ ...barcodeForm, barcodeSymbology: e.target.value })}>
+                    {BARCODE_FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  </select>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Barcode Prefix</label>
+                  <input className="form-control" value={barcodeForm.barcodePrefix} onChange={e => setBarcodeForm({ ...barcodeForm, barcodePrefix: e.target.value })} placeholder="e.g. SHOP-" />
+                </div>
+              </div>
+              <div className="mb-2">
+                <label className="printer-settings-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={barcodeForm.autoGenerateBarcode}
+                    onChange={e => setBarcodeForm({ ...barcodeForm, autoGenerateBarcode: e.target.checked })}
+                  />
+                  <span>Auto-generate barcodes for new products</span>
+                </label>
+              </div>
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>
+                Used as the default format and prefix when generating barcodes for new products.
+              </small>
+            </div>
+          </div>
+        );
+
+      case 'backup':
+        return (
+          <>
+            <div className="table-container mb-4">
+              <div className="table-header"><h5><BiCloudDownload /> Download Backup</h5></div>
+              <div className="p-4">
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Export your shop information, products, categories, suppliers, and customers as a single JSON file.
+                </p>
+                <button type="button" className="btn-premium btn-premium-primary" onClick={handleDownloadBackup} disabled={downloadingBackup}>
+                  {downloadingBackup ? <><span className="spinner-border spinner-border-sm" /> Preparing...</> : <><BiCloudDownload /> Download Backup</>}
+                </button>
+              </div>
+            </div>
+            <div className="table-container">
+              <div className="table-header"><h5><BiCloudUpload /> Restore from Backup</h5></div>
+              <div className="p-4">
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Upload a previously downloaded backup file to restore your products, categories, suppliers, and customers. Matching records are overwritten.
+                </p>
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <label className="btn-premium btn-premium-secondary" style={{ cursor: 'pointer', margin: 0 }}>
+                    <BiCloudUpload /> Choose File
+                    <input type="file" accept="application/json" onChange={handleRestoreFileChange} style={{ display: 'none' }} />
+                  </label>
+                  {restoreFile && <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{restoreFile.name}</span>}
+                  <button type="button" className="btn-premium btn-premium-primary" onClick={handleRestore} disabled={!restoreFile || restoring}>
+                    {restoring ? <><span className="spinner-border spinner-border-sm" /> Restoring...</> : 'Restore'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        );
+
+      case 'security':
+        return (
+          <div className="table-container">
+            <div className="table-header"><h5><BiShieldQuarter /> Security</h5></div>
+            <div className="p-4">
+              <div className="settings-field-row">
+                <div className="mb-3">
+                  <label className="form-label">Email</label>
+                  <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{profileData?.email || '—'}</div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Role</label>
+                  <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{profileData?.role || '—'}</div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Last Login</label>
+                  <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{formatDateTime(profileData?.lastLogin)}</div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Member Since</label>
+                  <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{formatDateTime(profileData?.createdAt)}</div>
+                </div>
+              </div>
+              <hr style={{ borderColor: 'var(--border-color)' }} />
+              <label className="form-label">Sessions</label>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                If you suspect your account is signed in somewhere it shouldn't be, sign out everywhere and log back in.
+              </p>
+              <button type="button" className="btn-premium" style={{ background: 'var(--danger)', color: '#fff' }} onClick={handleSignOutAllDevices}>
+                Sign Out From All Devices
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'profile':
+        return (
+          <div className="table-container">
+            <div className="table-header"><h5><BiUserCircle /> Profile</h5></div>
+            <div className="p-4">
+              <div className="settings-field-row">
+                <div className="mb-3">
+                  <label className="form-label">{t('auth.name')}</label>
+                  <input className="form-control" value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">{t('auth.phone')}</label>
+                  <input className="form-control" value={profileForm.phone} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Email</label>
+                  <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{profileData?.email || '—'}</div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label"><BiImage style={{ marginRight: 4 }} /> Avatar URL</label>
+                  <input className="form-control" value={profileForm.avatar} onChange={e => setProfileForm({ ...profileForm, avatar: e.target.value })} placeholder="https://..." />
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'password':
+        return (
+          <div className="table-container">
+            <div className="table-header"><h5><BiLockAlt /> Change Password</h5></div>
+            <div className="p-4">
+              <div className="mb-3">
+                <label className="form-label">Current Password</label>
+                <input type="password" className="form-control" style={{ maxWidth: '320px' }} value={passwordForm.currentPassword} onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} autoComplete="current-password" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">New Password</label>
+                <input type="password" className="form-control" style={{ maxWidth: '320px' }} value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} autoComplete="new-password" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Confirm New Password</label>
+                <input type="password" className="form-control" style={{ maxWidth: '320px' }} value={passwordForm.confirmPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} autoComplete="new-password" />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: 4, display: 'block' }}>
+                  Must be at least 6 characters.
+                </small>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const saveAction = SAVE_ACTIONS[activeSection];
+
+  return (
+    <div>
+      <div className="mb-4">
+        <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.settings')}</h4>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>Manage your shop, invoicing, security, and account preferences.</p>
+      </div>
+
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
+          {SECTIONS.map(section => (
+            <button
+              key={section.key}
+              type="button"
+              className={`settings-nav-item ${activeSection === section.key ? 'active' : ''}`}
+              onClick={() => setActiveSection(section.key)}
+            >
+              <section.icon /> <span>{section.label}</span>
+            </button>
+          ))}
+        </aside>
+
+        <div className="settings-content">
+          {renderSection()}
+
+          {saveAction && (
+            <div className="settings-save-bar">
+              <span className="settings-save-hint">Changes are saved only when you click {saveAction.label}.</span>
+              <button type="button" className="btn-premium btn-premium-primary" onClick={saveAction.onSave} disabled={saving}>
+                {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiSave /> {saveAction.label}</>}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,9 @@
 const Shop = require('../models/Shop');
 const User = require('../models/User');
+const Product = require('../models/Product');
+const Category = require('../models/Category');
+const Supplier = require('../models/Supplier');
+const Customer = require('../models/Customer');
 
 // @desc    Get all shops (Super Admin)
 // @route   GET /api/shops
@@ -217,14 +221,103 @@ const updateMyShopSettings = async (req, res) => {
       return res.status(404).json({ message: 'Shop not found' });
     }
 
-    const { taxRate, taxName, receiptFooter } = req.body;
+    const { taxRate, taxName, receiptFooter, invoicePrefix, barcodePrefix, barcodeSymbology, autoGenerateBarcode } = req.body;
 
     if (taxRate !== undefined) shop.settings.taxRate = Math.max(0, Math.min(100, Number(taxRate)));
     if (taxName !== undefined) shop.settings.taxName = taxName;
     if (receiptFooter !== undefined) shop.settings.receiptFooter = receiptFooter;
+    if (invoicePrefix !== undefined) shop.settings.invoicePrefix = invoicePrefix;
+    if (barcodePrefix !== undefined) shop.settings.barcodePrefix = barcodePrefix;
+    if (barcodeSymbology !== undefined) shop.settings.barcodeSymbology = barcodeSymbology;
+    if (autoGenerateBarcode !== undefined) shop.settings.autoGenerateBarcode = !!autoGenerateBarcode;
 
     await shop.save();
     res.json(shop);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Export a backup of the shop's core data (shop info + catalog)
+// @route   GET /api/shops/backup
+const getShopBackup = async (req, res) => {
+  try {
+    const shopId = req.user.shop;
+
+    const [shop, products, categories, suppliers, customers] = await Promise.all([
+      Shop.findById(shopId).lean(),
+      Product.find({ shop: shopId }).lean(),
+      Category.find({ shop: shopId }).lean(),
+      Supplier.find({ shop: shopId }).lean(),
+      Customer.find({ shop: shopId }).lean(),
+    ]);
+
+    if (!shop) {
+      return res.status(404).json({ message: 'Shop not found' });
+    }
+
+    res.json({
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      shop,
+      products,
+      categories,
+      suppliers,
+      customers,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Restore catalog data (products/categories/suppliers/customers) from a backup file
+// @route   POST /api/shops/restore
+const restoreShopBackup = async (req, res) => {
+  try {
+    const shopId = req.user.shop;
+    const { products = [], categories = [], suppliers = [], customers = [] } = req.body || {};
+
+    const restoreCollection = async (Model, docs) => {
+      let restored = 0;
+      let failed = 0;
+      for (const doc of Array.isArray(docs) ? docs : []) {
+        try {
+          const { _id, ...rest } = doc;
+          // Always force ownership to the requesting shop — never trust the
+          // shop field from an uploaded file, so a backup can't be replayed
+          // into a different shop's data.
+          const payload = { ...rest, shop: shopId };
+          if (_id) {
+            await Model.findOneAndUpdate(
+              { _id, shop: shopId },
+              payload,
+              { upsert: true, setDefaultsOnInsert: true, runValidators: true }
+            );
+          } else {
+            await Model.create(payload);
+          }
+          restored++;
+        } catch (err) {
+          failed++;
+        }
+      }
+      return { restored, failed };
+    };
+
+    const [productsResult, categoriesResult, suppliersResult, customersResult] = await Promise.all([
+      restoreCollection(Product, products),
+      restoreCollection(Category, categories),
+      restoreCollection(Supplier, suppliers),
+      restoreCollection(Customer, customers),
+    ]);
+
+    res.json({
+      message: 'Restore completed',
+      products: productsResult,
+      categories: categoriesResult,
+      suppliers: suppliersResult,
+      customers: customersResult,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -239,4 +332,6 @@ module.exports = {
   getMyShop,
   getShopStats,
   updateMyShopSettings,
+  getShopBackup,
+  restoreShopBackup,
 };
