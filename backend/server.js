@@ -17,9 +17,10 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const saleRoutes = require('./routes/saleRoutes');
-const expenseRoutes = require('./routes/expenseRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
 const app = express();
 
@@ -46,9 +47,10 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/sales', saleRoutes);
-app.use('/api/expenses', expenseRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

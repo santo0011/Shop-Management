@@ -1,5 +1,7 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
+const Purchase = require('../models/Purchase');
+const Sale = require('../models/Sale');
 
 const getProducts = async (req, res) => {
   try {
@@ -59,15 +61,61 @@ const getProduct = async (req, res) => {
 const createProduct = async (req, res) => {
   try {
     req.body.shop = req.user.shop;
+
+    // Check for duplicate name within shop
+    const existingName = await Product.findOne({ name: req.body.name, shop: req.user.shop });
+    if (existingName) {
+      return res.status(400).json({ message: 'A product with this name already exists in your shop.' });
+    }
+
+    // Check for duplicate barcode within shop
+    if (req.body.barcode) {
+      const existingBarcode = await Product.findOne({ barcode: req.body.barcode, shop: req.user.shop });
+      if (existingBarcode) {
+        return res.status(400).json({ message: 'A product with this barcode already exists in your shop.' });
+      }
+    }
+
     const product = await Product.create(req.body);
     res.status(201).json(product);
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      if (field === 'barcode') {
+        return res.status(400).json({ message: 'A product with this barcode already exists in your shop.' });
+      }
+      return res.status(400).json({ message: 'A product with this name already exists in your shop.' });
+    }
     res.status(500).json({ message: error.message });
   }
 };
 
 const updateProduct = async (req, res) => {
   try {
+    // Check for duplicate name (excluding current record)
+    if (req.body.name) {
+      const existingName = await Product.findOne({
+        name: req.body.name,
+        shop: req.user.shop,
+        _id: { $ne: req.params.id },
+      });
+      if (existingName) {
+        return res.status(400).json({ message: 'Another product with this name already exists in your shop.' });
+      }
+    }
+
+    // Check for duplicate barcode (excluding current record)
+    if (req.body.barcode) {
+      const existingBarcode = await Product.findOne({
+        barcode: req.body.barcode,
+        shop: req.user.shop,
+        _id: { $ne: req.params.id },
+      });
+      if (existingBarcode) {
+        return res.status(400).json({ message: 'Another product with this barcode already exists in your shop.' });
+      }
+    }
+
     const product = await Product.findOneAndUpdate(
       { _id: req.params.id, shop: req.user.shop },
       req.body,
@@ -76,12 +124,37 @@ const updateProduct = async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      if (field === 'barcode') {
+        return res.status(400).json({ message: 'Another product with this barcode already exists in your shop.' });
+      }
+      return res.status(400).json({ message: 'Another product with this name already exists in your shop.' });
+    }
     res.status(500).json({ message: error.message });
   }
 };
 
 const deleteProduct = async (req, res) => {
   try {
+    // Check if product exists in purchases
+    const purchaseCount = await Purchase.countDocuments({ 'items.product': req.params.id, shop: req.user.shop });
+    if (purchaseCount > 0) {
+      return res.status(400).json({
+        message: 'This product cannot be deleted because it exists in purchase transactions.',
+        usedBy: { purchases: purchaseCount },
+      });
+    }
+
+    // Check if product exists in sales
+    const saleCount = await Sale.countDocuments({ 'items.product': req.params.id, shop: req.user.shop });
+    if (saleCount > 0) {
+      return res.status(400).json({
+        message: 'This product cannot be deleted because it exists in sale transactions.',
+        usedBy: { sales: saleCount },
+      });
+    }
+
     const product = await Product.findOneAndDelete({ _id: req.params.id, shop: req.user.shop });
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json({ message: 'Product deleted successfully' });

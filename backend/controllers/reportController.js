@@ -1,6 +1,5 @@
 const Sale = require('../models/Sale');
 const Purchase = require('../models/Purchase');
-const Expense = require('../models/Expense');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Supplier = require('../models/Supplier');
@@ -91,58 +90,16 @@ const getProfitReport = async (req, res) => {
       },
     ]);
 
-    const totalExpenses = await Expense.aggregate([
-      { $match: { shop: shopId, ...dateFilter } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-
     const revenue = totalSales[0]?.total || 0;
     const cogs = soldItems[0]?.totalCost || 0;
-    const expenses = totalExpenses[0]?.total || 0;
-    const grossProfit = revenue - cogs;
-    const netProfit = revenue - cogs - expenses;
+    const netProfit = revenue - cogs;
 
     res.json({
       revenue,
       cogs,
-      expenses,
-      grossProfit,
       netProfit,
       profitMargin: revenue > 0 ? ((netProfit / revenue) * 100).toFixed(2) : 0,
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-const getExpenseReport = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const shopId = req.user.shop;
-    let dateFilter = {};
-
-    if (startDate && endDate) {
-      dateFilter = { expenseDate: { $gte: new Date(startDate), $lte: new Date(endDate) } };
-    }
-
-    const report = await Expense.aggregate([
-      { $match: { shop: shopId, ...dateFilter } },
-      {
-        $group: {
-          _id: '$category',
-          total: { $sum: '$amount' },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { total: -1 } },
-    ]);
-
-    const total = await Expense.aggregate([
-      { $match: { shop: shopId, ...dateFilter } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-
-    res.json({ report, total: total[0]?.total || 0 });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -231,4 +188,4 @@ const getTaxReport = async (req, res) => {
   }
 };
 
-module.exports = { getSalesReport, getProfitReport, getExpenseReport, getStockReport, getCustomerDueReport, getSupplierDueReport, getTaxReport };
+module.exports = { getSalesReport, getProfitReport, getStockReport, getCustomerDueReport, getSupplierDueReport, getTaxReport };

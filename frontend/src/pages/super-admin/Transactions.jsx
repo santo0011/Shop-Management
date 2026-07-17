@@ -29,7 +29,7 @@ const Transactions = () => {
               <tr key={sub._id}>
                 <td>{sub.shop?.name || 'N/A'}</td>
                 <td>{sub.plan?.name || 'N/A'}</td>
-                <td>৳{sub.totalAmount}</td>
+                <td>₹{sub.totalAmount}</td>
                 <td><span className={`badge ${sub.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{sub.status}</span></td>
                 <td>{new Date(sub.createdAt).toLocaleDateString()}</td>
               </tr>

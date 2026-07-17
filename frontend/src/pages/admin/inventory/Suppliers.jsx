@@ -1,23 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
-import { BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck } from 'react-icons/bi';
+import Swal from 'sweetalert2';
+import {
+  BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
+  BiUpload, BiDownload, BiFile, BiPaste, BiTable,
+  BiError, BiMessageSquare, BiRefresh, BiInfoCircle
+} from 'react-icons/bi';
+import * as XLSX from 'xlsx';
 
 const emptyForm = { name: '', nameBn: '', company: '', email: '', phone: '', address: '' };
-
 const REQUIRED_FIELDS = ['name', 'phone'];
+const IMPORT_TEMPLATE_COLS = ['name', 'phone', 'email', 'address', 'company', 'nameBn'];
 
 const validateField = (name, value) => {
   switch (name) {
-    case 'name':
-      return String(value || '').trim() ? '' : 'Supplier name is required';
-    case 'phone':
-      return String(value || '').trim() ? '' : 'Phone number is required';
-    default:
-      return '';
+    case 'name': return String(value || '').trim() ? '' : 'Supplier name is required';
+    case 'phone': return String(value || '').trim() ? '' : 'Phone number is required';
+    default: return '';
   }
 };
 
+// ─── Add/Edit Supplier Drawer ─────────────────────────────────────────────────
 const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
@@ -61,7 +65,6 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
       setErrors(newErrors);
       return;
     }
-
     setSaving(true);
     setSubmitError(null);
     try {
@@ -95,15 +98,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
         </div>
         <div className="drawer-body">
           {submitError && (
-            <div style={{
-              padding: '0.75rem 1rem',
-              borderRadius: 'var(--border-radius-md)',
-              background: 'var(--glow-danger)',
-              color: 'var(--danger)',
-              fontWeight: 500,
-              marginBottom: '1.25rem',
-              fontSize: '0.85rem',
-            }}>
+            <div className="alert alert-danger" style={{ fontSize: '0.85rem', padding: '0.75rem 1rem' }}>
               {submitError}
             </div>
           )}
@@ -111,7 +106,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.name')} (EN)</label>
+                  <label className="form-label">{t('auth.name')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
                   <input {...field('name')} placeholder="Enter supplier name" />
                   {errors.name && <div className="invalid-feedback-premium">{errors.name}</div>}
                 </div>
@@ -124,7 +119,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.phone')}</label>
+                  <label className="form-label">{t('auth.phone')} <span style={{ color: 'var(--danger)' }}>*</span></label>
                   <input {...field('phone')} placeholder="Enter phone number" />
                   {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
                 </div>
@@ -143,7 +138,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-0">
-                  <label className="form-label">{t('product.address') || 'Address'}</label>
+                  <label className="form-label">Address</label>
                   <input {...field('address')} placeholder="Enter address" />
                 </div>
               </div>
@@ -161,28 +156,557 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
   );
 };
 
+// ─── Bulk Import Drawer ──────────────────────────────────────────────────────
+const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
+  const [activeTab, setActiveTab] = useState('excel'); // 'excel' | 'paste'
+  const [excelData, setExcelData] = useState([]);
+  const [pasteData, setPasteData] = useState('');
+  const [parsedRows, setParsedRows] = useState([]);
+  const [errors, setErrors] = useState({});
+  const [duplicates, setDuplicates] = useState({});
+  const [existingSuppliers, setExistingSuppliers] = useState([]);
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // Reset state when drawer opens
+  useEffect(() => {
+    if (!open) return;
+    resetState();
+    loadExistingSuppliers();
+  }, [open]);
+
+  const resetState = () => {
+    setExcelData([]);
+    setPasteData('');
+    setParsedRows([]);
+    setErrors({});
+    setDuplicates({});
+    setShowPreview(false);
+    setImportResult(null);
+    setActiveTab('excel');
+  };
+
+  const loadExistingSuppliers = async () => {
+    try {
+      const { data } = await api.get('/suppliers?limit=10000');
+      setExistingSuppliers(data.suppliers || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ─── Detect Duplicates ──────────────────────────────────────────────────
+  const detectDuplicates = useCallback((rows) => {
+    const dupMap = {};
+    const errorMap = {};
+    rows.forEach((row, idx) => {
+      const rowErrors = [];
+      // Validate required fields
+      if (!row.name?.trim()) rowErrors.push('Name is required');
+      if (!row.phone?.trim()) rowErrors.push('Phone is required');
+
+      // Check duplicates against existing
+      const existing = existingSuppliers.find(s =>
+        s.phone === row.phone?.trim() || s.email?.toLowerCase() === row.email?.trim()?.toLowerCase()
+      );
+      if (existing) {
+        dupMap[idx] = existing;
+      }
+
+      if (rowErrors.length > 0) {
+        errorMap[idx] = rowErrors;
+      }
+    });
+    setErrors(errorMap);
+    setDuplicates(dupMap);
+    return { errorMap, dupMap };
+  }, [existingSuppliers]);
+
+  // ─── Excel/CSV Import ───────────────────────────────────────────────────
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+        if (jsonData.length === 0) {
+          Swal.fire({ icon: 'warning', title: 'Empty File', text: 'The file contains no data.', confirmButtonColor: '#6C63FF' });
+          return;
+        }
+
+        // Map column names (case-insensitive)
+        const mapped = jsonData.map(row => {
+          const keys = Object.keys(row).reduce((acc, key) => {
+            acc[key.toLowerCase().trim()] = row[key];
+            return acc;
+          }, {});
+          return {
+            name: keys.name || keys['supplier name'] || keys['supplier_name'] || '',
+            phone: String(keys.phone || keys['phone number'] || keys['phone_number'] || keys.mobile || ''),
+            email: keys.email || keys['e-mail'] || keys['email address'] || '',
+            address: keys.address || keys['address'] || '',
+            company: keys.company || keys['company name'] || keys['company_name'] || '',
+            nameBn: keys.namebn || keys['name_bn'] || keys['bangla name'] || keys['bangla_name'] || '',
+            previousDue: parseFloat(keys.previousdue || keys['previous due'] || keys['previous_due'] || keys.due || 0) || 0,
+          };
+        });
+
+        setExcelData(mapped);
+        setParsedRows(mapped);
+        setShowPreview(true);
+        detectDuplicates(mapped);
+      } catch (err) {
+        Swal.fire({ icon: 'error', title: 'Parse Error', text: 'Failed to parse the file. Please check the format.', confirmButtonColor: '#6C63FF' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // ─── Download Sample Template ───────────────────────────────────────────
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { name: 'ABC Traders', phone: '01711111111', email: 'abc@gmail.com', address: 'Dhaka', company: 'ABC Group', nameBn: 'এবিসি ট্রেডার্স' },
+      { name: 'XYZ Foods', phone: '01822222222', email: 'xyz@gmail.com', address: 'Kolkata', company: 'XYZ Ltd', nameBn: 'এক্সওয়াইজেড ফুডস' },
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Suppliers');
+    XLSX.writeFile(wb, 'supplier_import_template.xlsx');
+  };
+
+  // ─── Paste Import ───────────────────────────────────────────────────────
+  const handleParsePaste = () => {
+    if (!pasteData.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Empty Data', text: 'Please paste supplier data first.', confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    const lines = pasteData.split('\n').filter(line => line.trim());
+    const parsed = lines.map((line, idx) => {
+      // Support comma, tab, or pipe separated
+      const parts = line.includes('\t') ? line.split('\t') :
+                    line.includes('|') ? line.split('|') :
+                    line.split(',');
+      const cleanParts = parts.map(p => p.trim());
+      return {
+        name: cleanParts[0] || '',
+        phone: cleanParts[1] || '',
+        email: cleanParts[2] || '',
+        address: cleanParts[3] || '',
+        previousDue: parseFloat(cleanParts[4]) || 0,
+        company: cleanParts[5] || '',
+        nameBn: cleanParts[6] || '',
+      };
+    });
+
+    if (parsed.length === 0) {
+      Swal.fire({ icon: 'warning', title: 'No Data', text: 'Could not parse any rows from the pasted data.', confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    setParsedRows(parsed);
+    setShowPreview(true);
+    detectDuplicates(parsed);
+  };
+
+  // ─── Remove Row ─────────────────────────────────────────────────────────
+  const removeRow = (idx) => {
+    const updated = parsedRows.filter((_, i) => i !== idx);
+    setParsedRows(updated);
+    const newErrors = { ...errors };
+    const newDups = { ...duplicates };
+    // Re-index errors and duplicates
+    const reIndexedErrors = {};
+    const reIndexedDups = {};
+    updated.forEach((_, i) => {
+      // Map old indices
+      let oldIdx = -1;
+      let count = -1;
+      for (let j = 0; j < parsedRows.length; j++) {
+        if (j !== idx) count++;
+        if (count === i) { oldIdx = j; break; }
+      }
+      // Simplified: just re-detect
+    });
+    detectDuplicates(updated);
+  };
+
+  // ─── Import All ─────────────────────────────────────────────────────────
+  const handleImport = async () => {
+    const validRows = parsedRows.filter((row, idx) => {
+      if (errors[idx] && errors[idx].length > 0) return false;
+      if (skipDuplicates && duplicates[idx]) return false;
+      return true;
+    });
+
+    if (validRows.length === 0) {
+      Swal.fire({ icon: 'warning', title: 'No Valid Rows', text: 'All rows have errors or are duplicates. Fix them or disable skip duplicates.', confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    setImporting(true);
+    let imported = 0;
+    let updated = 0;
+    let failed = 0;
+    const failedDetails = [];
+
+    for (const row of validRows) {
+      try {
+        // Check if duplicate (update existing)
+        const existing = existingSuppliers.find(s =>
+          s.phone === row.phone?.trim() || (row.email && s.email?.toLowerCase() === row.email.toLowerCase())
+        );
+
+        const payload = {
+          name: row.name,
+          nameBn: row.nameBn || '',
+          company: row.company || '',
+          email: row.email || '',
+          phone: row.phone,
+          address: row.address || '',
+        };
+
+        if (existing && !skipDuplicates) {
+          // Update existing
+          await api.put(`/suppliers/${existing._id}`, payload);
+          updated++;
+        } else {
+          // Create new
+          await api.post('/suppliers', payload);
+          imported++;
+        }
+      } catch (err) {
+        failed++;
+        failedDetails.push(`${row.name}: ${err.response?.data?.message || err.message}`);
+      }
+    }
+
+    setImportResult({ total: parsedRows.length, imported, updated, failed, failedDetails });
+    setImporting(false);
+    onSuccess();
+  };
+
+  // ─── Get error count ────────────────────────────────────────────────────
+  const errorCount = Object.keys(errors).length;
+  const duplicateCount = Object.keys(duplicates).length;
+  const validCount = parsedRows.length - errorCount - (skipDuplicates ? duplicateCount : 0);
+
+  // ─── Render Row Status ──────────────────────────────────────────────────
+  const getRowStatus = (idx) => {
+    const rowErrors = errors[idx];
+    const isDup = duplicates[idx];
+    if (rowErrors && rowErrors.length > 0) return 'error';
+    if (isDup && skipDuplicates) return 'duplicate-skip';
+    if (isDup) return 'duplicate-update';
+    return 'valid';
+  };
+
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+      <div className={`drawer ${open ? 'open' : ''}`} style={{ width: '640px', maxWidth: '100vw' }}>
+        <div className="drawer-header">
+          <h5><BiUpload className="me-2" />Bulk Import Suppliers</h5>
+          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        </div>
+        <div className="drawer-body" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
+          {/* Tabs */}
+          <div className="bulk-import-tabs">
+            <button
+              className={`bulk-import-tab ${activeTab === 'excel' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('excel'); setShowPreview(false); setParsedRows([]); }}
+            >
+              <BiFile /> Excel / CSV Import
+            </button>
+            <button
+              className={`bulk-import-tab ${activeTab === 'paste' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('paste'); setShowPreview(false); setParsedRows([]); }}
+            >
+              <BiPaste /> Copy & Paste Import
+            </button>
+          </div>
+
+          <div style={{ padding: '1.25rem', flex: 1, overflowY: 'auto' }}>
+            {/* ─── Tab 1: Excel/CSV ────────────────────────────────────────── */}
+            {activeTab === 'excel' && !showPreview && (
+              <div className="bulk-import-upload-area">
+                <div className="bulk-import-upload-box">
+                  <BiUpload size={48} />
+                  <h6>Upload Excel or CSV File</h6>
+                  <p>Supports .xlsx, .xls, and .csv files</p>
+                  <div className="d-flex gap-2 justify-content-center flex-wrap">
+                    <button
+                      className="btn-premium btn-premium-primary"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <BiUpload /> Select File
+                    </button>
+                    <button
+                      className="btn-premium btn-premium-secondary"
+                      onClick={handleDownloadTemplate}
+                    >
+                      <BiDownload /> Download Template
+                    </button>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                  />
+                  <div className="bulk-import-format-info">
+                    <BiInfoCircle />
+                    <small>Expected columns: Name, Phone, Email, Address, Company, Name (Bangla)</small>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Tab 2: Paste ────────────────────────────────────────────── */}
+            {activeTab === 'paste' && !showPreview && (
+              <div className="bulk-import-paste-area">
+                <div className="bulk-import-paste-header">
+                  <BiPaste size={28} />
+                  <h6>Paste Supplier Data</h6>
+                </div>
+                <p className="bulk-import-paste-desc">
+                  Paste comma-separated values. One supplier per line.
+                </p>
+                <div className="bulk-import-format-example">
+                  <strong>Format:</strong> Supplier Name, Phone, Email, Address, Previous Due
+                </div>
+                <textarea
+                  className="bulk-import-textarea"
+                  rows={8}
+                  value={pasteData}
+                  onChange={(e) => setPasteData(e.target.value)}
+                  placeholder={`ABC Traders,01711111111,abc@gmail.com,Dhaka,5000\nXYZ Foods,01822222222,xyz@gmail.com,Kolkata,0`}
+                />
+                <button
+                  className="btn-premium btn-premium-primary w-100 mt-2"
+                  onClick={handleParsePaste}
+                >
+                  <BiTable /> Parse & Preview
+                </button>
+              </div>
+            )}
+
+            {/* ─── Preview Table ───────────────────────────────────────────── */}
+            {showPreview && parsedRows.length > 0 && (
+              <div className="bulk-import-preview">
+                {/* Summary Stats */}
+                <div className="bulk-import-summary">
+                  <div className="bulk-import-stat">
+                    <span className="bulk-import-stat-value">{parsedRows.length}</span>
+                    <span className="bulk-import-stat-label">Total Rows</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-valid">
+                    <span className="bulk-import-stat-value">{validCount}</span>
+                    <span className="bulk-import-stat-label">Valid</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-error">
+                    <span className="bulk-import-stat-value">{errorCount}</span>
+                    <span className="bulk-import-stat-label">Errors</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-dup">
+                    <span className="bulk-import-stat-value">{duplicateCount}</span>
+                    <span className="bulk-import-stat-label">Duplicates</span>
+                  </div>
+                </div>
+
+                {/* Duplicate handling toggle */}
+                {duplicateCount > 0 && (
+                  <div className="bulk-import-dup-toggle">
+                    <label className="bulk-import-toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={skipDuplicates}
+                        onChange={(e) => setSkipDuplicates(e.target.checked)}
+                      />
+                      <span>Skip duplicate suppliers ({duplicateCount} found)</span>
+                    </label>
+                    <span className="bulk-import-toggle-hint">
+                      Uncheck to update existing records instead
+                    </span>
+                  </div>
+                )}
+
+                {/* Import Result */}
+                {importResult && (
+                  <div className="bulk-import-result">
+                    <div className="bulk-import-result-icon">
+                      <BiCheck size={32} />
+                    </div>
+                    <h6>Import Complete</h6>
+                    <div className="bulk-import-result-stats">
+                      <span>Imported: <strong>{importResult.imported}</strong></span>
+                      <span>Updated: <strong>{importResult.updated}</strong></span>
+                      <span>Failed: <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
+                    </div>
+                    {importResult.failedDetails.length > 0 && (
+                      <div className="bulk-import-result-failures">
+                        <small>Failed rows:</small>
+                        {importResult.failedDetails.map((detail, i) => (
+                          <div key={i} className="bulk-import-failure-item">{detail}</div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      className="btn-premium btn-premium-primary mt-3"
+                      onClick={() => { setShowPreview(false); setImportResult(null); setParsedRows([]); }}
+                    >
+                      <BiRefresh /> Import More
+                    </button>
+                  </div>
+                )}
+
+                {/* Preview Table (hidden when import complete) */}
+                {!importResult && (
+                  <>
+                    <div className="bulk-import-preview-scroll">
+                      <table className="bulk-import-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '40px' }}>#</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>Address</th>
+                            <th>Company</th>
+                            <th style={{ width: '80px' }}>Status</th>
+                            <th style={{ width: '40px' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parsedRows.map((row, idx) => {
+                            const status = getRowStatus(idx);
+                            return (
+                              <tr key={idx} className={`bulk-import-row-${status}`}>
+                                <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{idx + 1}</td>
+                                <td>
+                                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{row.name || '-'}</div>
+                                  {row.nameBn && <small style={{ color: 'var(--text-muted)' }}>{row.nameBn}</small>}
+                                </td>
+                                <td style={{ fontSize: '0.85rem' }}>{row.phone || '-'}</td>
+                                <td style={{ fontSize: '0.85rem' }}>{row.email || '-'}</td>
+                                <td style={{ fontSize: '0.85rem', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.address || '-'}</td>
+                                <td style={{ fontSize: '0.85rem' }}>{row.company || '-'}</td>
+                                <td>
+                                  {status === 'error' && (
+                                    <span className="bulk-import-status-badge status-error" title={errors[idx]?.join(', ')}>
+                                      <BiError /> Error
+                                    </span>
+                                  )}
+                                  {status === 'duplicate-skip' && (
+                                    <span className="bulk-import-status-badge status-dup-skip" title={`Duplicate of ${duplicates[idx]?.name}`}>
+                                      <BiX /> Skip
+                                    </span>
+                                  )}
+                                  {status === 'duplicate-update' && (
+                                    <span className="bulk-import-status-badge status-dup-update" title={`Will update ${duplicates[idx]?.name}`}>
+                                      <BiRefresh /> Update
+                                    </span>
+                                  )}
+                                  {status === 'valid' && (
+                                    <span className="bulk-import-status-badge status-valid">
+                                      <BiCheck /> Valid
+                                    </span>
+                                  )}
+                                </td>
+                                <td>
+                                  <button
+                                    className="bulk-import-remove-row"
+                                    onClick={() => removeRow(idx)}
+                                    title="Remove row"
+                                  >
+                                    <BiX />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Error Details */}
+                    {errorCount > 0 && (
+                      <div className="bulk-import-errors-section">
+                        <h6><BiError /> Row Errors</h6>
+                        {Object.entries(errors).map(([idx, errs]) => (
+                          <div key={idx} className="bulk-import-error-item">
+                            <strong>Row {parseInt(idx) + 1}:</strong> {parsedRows[parseInt(idx)]?.name} — {errs.join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="bulk-import-actions">
+                      <button
+                        className="btn-premium btn-premium-secondary"
+                        onClick={() => { setShowPreview(false); setImportResult(null); }}
+                      >
+                        <BiX /> Cancel
+                      </button>
+                      <button
+                        className="btn-premium btn-premium-primary"
+                        onClick={handleImport}
+                        disabled={importing || validCount === 0}
+                      >
+                        {importing ? (
+                          <><span className="spinner-border spinner-border-sm" /> Importing...</>
+                        ) : (
+                          <><BiUpload /> Import {validCount} Supplier{validCount !== 1 ? 's' : ''}</>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ─── Main Suppliers Page ─────────────────────────────────────────────────────
 const Suppliers = () => {
   const { t } = useTranslation();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const isFirstLoad = useRef(true);
 
-  useEffect(() => {
-    fetchSuppliers();
-  }, []);
+  useEffect(() => { fetchSuppliers(); }, []);
 
   const fetchSuppliers = async () => {
-    setLoading(true);
+    const silent = !isFirstLoad.current;
+    if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/suppliers?search=${search}`);
+      const { data } = await api.get(`/suppliers?search=${search}`, { _skipLoading: silent });
       setSuppliers(data.suppliers);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (silent) setSearching(false); else setLoading(false);
+      isFirstLoad.current = false;
     }
   };
 
@@ -209,16 +733,21 @@ const Suppliers = () => {
   return (
     <div>
       {/* Page Header */}
-      <div className="d-flex align-items-center justify-content-between mb-4">
+      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.suppliers')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
             Manage your suppliers
           </p>
         </div>
-        <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
-          <BiPlus /> Add Supplier
-        </button>
+        <div className="d-flex gap-2">
+          <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
+            <BiUpload /> Bulk Import
+          </button>
+          <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
+            <BiPlus /> Add Supplier
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -231,11 +760,12 @@ const Suppliers = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {searching && <span className="search-box-spinner" aria-hidden="true" />}
         </div>
       </div>
 
       {/* Suppliers Table */}
-      <div className="table-container">
+      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -243,7 +773,7 @@ const Suppliers = () => {
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
                 <th>Email</th>
-                <th>{t('purchase.supplier')} Due</th>
+                <th>Due</th>
                 <th style={{ width: '120px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
@@ -270,8 +800,8 @@ const Suppliers = () => {
                   <td>{supplier.phone}</td>
                   <td>{supplier.email || '-'}</td>
                   <td>
-                    <span style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>
-                      ৳{supplier.dueAmount || 0}
+                    <span style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : {}}>
+                      ₹{supplier.dueAmount || 0}
                     </span>
                   </td>
                   <td>
@@ -300,6 +830,14 @@ const Suppliers = () => {
         t={t}
       />
 
+      {/* Bulk Import Drawer */}
+      <BulkImportDrawer
+        open={bulkImportOpen}
+        onClose={() => { setBulkImportOpen(false); }}
+        onSuccess={fetchSuppliers}
+        t={t}
+      />
+
       {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
@@ -309,8 +847,16 @@ const Suppliers = () => {
               <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
             </div>
             <div className="modal-premium-body text-center">
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--glow-danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 1.25rem' }}><BiTrash /></div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>Are you sure you want to delete this supplier? This action cannot be undone.</p>
+              <div style={{
+                width: '64px', height: '64px', borderRadius: '50%', background: 'var(--glow-danger)',
+                color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.8rem', margin: '0 auto 1.25rem'
+              }}>
+                <BiTrash />
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                Are you sure you want to delete this supplier? This action cannot be undone.
+              </p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
               <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>

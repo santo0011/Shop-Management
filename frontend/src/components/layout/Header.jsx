@@ -5,6 +5,7 @@ import { toggleTheme } from '../../redux/slices/themeSlice';
 import { updateLanguage } from '../../redux/slices/authSlice';
 import api from '../../services/api';
 import { BiMenu, BiSun, BiMoon, BiUser, BiGlobe, BiLogOut, BiBell } from 'react-icons/bi';
+import GlobalSearch from '../common/GlobalSearch';
 
 const Header = ({ onToggleSidebar }) => {
   const { t, i18n } = useTranslation();
@@ -52,6 +53,8 @@ const Header = ({ onToggleSidebar }) => {
           <BiMenu />
         </button>
       </div>
+
+      <GlobalSearch />
 
       <div className="header-right">
         {/* Language Switcher */}

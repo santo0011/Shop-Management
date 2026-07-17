@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import api from '../../../services/api';
 import { BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow } from 'react-icons/bi';
 import Swal from 'sweetalert2';
@@ -19,7 +20,7 @@ const validateField = (name, value) => {
   }
 };
 
-const CustomerDrawer = ({ open, onClose, onSuccess, editing, t }) => {
+const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFromView, t }) => {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
@@ -29,14 +30,15 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     if (!open) return;
     setErrors({});
     setSubmitError(null);
-    setForm(editing ? {
-      name: editing.name || '',
-      nameBn: editing.nameBn || '',
-      phone: editing.phone || '',
-      email: editing.email || '',
-      address: editing.address || '',
+    const data = viewing || editing;
+    setForm(data ? {
+      name: data.name || '',
+      nameBn: data.nameBn || '',
+      phone: data.phone || '',
+      email: data.email || '',
+      address: typeof data.address === 'object' ? Object.values(data.address).filter(Boolean).join(', ') : (data.address || ''),
     } : emptyForm);
-  }, [open, editing]);
+  }, [open, editing, viewing]);
 
   const handleChange = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -79,11 +81,182 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     }
   };
 
+  const isViewing = !!viewing;
+
   const field = (name) => ({
     className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
     value: form[name],
     onChange: (e) => handleChange(name, e.target.value),
+    readOnly: isViewing,
+    disabled: isViewing,
+    style: isViewing ? { background: 'var(--bg-input)', cursor: 'default', opacity: 0.8 } : {},
   });
+
+  if (isViewing) {
+    const data = viewing;
+    return (
+      <>
+        <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+        <div className={`drawer ${open ? 'open' : ''}`}>
+          <div className="drawer-header">
+            <h5>Customer Details</h5>
+            <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+          </div>
+          <div className="drawer-body">
+            {/* Profile Card */}
+            <div style={{
+              textAlign: 'center',
+              marginBottom: '1.5rem',
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.06), rgba(0, 217, 166, 0.06))',
+              borderRadius: 'var(--border-radius-lg)',
+              border: '1px solid rgba(108, 99, 255, 0.12)',
+            }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'var(--gradient-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '1.5rem',
+                fontWeight: 700,
+                margin: '0 auto 12px',
+                boxShadow: '0 4px 15px rgba(108, 99, 255, 0.3)',
+              }}>
+                {(data.name || '?').charAt(0).toUpperCase()}
+              </div>
+              <h4 style={{ margin: '0 0 4px', fontWeight: 700, color: 'var(--text-primary)' }}>{data.name}</h4>
+              {data.nameBn && <p style={{ margin: '0 0 8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{data.nameBn}</p>}
+              {data.phone && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 12px',
+                  background: 'rgba(0, 217, 166, 0.1)',
+                  borderRadius: '20px',
+                  color: 'var(--secondary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                }}>
+                  📞 {data.phone}
+                </div>
+              )}
+            </div>
+
+            {/* Info Cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-light)',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Email</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{data.email || '—'}</span>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-light)',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Address</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '60%' }}>
+                  {typeof data.address === 'object' ? Object.values(data.address).filter(Boolean).join(', ') : (data.address || '—')}
+                </span>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-light)',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Total Purchases</span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)' }}>₹{data.totalPurchases || 0}</span>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-light)',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Due Amount</span>
+                <span style={{
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  color: data.dueAmount > 0 ? 'var(--danger)' : 'var(--secondary)',
+                }}>
+                  ₹{data.dueAmount || 0}
+                </span>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-light)',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Loyalty Points</span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  color: 'var(--primary)',
+                  padding: '2px 10px',
+                  borderRadius: '20px',
+                  background: 'rgba(108, 99, 255, 0.1)',
+                }}>
+                  ⭐ {data.loyaltyPoints || 0} pts
+                </span>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderRadius: 'var(--border-radius-md)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-light)',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Customer Since</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  {data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="drawer-footer">
+            <button type="button" className="btn-premium btn-premium-primary" onClick={onClose}>
+              <BiCheck /> Close
+            </button>
+            <button type="button" className="btn-premium btn-premium-secondary" onClick={() => onEditFromView?.(data)}>
+              <BiEdit /> Edit
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -111,7 +284,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, t }) => {
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.name')} (EN)</label>
+                  <label className="form-label">{t('auth.name')} (EN) <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input {...field('name')} placeholder="Enter customer name" />
                   {errors.name && <div className="invalid-feedback-premium">{errors.name}</div>}
                 </div>
@@ -124,7 +297,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, t }) => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.phone')}</label>
+                  <label className="form-label">{t('auth.phone')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input {...field('phone')} placeholder="Enter phone number" />
                   {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
                 </div>
@@ -157,25 +330,41 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, t }) => {
 
 const Customers = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const isFirstLoad = useRef(true);
 
   useEffect(() => {
     fetchCustomers();
   }, []);
 
+  // Deep-link: open a specific customer's drawer when navigated here from Global Search.
+  useEffect(() => {
+    const openId = location.state?.openCustomerId;
+    if (!openId) return;
+    window.history.replaceState({}, document.title);
+    api.get(`/customers/${openId}`, { _skipLoading: true })
+      .then(({ data }) => { setViewing(data); setEditing(null); setDrawerOpen(true); })
+      .catch((err) => console.error(err));
+  }, [location.state]);
+
   const fetchCustomers = async () => {
-    setLoading(true);
+    const silent = !isFirstLoad.current;
+    if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/customers?search=${search}`);
+      const { data } = await api.get(`/customers?search=${search}`, { _skipLoading: silent });
       setCustomers(data.customers);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (silent) setSearching(false); else setLoading(false);
+      isFirstLoad.current = false;
     }
   };
 
@@ -184,8 +373,15 @@ const Customers = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const handleView = (customer) => {
+    setViewing(customer);
+    setEditing(null);
+    setDrawerOpen(true);
+  };
+
   const handleEdit = (customer) => {
     setEditing(customer);
+    setViewing(null);
     setDrawerOpen(true);
   };
 
@@ -237,7 +433,7 @@ const Customers = () => {
             Manage your customers
           </p>
         </div>
-        <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
+        <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setViewing(null); setDrawerOpen(true); }}>
           <BiPlus /> Add Customer
         </button>
       </div>
@@ -252,11 +448,12 @@ const Customers = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {searching && <span className="search-box-spinner" aria-hidden="true" />}
         </div>
       </div>
 
       {/* Customers Table */}
-      <div className="table-container">
+      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -290,10 +487,10 @@ const Customers = () => {
                     {customer.nameBn && <small style={{ color: 'var(--text-muted)' }}>{customer.nameBn}</small>}
                   </td>
                   <td>{customer.phone}</td>
-                  <td>৳{customer.totalPurchases || 0}</td>
+                  <td>₹{customer.totalPurchases || 0}</td>
                   <td>
                     <span style={customer.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>
-                      ৳{customer.dueAmount || 0}
+                      ₹{customer.dueAmount || 0}
                     </span>
                   </td>
                   <td>
@@ -310,7 +507,7 @@ const Customers = () => {
                   </td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip="View">
+                      <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(customer)}>
                         <BiShow />
                       </button>
                       <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(customer)}>
@@ -331,9 +528,11 @@ const Customers = () => {
       {/* Add / Edit Customer Drawer */}
       <CustomerDrawer
         open={drawerOpen}
-        onClose={() => { setDrawerOpen(false); setEditing(null); }}
+        onClose={() => { setDrawerOpen(false); setEditing(null); setViewing(null); }}
         onSuccess={fetchCustomers}
         editing={editing}
+        viewing={viewing}
+        onEditFromView={(customer) => { setDrawerOpen(false); setViewing(null); setTimeout(() => { setEditing(customer); setDrawerOpen(true); }, 200); }}
         t={t}
       />
     </div>

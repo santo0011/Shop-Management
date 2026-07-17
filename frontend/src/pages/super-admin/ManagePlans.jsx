@@ -3,10 +3,30 @@ import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { BiPlus, BiEdit, BiTrash, BiStore, BiX, BiCheck, BiDollar, BiUser, BiPackage, BiStar } from 'react-icons/bi';
 
+const REQUIRED_PLAN_FIELDS = ['name', 'price', 'duration'];
+
+const validatePlanField = (name, value) => {
+  switch (name) {
+    case 'name':
+      return String(value || '').trim() ? '' : 'Plan name is required';
+    case 'price':
+      return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid price';
+    case 'duration':
+      return value ? '' : 'Duration is required';
+    case 'maxUsers':
+      return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid number';
+    case 'maxProducts':
+      return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid number';
+    default:
+      return '';
+  }
+};
+
 const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [errors, setErrors] = useState({});
   const [form, setForm] = useState({
     name: '', nameBn: '', duration: 'monthly', price: '',
     description: '', features: [], isPopular: false,
@@ -30,6 +50,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
     } else {
       setForm({ name: '', nameBn: '', duration: 'monthly', price: '', description: '', features: [], isPopular: false, maxUsers: 1, maxProducts: 100 });
     }
+    setErrors({});
     setError(null);
     setFeatureInput('');
   }, [editing, plan, open]);
@@ -45,8 +66,30 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
     setForm({ ...form, features: form.features.filter((_, i) => i !== index) });
   };
 
+  const handleChange = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const msg = validatePlanField(name, value);
+      const next = { ...prev };
+      if (msg) next[name] = msg; else delete next[name];
+      return next;
+    });
+    if (error) setError(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const newErrors = {};
+    REQUIRED_PLAN_FIELDS.forEach((field) => {
+      const msg = validatePlanField(field, form[field]);
+      if (msg) newErrors[field] = msg;
+    });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -55,6 +98,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
       } else {
         await api.post('/plans', form);
       }
+      setErrors({});
       onSuccess();
       onClose();
     } catch (err) {
@@ -63,6 +107,12 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
       setLoading(false);
     }
   };
+
+  const field = (name) => ({
+    className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
+    value: form[name],
+    onChange: (e) => handleChange(name, e.target.value),
+  });
 
   return (
     <>
@@ -76,58 +126,67 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
           {error && (
             <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--border-radius-md)', background: 'var(--glow-danger)', color: 'var(--danger)', fontWeight: 500, marginBottom: '1.25rem', fontSize: '0.85rem' }}>{error}</div>
           )}
-          <form onSubmit={handleSubmit} id="plan-form">
+          <form onSubmit={handleSubmit} id="plan-form" noValidate>
             <div className="row g-3">
               <div className="col-6">
                 <div className="form-group">
-                  <label className="form-label">Plan Name</label>
-                  <input className="form-control" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Starter" required />
+                  <label className="form-label">Plan Name <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input {...field('name')} placeholder="e.g. Starter" />
+                  {errors.name && <div className="invalid-feedback-premium">{errors.name}</div>}
                 </div>
               </div>
               <div className="col-6">
                 <div className="form-group">
                   <label className="form-label">Name (Bengali)</label>
-                  <input className="form-control" value={form.nameBn} onChange={e => setForm({...form, nameBn: e.target.value})} placeholder="বাংলা নাম" />
+                  <input {...field('nameBn')} placeholder="বাংলা নাম" />
                 </div>
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label className="form-label">Duration</label>
-                  <select className="form-select" value={form.duration} onChange={e => setForm({...form, duration: e.target.value})}>
+                  <label className="form-label">Duration <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <select
+                    className={`form-select ${errors.duration ? 'is-invalid' : ''}`}
+                    value={form.duration}
+                    onChange={(e) => handleChange('duration', e.target.value)}
+                  >
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
                     <option value="yearly">Yearly</option>
                   </select>
+                  {errors.duration && <div className="invalid-feedback-premium">{errors.duration}</div>}
                 </div>
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label className="form-label"><BiDollar style={{ marginRight: '4px' }} />Price</label>
-                  <input type="number" className="form-control" value={form.price} onChange={e => setForm({...form, price: e.target.value})} placeholder="0" required />
+                  <label className="form-label"><BiDollar style={{ marginRight: '4px' }} />Price <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input type="number" {...field('price')} placeholder="0" />
+                  {errors.price && <div className="invalid-feedback-premium">{errors.price}</div>}
                 </div>
               </div>
               <div className="col-4">
                 <div className="form-group">
                   <label className="form-label"><BiUser style={{ marginRight: '4px' }} />Max Users</label>
-                  <input type="number" className="form-control" value={form.maxUsers} onChange={e => setForm({...form, maxUsers: e.target.value})} />
+                  <input type="number" {...field('maxUsers')} />
+                  {errors.maxUsers && <div className="invalid-feedback-premium">{errors.maxUsers}</div>}
                 </div>
               </div>
               <div className="col-6">
                 <div className="form-group">
                   <label className="form-label"><BiPackage style={{ marginRight: '4px' }} />Max Products</label>
-                  <input type="number" className="form-control" value={form.maxProducts} onChange={e => setForm({...form, maxProducts: e.target.value})} />
+                  <input type="number" {...field('maxProducts')} />
+                  {errors.maxProducts && <div className="invalid-feedback-premium">{errors.maxProducts}</div>}
                 </div>
               </div>
               <div className="col-6 d-flex align-items-end">
                 <div className="form-check mb-3">
-                  <input type="checkbox" className="form-check-input" id="isPopular" checked={form.isPopular} onChange={e => setForm({...form, isPopular: e.target.checked})} />
+                  <input type="checkbox" className="form-check-input" id="isPopular" checked={form.isPopular} onChange={e => handleChange('isPopular', e.target.checked)} />
                   <label className="form-check-label" htmlFor="isPopular"><BiStar style={{ marginRight: '4px', color: 'var(--warning)' }} />Popular Plan</label>
                 </div>
               </div>
               <div className="col-12">
                 <div className="form-group">
                   <label className="form-label">Description</label>
-                  <textarea className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={2} placeholder="Plan description" />
+                  <textarea className="form-control" value={form.description} onChange={e => handleChange('description', e.target.value)} rows={2} placeholder="Plan description" />
                 </div>
               </div>
               <div className="col-12">
@@ -209,69 +268,78 @@ const ManagePlans = () => {
       {/* Page Header */}
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
-          <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.plans')}</h4>
+          <h4 className="mb-1" style={{ fontWeight: 800 }}>Subscription Plans</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
             Manage subscription plans and pricing
           </p>
         </div>
         <button className="btn-premium btn-premium-primary" onClick={openCreateDrawer}>
-          <BiPlus /> {t('common.create')}
+          <BiPlus /> Create Plan
         </button>
       </div>
 
       {/* Plans Grid */}
-      {loading ? (
-        <div className="text-center py-5"><div className="spinner-border spinner-border-sm" /> Loading...</div>
-      ) : plans.length === 0 ? (
-        <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📋</div>
-          No plans found
-        </div>
-      ) : (
-        <div className="row g-3">
-          {plans.map(plan => (
-            <div key={plan._id} className="col-md-6 col-lg-4">
-              <div className="premium-card" style={{ position: 'relative', overflow: 'visible' }}>
-                {plan.isPopular && (
-                  <span style={{ position: 'absolute', top: '-10px', right: '16px', padding: '4px 12px', borderRadius: '50px', background: 'var(--gradient-primary)', color: '#fff', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Popular
-                  </span>
-                )}
-                <div className="premium-card-body text-center">
-                  <h5 style={{ fontWeight: 700 }}>{plan.name}</h5>
-                  {plan.nameBn && <small style={{ color: 'var(--text-muted)' }}>{plan.nameBn}</small>}
-                  <h2 style={{ color: 'var(--primary)', fontWeight: 800, margin: '1rem 0 0.25rem' }}>৳{plan.price}</h2>
-                  <small style={{ color: 'var(--text-secondary)', textTransform: 'capitalize' }}>per {plan.duration}</small>
-
-                  <div className="mt-3 mb-3" style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
-                    {(plan.features || []).map((f, i) => (
-                      <div key={i} className="d-flex align-items-center gap-2 mb-2" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        <BiCheck style={{ color: 'var(--secondary)', fontSize: '1rem', flexShrink: 0 }} />
-                        {f}
-                      </div>
-                    ))}
+      <div className="row g-3">
+        {loading ? (
+          <div className="col-12 text-center py-5">
+            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="col-12 text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📋</div>
+            No plans found
+          </div>
+        ) : plans.map((plan) => (
+          <div key={plan._id} className="col-md-4">
+            <div className={`premium-card ${plan.isPopular ? 'border-primary' : ''}`}>
+              <div className="premium-card-body">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div>
+                    <h5 className="mb-0" style={{ fontWeight: 700 }}>{plan.name}</h5>
+                    {plan.nameBn && <small style={{ color: 'var(--text-muted)' }}>{plan.nameBn}</small>}
                   </div>
-
-                  <div className="d-flex gap-2 justify-content-center">
-                    <button className="btn-premium btn-premium-sm btn-premium-secondary" onClick={() => openEditDrawer(plan)}>
-                      <BiEdit /> Edit
-                    </button>
-                    <button className="btn-premium btn-premium-sm btn-premium-danger" onClick={() => setDeleteConfirm(plan._id)}>
-                      <BiTrash /> Delete
-                    </button>
-                  </div>
+                  {plan.isPopular && <span className="badge badge-primary">Popular</span>}
+                </div>
+                <div className="mb-3">
+                  <span style={{ fontSize: '2rem', fontWeight: 800 }}>₹{plan.price}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>/{plan.duration}</span>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{plan.description}</p>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  <div><BiUser style={{ marginRight: '4px' }} />{plan.maxUsers} Users</div>
+                  <div><BiPackage style={{ marginRight: '4px' }} />{plan.maxProducts} Products</div>
+                </div>
+                <div className="d-flex gap-2 mt-3">
+                  <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => openEditDrawer(plan)}>
+                    <BiEdit /> Edit
+                  </button>
+                  <button className="btn-premium btn-premium-danger btn-premium-sm" onClick={() => setDeleteConfirm(plan._id)}>
+                    <BiTrash /> Delete
+                  </button>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add / Edit Plan Drawer */}
+      <PlanDrawer
+        open={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setEditing(false); setEditingPlan(null); }}
+        onSuccess={fetchPlans}
+        editing={editing}
+        plan={editingPlan}
+      />
 
       {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-premium-header"><h5>Delete Plan</h5><button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button></div>
+          <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-premium-header">
+              <h5>Delete Plan</h5>
+              <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
+            </div>
             <div className="modal-premium-body text-center">
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--glow-danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 1.25rem' }}><BiTrash /></div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>Are you sure you want to delete this plan? This action cannot be undone.</p>
@@ -283,15 +351,6 @@ const ManagePlans = () => {
           </div>
         </div>
       )}
-
-      {/* Plan Drawer */}
-      <PlanDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onSuccess={fetchPlans}
-        editing={editing}
-        plan={editingPlan}
-      />
     </div>
   );
 };

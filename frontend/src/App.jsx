@@ -19,7 +19,6 @@ import Suppliers from './pages/admin/inventory/Suppliers';
 import Customers from './pages/admin/inventory/Customers';
 import Purchases from './pages/admin/inventory/Purchases';
 import Sales from './pages/admin/Sales';
-import Expense from './pages/admin/Expense';
 import POS from './pages/admin/POS';
 import Reports from './pages/admin/Reports';
 import Subscription from './pages/admin/Subscription';
@@ -30,15 +29,16 @@ import SuperDashboard from './pages/super-admin/Dashboard';
 import ManageShops from './pages/super-admin/ManageShops';
 import ManagePlans from './pages/super-admin/ManagePlans';
 import Transactions from './pages/super-admin/Transactions';
+import SuperAdminSettings from './pages/super-admin/Settings';
 
 // Common
-import Loading from './components/common/Loading';
+import LoadingOverlay from './components/common/LoadingOverlay';
 
 const PrivateRoute = ({ children, role }) => {
   const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
 
   if (loading) {
-    return <Loading text="Checking authentication..." />;
+    return null; // LoadingOverlay handles this globally via API calls
   }
 
   if (!isAuthenticated) {
@@ -88,6 +88,7 @@ function App() {
 
   return (
     <Router>
+      <LoadingOverlay />
       <Routes>
         {/* Auth Routes */}
         <Route 
@@ -112,6 +113,7 @@ function App() {
           <Route path="shops" element={<ManageShops />} />
           <Route path="plans" element={<ManagePlans />} />
           <Route path="transactions" element={<Transactions />} />
+          <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
 
         {/* Admin Routes */}
@@ -132,7 +134,6 @@ function App() {
           <Route path="customers" element={<Customers />} />
           <Route path="purchases" element={<Purchases />} />
           <Route path="sales" element={<Sales />} />
-          <Route path="expenses" element={<Expense />} />
           <Route path="reports" element={<Reports />} />
           <Route path="subscription" element={<Subscription />} />
           <Route path="settings" element={<Settings />} />

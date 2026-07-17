@@ -40,4 +40,7 @@ const categorySchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Unique compound index: category name must be unique within a shop
+categorySchema.index({ name: 1, shop: 1 }, { unique: true });
+
 module.exports = mongoose.model('Category', categorySchema);

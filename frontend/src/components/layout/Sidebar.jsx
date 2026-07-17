@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import {
   BiGridAlt, BiCart, BiPackage, BiCategory, BiCar, BiGroup,
-  BiReceipt, BiDollar, BiWallet, BiLineChart, BiCog,
+  BiReceipt, BiDollar, BiLineChart, BiCog,
   BiCreditCard, BiLogOut, BiStore, BiX
 } from 'react-icons/bi';
 
@@ -27,7 +27,6 @@ const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
 
   const financeMenu = [
     { path: '/sales', icon: BiDollar, label: t('nav.sales') },
-    { path: '/expenses', icon: BiWallet, label: t('nav.expenses') },
     { path: '/reports', icon: BiLineChart, label: t('nav.reports') },
   ];
 

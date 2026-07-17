@@ -3,11 +3,12 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSelector, useDispatch } from 'react-redux';
 import { toggleTheme } from '../../redux/slices/themeSlice';
-import ConfirmModal from '../common/ConfirmModal';
+import { logout } from '../../redux/slices/authSlice';
+import Swal from 'sweetalert2';
 import {
   BiGridAlt, BiStore, BiSun, BiMoon,
-  BiLogOut, BiMenu, BiGlobe, BiUser, BiX,
-  BiCog, BiTrendingUp, BiDollar
+  BiMenu, BiGlobe, BiUser, BiX,
+  BiCog, BiTrendingUp, BiDollar, BiLogOut
 } from 'react-icons/bi';
 
 const SuperAdminLayout = () => {
@@ -63,7 +64,7 @@ const SuperAdminLayout = () => {
     },
   ];
 
-  const handleNavClick = (item) => {
+  const handleNavClick = () => {
     if (window.innerWidth <= 991.98) setMobileOpen(false);
   };
 
@@ -78,15 +79,27 @@ const SuperAdminLayout = () => {
     }
   };
 
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-
   const handleLogout = () => {
-    setLogoutConfirmOpen(true);
-  };
-
-  const confirmLogout = () => {
-    localStorage.clear();
-    window.location.href = '/login';
+    Swal.fire({
+      title: 'Are you sure?',
+      text: 'You will be logged out from the system.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#FF6B6B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, logout!',
+      cancelButtonText: 'Cancel',
+      background: 'var(--bg-card)',
+      color: 'var(--text-primary)',
+      reverseButtons: true,
+      iconColor: '#FF6B6B',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        dispatch(logout());
+        localStorage.clear();
+        navigate('/login', { replace: true });
+      }
+    });
   };
 
   const toggleSidebar = () => {
@@ -128,7 +141,7 @@ const SuperAdminLayout = () => {
                   to={item.path}
                   end={item.end}
                   className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => handleNavClick(item)}
+                  onClick={handleNavClick}
                 >
                   <item.icon className="nav-icon" />
                   <span className="nav-label">{item.label}</span>
@@ -137,26 +150,7 @@ const SuperAdminLayout = () => {
             </div>
           ))}
         </div>
-
-        <div className="sidebar-footer">
-          <div className="nav-item" onClick={handleLogout}>
-            <BiLogOut className="nav-icon" />
-            <span className="nav-label">{t('nav.logout')}</span>
-          </div>
-        </div>
       </div>
-
-      {/* Logout Confirmation Modal */}
-      <ConfirmModal
-        open={logoutConfirmOpen}
-        onClose={() => setLogoutConfirmOpen(false)}
-        onConfirm={confirmLogout}
-        title="Are you sure?"
-        message="You will be logged out from the system."
-        confirmText="Logout"
-        cancelText="Cancel"
-        variant="danger"
-      />
 
       {/* Main Content */}
       <div className={`main-content ${!sidebarOpen ? 'expanded' : ''}`}>
@@ -200,8 +194,8 @@ const SuperAdminLayout = () => {
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{user?.email}</div>
                   </div>
                   <div className="dropdown-divider-premium" />
-                  <button className="dropdown-item-premium" onClick={handleLogout}>
-                    <BiLogOut /> {t('nav.logout')}
+                  <button className="dropdown-item-premium" onClick={handleLogout} style={{ color: 'var(--danger)' }}>
+                    <BiLogOut /> Logout
                   </button>
                 </div>
               )}

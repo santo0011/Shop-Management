@@ -208,6 +208,28 @@ const getShopStats = async (req, res) => {
   }
 };
 
+// @desc    Update my shop settings (tax, footer, etc.)
+// @route   PUT /api/shops/settings
+const updateMyShopSettings = async (req, res) => {
+  try {
+    const shop = await Shop.findById(req.user.shop);
+    if (!shop) {
+      return res.status(404).json({ message: 'Shop not found' });
+    }
+
+    const { taxRate, taxName, receiptFooter } = req.body;
+
+    if (taxRate !== undefined) shop.settings.taxRate = Math.max(0, Math.min(100, Number(taxRate)));
+    if (taxName !== undefined) shop.settings.taxName = taxName;
+    if (receiptFooter !== undefined) shop.settings.receiptFooter = receiptFooter;
+
+    await shop.save();
+    res.json(shop);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getShops,
   getShop,
@@ -216,4 +238,5 @@ module.exports = {
   toggleShopStatus,
   getMyShop,
   getShopStats,
+  updateMyShopSettings,
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
 import { BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow } from 'react-icons/bi';
@@ -147,7 +147,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, editing, t }) => {
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="form-group mb-0">
-                  <label className="form-label">{t('purchase.supplier')}</label>
+                  <label className="form-label">{t('purchase.supplier')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <select
                     className={`form-select ${errors.supplier ? 'is-invalid' : ''}`}
                     value={form.supplier}
@@ -161,7 +161,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, editing, t }) => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-0">
-                  <label className="form-label">{t('purchase.invoiceNo')}</label>
+                  <label className="form-label">{t('purchase.invoiceNo')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input {...field('invoiceNo')} placeholder="Enter invoice number" />
                   {errors.invoiceNo && <div className="invalid-feedback-premium">{errors.invoiceNo}</div>}
                 </div>
@@ -243,24 +243,28 @@ const Purchases = () => {
   const { t } = useTranslation();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const isFirstLoad = useRef(true);
 
   useEffect(() => {
     fetchPurchases();
   }, []);
 
   const fetchPurchases = async () => {
-    setLoading(true);
+    const silent = !isFirstLoad.current;
+    if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/purchases?search=${search}`);
+      const { data } = await api.get(`/purchases?search=${search}`, { _skipLoading: silent });
       setPurchases(data.purchases);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (silent) setSearching(false); else setLoading(false);
+      isFirstLoad.current = false;
     }
   };
 
@@ -348,11 +352,12 @@ const Purchases = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {searching && <span className="search-box-spinner" aria-hidden="true" />}
         </div>
       </div>
 
       {/* Purchases Table */}
-      <div className="table-container">
+      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -386,11 +391,11 @@ const Purchases = () => {
                     <div style={{ fontWeight: 600 }}>{purchase.invoiceNo}</div>
                   </td>
                   <td>{purchase.supplier?.name || '-'}</td>
-                  <td>৳{purchase.totalAmount}</td>
-                  <td>৳{purchase.paidAmount}</td>
+                  <td>₹{purchase.totalAmount}</td>
+                  <td>₹{purchase.paidAmount}</td>
                   <td>
                     <span style={purchase.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>
-                      ৳{purchase.dueAmount}
+                      ₹{purchase.dueAmount}
                     </span>
                   </td>
                   <td>{getStatusBadge(purchase.paymentStatus)}</td>

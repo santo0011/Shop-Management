@@ -67,7 +67,7 @@ const Subscription = () => {
             <div className={`glass-card p-4 text-center ${plan.isPopular ? 'border border-primary' : ''}`}>
               {plan.isPopular && <span className="badge badge-primary mb-2">Popular</span>}
               <h5>{plan.name}</h5>
-              <h2 className="my-3" style={{ color: 'var(--primary-color)' }}>৳{plan.price}</h2>
+              <h2 className="my-3" style={{ color: 'var(--primary-color)' }}>₹{plan.price}</h2>
               <small className="d-block mb-3">{plan.duration === 'monthly' ? t('subscription.monthly') : plan.duration === 'quarterly' ? t('subscription.quarterly') : t('subscription.yearly')}</small>
               <ul className="list-unstyled mb-4">
                 {(plan.features || []).map((f, i) => <li key={i} className="mb-2">✓ {f}</li>)}

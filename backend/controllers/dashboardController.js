@@ -1,15 +1,14 @@
 const Sale = require('../models/Sale');
 const Purchase = require('../models/Purchase');
-const Expense = require('../models/Expense');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Supplier = require('../models/Supplier');
+const { getTodayRangeIST } = require('../utils/dateRange');
 
 const getDashboardStats = async (req, res) => {
   try {
     const shopId = req.user.shop;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { start: today } = getTodayRangeIST();
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
@@ -31,17 +30,10 @@ const getDashboardStats = async (req, res) => {
       { $group: { _id: null, total: { $sum: '$totalAmount' } } },
     ]);
 
-    // Monthly expenses
-    const monthlyExpenses = await Expense.aggregate([
-      { $match: { shop: shopId, expenseDate: { $gte: startOfMonth } } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-
-    // Profit = (monthly sales - monthly purchases - monthly expenses)
+    // Profit = (monthly sales - monthly purchases)
     const totalSales = monthlySales[0]?.total || 0;
     const totalPurchases = monthlyPurchases[0]?.total || 0;
-    const totalExpenses = monthlyExpenses[0]?.total || 0;
-    const profit = totalSales - totalPurchases - totalExpenses;
+    const profit = totalSales - totalPurchases;
 
     // Low stock products
     const lowStockProducts = await Product.countDocuments({
@@ -76,7 +68,6 @@ const getDashboardStats = async (req, res) => {
       monthlySales: totalSales,
       monthlySalesCount: monthlySales[0]?.count || 0,
       monthlyPurchases: totalPurchases,
-      monthlyExpenses: totalExpenses,
       profit,
       lowStockProducts,
       totalProducts,
@@ -180,10 +171,10 @@ const getRecentTransactions = async (req, res) => {
     const shopId = req.user.shop;
 
     const recentSales = await Sale.find({ shop: shopId })
-      .populate('customer', 'name')
+      .populate('customer', 'name phone')
       .sort({ createdAt: -1 })
-      .limit(5)
-      .select('invoiceNo totalAmount paymentStatus createdAt');
+      .limit(7)
+      .select('invoiceNo totalAmount paidAmount dueAmount paymentStatus paymentMethod createdAt customer');
 
     res.json(recentSales);
   } catch (error) {
