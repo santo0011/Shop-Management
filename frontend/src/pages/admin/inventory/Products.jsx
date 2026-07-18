@@ -4,10 +4,13 @@ import { useLocation } from 'react-router-dom';
 import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ProductDrawer from '../../../components/common/ProductDrawer';
+import ExpandableCard from '../../../components/common/ExpandableCard';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
-  BiError, BiRefresh, BiInfoCircle, BiLoader
+  BiError, BiRefresh, BiInfoCircle, BiLoader,
+  BiShow, BiCategory, BiBarcode, BiCart, BiPackage,
+  BiCalendar, BiDollar, BiStore
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
 
@@ -783,8 +786,8 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Products Table */}
-      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
+      {/* ─── Desktop Table ─────────────────────────────────────────────── */}
+      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -846,6 +849,101 @@ const Products = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
+      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
+        {loading ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
+            No products found
+          </div>
+        ) : products.map((product) => (
+          <ExpandableCard
+            key={product._id}
+            compact={
+              <>
+                <div className="expandable-card__compact-row">
+                  <span className="expandable-card__name">{product.name}</span>
+                  <span className="expandable-card__price">₹{product.sellingPrice}</span>
+                </div>
+                <div className="expandable-card__meta">
+                  <span className="expandable-card__meta-item">
+                    <BiPackage />
+                    <strong>{product.stock}</strong> {product.unit}
+                  </span>
+                  <span className={`expandable-card__stock ${product.stock <= product.minStock ? 'expandable-card__stock--low' : 'expandable-card__stock--ok'}`}>
+                    {product.stock <= product.minStock ? 'Low Stock' : 'In Stock'}
+                  </span>
+                </div>
+              </>
+            }
+            expanded={
+              <div className="expandable-card__rows">
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Category</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{product.category?.name || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Barcode</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value expandable-card__row-value--mono">{product.barcode || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Purchase Price</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">₹{product.purchasePrice || 0}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Wholesale Price</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">₹{product.wholesalePrice || 0}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Unit</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{product.unit || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Min Stock</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{product.minStock || 0}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Status</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">
+                    {product.stock <= product.minStock ? (
+                      <span className="badge badge-danger">{t('common.lowStock') || 'Low'}</span>
+                    ) : (
+                      <span className="badge badge-success">{t('common.active')}</span>
+                    )}
+                  </span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{new Date(product.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            }
+            actions={
+              <>
+                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(product)}>
+                  <BiEdit />
+                </button>
+                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(product._id)}>
+                  <BiTrash />
+                </button>
+              </>
+            }
+          />
+        ))}
       </div>
 
       {/* Add / Edit Product Drawer */}

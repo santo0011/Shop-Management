@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import api from '../../../services/api';
-import { BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow } from 'react-icons/bi';
+import ExpandableCard from '../../../components/common/ExpandableCard';
+import { BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow, BiPhone, BiEnvelope, BiMapPin, BiDollar, BiCalendar, BiUser, BiWallet, BiAward } from 'react-icons/bi';
 import Swal from 'sweetalert2';
 
 const emptyForm = { name: '', nameBn: '', phone: '', email: '', address: '' };
@@ -83,13 +84,17 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
 
   const isViewing = !!viewing;
 
+  const inputStyle = { padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px', height: '40px' };
+  const labelStyle = { fontSize: '0.72rem', marginBottom: '0.2rem' };
+  const errorStyle = { fontSize: '0.7rem', marginTop: '0.1rem' };
+
   const field = (name) => ({
     className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
     value: form[name],
     onChange: (e) => handleChange(name, e.target.value),
     readOnly: isViewing,
     disabled: isViewing,
-    style: isViewing ? { background: 'var(--bg-input)', cursor: 'default', opacity: 0.8 } : {},
+    style: isViewing ? { background: 'var(--bg-input)', cursor: 'default', opacity: 0.8 } : inputStyle,
   });
 
   if (isViewing) {
@@ -262,64 +267,61 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
-        <div className="drawer-header">
-          <h5>{editing ? 'Edit Customer' : 'Add Customer'}</h5>
-          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        <div className="drawer-header" style={{ padding: '0.85rem 1.25rem', minHeight: 'auto' }}>
+          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? 'Edit Customer' : 'Add Customer'}</h5>
+          <button className="btn-close-premium" onClick={onClose} style={{ width: '32px', height: '32px' }}><BiX /></button>
         </div>
-        <div className="drawer-body">
+        <div className="drawer-body customer-drawer-body" style={{ padding: '0.85rem 1rem 0.4rem 1rem' }}>
           {submitError && (
             <div style={{
-              padding: '0.75rem 1rem',
-              borderRadius: 'var(--border-radius-md)',
+              padding: '0.5rem 0.75rem',
+              borderRadius: 'var(--border-radius-sm)',
               background: 'var(--glow-danger)',
               color: 'var(--danger)',
               fontWeight: 500,
-              marginBottom: '1.25rem',
-              fontSize: '0.85rem',
+              marginBottom: '0.6rem',
+              fontSize: '0.78rem',
             }}>
               {submitError}
             </div>
           )}
           <form onSubmit={handleSubmit} id="customer-form" noValidate>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.name')} (EN) <span style={{color: 'var(--danger)'}}>*</span></label>
-                  <input {...field('name')} placeholder="Enter customer name" />
-                  {errors.name && <div className="invalid-feedback-premium">{errors.name}</div>}
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {/* Customer Name - full width */}
+              <div>
+                <label className="form-label" style={labelStyle}>{t('auth.name')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input {...field('name')} placeholder="Enter customer name" />
+                {errors.name && <div className="invalid-feedback-premium" style={errorStyle}>{errors.name}</div>}
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.name')} (BN)</label>
+              {/* 2-col row: Name (BN) + Phone */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label className="form-label" style={labelStyle}>{t('auth.name')} (BN)</label>
                   <input {...field('nameBn')} placeholder="গ্রাহকের নাম লিখুন" />
                 </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.phone')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                <div>
+                  <label className="form-label" style={labelStyle}>{t('auth.phone')} <span style={{ color: 'var(--danger)' }}>*</span></label>
                   <input {...field('phone')} placeholder="Enter phone number" />
-                  {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
+                  {errors.phone && <div className="invalid-feedback-premium" style={errorStyle}>{errors.phone}</div>}
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">Email</label>
+              {/* 2-col row: Email + Address */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label className="form-label" style={labelStyle}>Email</label>
                   <input type="email" {...field('email')} placeholder="Enter email address" />
                 </div>
-              </div>
-              <div className="col-12">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('product.address') || 'Address'}</label>
-                  <textarea className={`form-control ${errors.address ? 'is-invalid' : ''}`} rows="3" value={form.address} onChange={(e) => handleChange('address', e.target.value)} placeholder="Enter address" />
+                <div>
+                  <label className="form-label" style={labelStyle}>Address</label>
+                  <input {...field('address')} placeholder="Enter address" />
                 </div>
               </div>
             </div>
           </form>
         </div>
-        <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="submit" form="customer-form" className="btn-premium btn-premium-primary" disabled={saving}>
+        <div className="drawer-footer customer-drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>{t('common.cancel')}</button>
+          <button type="submit" form="customer-form" className="btn-premium btn-premium-primary" disabled={saving} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
             {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
           </button>
         </div>
@@ -451,8 +453,8 @@ const Customers = () => {
         </div>
       </div>
 
-      {/* Customers Table */}
-      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
+      {/* ─── Desktop Table ─────────────────────────────────────────────── */}
+      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -522,6 +524,94 @@ const Customers = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
+      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
+        {loading ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+          </div>
+        ) : customers.length === 0 ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>👥</div>
+            No customers found
+          </div>
+        ) : customers.map((customer) => (
+          <ExpandableCard
+            key={customer._id}
+            compact={
+              <>
+                <div className="expandable-card__compact-row">
+                  <span className="expandable-card__name">{customer.name}</span>
+                  <span className="expandable-card__price">₹{customer.dueAmount || 0}</span>
+                </div>
+                <div className="expandable-card__meta">
+                  <span className="expandable-card__meta-item">
+                    <BiPhone />
+                    <strong>{customer.phone}</strong>
+                  </span>
+                  <span className="expandable-card__meta-item">
+                    <BiWallet />
+                    <span>₹{customer.totalPurchases || 0}</span>
+                  </span>
+                </div>
+              </>
+            }
+            expanded={
+              <div className="expandable-card__rows">
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Phone</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{customer.phone}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Email</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{customer.email || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Address</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{typeof customer.address === 'object' ? Object.values(customer.address).filter(Boolean).join(', ') : (customer.address || '-')}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Total Purchases</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">₹{customer.totalPurchases || 0}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Due Amount</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value" style={customer.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{customer.dueAmount || 0}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Loyalty Points</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{customer.loyaltyPoints || 0} pts</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{new Date(customer.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            }
+            actions={
+              <>
+                <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(customer)}>
+                  <BiShow />
+                </button>
+                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(customer)}>
+                  <BiEdit />
+                </button>
+                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => confirmDelete(customer)}>
+                  <BiTrash />
+                </button>
+              </>
+            }
+          />
+        ))}
       </div>
 
       {/* Add / Edit Customer Drawer */}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { showToast } from '../../utils/toast';
 import StatCard from '../../components/common/StatCard';
+import ExpandableCard from '../../components/common/ExpandableCard';
 import {
   BiSearch, BiPrinter, BiTrash, BiX, BiCheck, BiShow,
   BiFilter, BiCalendar, BiDollar, BiCreditCard,
@@ -607,6 +608,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
   const [refundMethod, setRefundMethod] = useState('cash');
   const [reason, setReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [showConfirmReturnAll, setShowConfirmReturnAll] = useState(false);
 
   useEffect(() => {
     if (sale && open) {
@@ -623,6 +625,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
       })));
       setRefundMethod('cash');
       setReason('');
+      setShowConfirmReturnAll(false);
     }
   }, [sale, open]);
 
@@ -636,6 +639,29 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
 
   const totalRefund = returnItems.reduce((s, i) => s + (i.refundAmount || 0), 0);
   const hasItems = returnItems.some(i => i.returnQty > 0);
+
+  // Check if all returnable items are already at max
+  const returnableItems = returnItems.filter(i => i.maxReturnable > 0);
+  const allSelected = returnableItems.length > 0 && returnableItems.every(i => i.returnQty === i.maxReturnable);
+
+  const handleReturnAll = () => {
+    if (allSelected) {
+      // Clear all
+      setReturnItems(prev => prev.map(i => ({ ...i, returnQty: 0, refundAmount: 0 })));
+    } else {
+      // Show confirmation first
+      setShowConfirmReturnAll(true);
+    }
+  };
+
+  const executeReturnAll = () => {
+    setReturnItems(prev => prev.map(i => ({
+      ...i,
+      returnQty: i.maxReturnable,
+      refundAmount: i.maxReturnable * i.price,
+    })));
+    setShowConfirmReturnAll(false);
+  };
 
   const handleSubmit = async () => {
     if (!hasItems) { showToast.error('Select at least one item to return'); return; }
@@ -702,6 +728,34 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 </div>
               ) : (
                 <>
+                  {/* Return All / Clear All Button */}
+                  {returnableItems.length > 0 && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <button
+                        onClick={handleReturnAll}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '7px 14px',
+                          border: 'none',
+                          borderRadius: 'var(--border-radius-sm)',
+                          background: allSelected ? 'rgba(255,107,107,0.1)' : 'rgba(108,99,255,0.1)',
+                          color: allSelected ? 'var(--danger)' : 'var(--primary)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          fontFamily: 'var(--font-family)',
+                          cursor: 'pointer',
+                          transition: 'all var(--transition-fast)',
+                          width: '100%',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {allSelected ? <><BiTrash size={16} /> Clear All</> : <><BiCheck size={16} /> Return All Products</>}
+                      </button>
+                    </div>
+                  )}
+
                   {/* Items to return */}
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
@@ -785,6 +839,81 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
           </div>
         )}
       </div>
+
+      {/* Return All Confirmation Dialog */}
+      {showConfirmReturnAll && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => setShowConfirmReturnAll(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-modal)',
+              borderRadius: 'var(--border-radius-xl)',
+              boxShadow: 'var(--shadow-xl)',
+              width: '100%',
+              maxWidth: 400,
+              animation: 'modalFadeIn 0.2s ease',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: 'rgba(108,99,255,0.1)',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 0.75rem',
+                }}
+              >
+                <BiUndo size={24} />
+              </div>
+              <h5 style={{ fontWeight: 700, fontSize: '1rem', margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
+                Return All Products?
+              </h5>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                This will set the return quantity to the maximum available for all products. You can still adjust individual quantities afterward.
+              </p>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                padding: '0.85rem 1.5rem',
+                borderTop: '1px solid var(--border-color)',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                className="btn-premium btn-premium-secondary btn-premium-sm"
+                onClick={() => setShowConfirmReturnAll(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-premium btn-premium-primary btn-premium-sm"
+                onClick={executeReturnAll}
+              >
+                <BiCheck size={16} /> Return All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -1082,7 +1211,7 @@ const Sales = () => {
         </div>
       </div>
 
-      <div className={`sales-table-container table-container ${searching ? 'is-refreshing' : ''}`}>
+      <div className={`sales-table-container table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
         <div className="sales-table-scroll">
           <table className="sales-table">
             <thead>
@@ -1135,6 +1264,100 @@ const Sales = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
+      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
+        {loading ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+          </div>
+        ) : sales.length === 0 ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🧾</div>
+            No sales found
+          </div>
+        ) : sales.map((sale) => {
+          const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
+          const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
+          return (
+            <ExpandableCard
+              key={sale._id}
+              compact={
+                <>
+                  <div className="expandable-card__compact-row">
+                    <span className="expandable-card__name">{sale.invoiceNo || 'N/A'}</span>
+                    <span className="expandable-card__price">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="expandable-card__meta">
+                    <span className="expandable-card__meta-item">
+                      <BiUser />
+                      <span>{sale.customer?.name || 'Walk-in'}</span>
+                    </span>
+                    <span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
+                  </div>
+                </>
+              }
+              expanded={
+                <div className="expandable-card__rows">
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Invoice</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{sale.invoiceNo || 'N/A'}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Customer</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{sale.customer?.name || 'Walk-in'}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Date</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{formatDate(sale.createdAt)}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Total Amount</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Paid Amount</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Due Amount</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value" style={sale.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{Number(sale.dueAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Payment Status</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value"><span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Return Status</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value"><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span></span>
+                  </div>
+                </div>
+              }
+              actions={
+                <>
+                  <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(sale)}>
+                    <BiShow />
+                  </button>
+                  <button className="btn-action btn-action-toggle" data-tooltip="Print" onClick={() => handlePrintClick(sale)}>
+                    <BiPrinter />
+                  </button>
+                  <button className="btn-action btn-action-edit" data-tooltip="Return" onClick={() => handleReturn(sale)}>
+                    <BiUndo />
+                  </button>
+                </>
+              }
+            />
+          );
+        })}
       </div>
 
       {totalPages > 1 && (

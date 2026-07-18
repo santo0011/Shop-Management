@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
 import Swal from 'sweetalert2';
+import ExpandableCard from '../../../components/common/ExpandableCard';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
-  BiError, BiRefresh, BiInfoCircle
+  BiError, BiRefresh, BiInfoCircle, BiCategory,
+  BiCalendar, BiMessageSquare, BiCheckCircle
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
 import { showToast } from '../../../utils/toast';
@@ -81,55 +83,56 @@ const CategoryDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     }
   };
 
+  const inputStyle = { padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px', height: '40px' };
+  const labelStyle = { fontSize: '0.72rem', marginBottom: '0.2rem' };
+  const errorStyle = { fontSize: '0.7rem', marginTop: '0.1rem' };
+
   const field = (name) => ({
     className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
     value: form[name],
     onChange: (e) => handleChange(name, e.target.value),
+    style: inputStyle,
   });
 
   return (
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
-        <div className="drawer-header">
-          <h5>{editing ? 'Edit Category' : 'Add Category'}</h5>
-          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        <div className="drawer-header" style={{ padding: '0.85rem 1.25rem', minHeight: 'auto' }}>
+          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? 'Edit Category' : 'Add Category'}</h5>
+          <button className="btn-close-premium" onClick={onClose} style={{ width: '32px', height: '32px' }}><BiX /></button>
         </div>
-        <div className="drawer-body">
+        <div className="drawer-body category-drawer-body" style={{ padding: '0.85rem 1rem 0.4rem 1rem' }}>
           {submitError && (
             <div style={{
-              padding: '0.75rem 1rem',
-              borderRadius: 'var(--border-radius-md)',
+              padding: '0.5rem 0.75rem',
+              borderRadius: 'var(--border-radius-sm)',
               background: 'var(--glow-danger)',
               color: 'var(--danger)',
               fontWeight: 500,
-              marginBottom: '1.25rem',
-              fontSize: '0.85rem',
+              marginBottom: '0.6rem',
+              fontSize: '0.78rem',
             }}>
               {submitError}
             </div>
           )}
           <form onSubmit={handleSubmit} id="category-form" noValidate>
-            <div className="row g-3">
-              <div className="col-12">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('product.productName')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
-                  <input {...field('name')} placeholder="Enter category name" />
-                  {errors.name && <div className="invalid-feedback-premium">{errors.name}</div>}
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div>
+                <label className="form-label" style={labelStyle}>{t('product.productName')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input {...field('name')} placeholder="Enter category name" />
+                {errors.name && <div className="invalid-feedback-premium" style={errorStyle}>{errors.name}</div>}
               </div>
-              <div className="col-12">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('product.productName')} (BN)</label>
-                  <input {...field('nameBn')} placeholder="বিভাগের নাম লিখুন" />
-                </div>
+              <div>
+                <label className="form-label" style={labelStyle}>{t('product.productName')} (BN)</label>
+                <input {...field('nameBn')} placeholder="বিভাগের নাম লিখুন" />
               </div>
             </div>
           </form>
         </div>
-        <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="submit" form="category-form" className="btn-premium btn-premium-primary" disabled={saving}>
+        <div className="drawer-footer category-drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>{t('common.cancel')}</button>
+          <button type="submit" form="category-form" className="btn-premium btn-premium-primary" disabled={saving} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
             {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
           </button>
         </div>
@@ -703,8 +706,8 @@ const Categories = () => {
         </div>
       </div>
 
-      {/* Categories Table */}
-      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
+      {/* ─── Desktop Table ─────────────────────────────────────────────── */}
+      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -749,6 +752,77 @@ const Categories = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
+      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
+        {loading ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
+            No categories found
+          </div>
+        ) : categories.map((category) => (
+          <ExpandableCard
+            key={category._id}
+            compact={
+              <>
+                <div className="expandable-card__compact-row">
+                  <span className="expandable-card__name">{category.name}</span>
+                  <span className="expandable-card__price">{category.productCount || 0} products</span>
+                </div>
+                <div className="expandable-card__meta">
+                  <span className="expandable-card__meta-item">
+                    <BiCategory />
+                    <span>{category.nameBn || 'No Bangla name'}</span>
+                  </span>
+                  <span className="expandable-card__stock expandable-card__stock--ok">
+                    Active
+                  </span>
+                </div>
+              </>
+            }
+            expanded={
+              <div className="expandable-card__rows">
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Description</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{category.description || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Bangla Name</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{category.nameBn || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{new Date(category.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Status</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">
+                    <span className="badge badge-success">Active</span>
+                  </span>
+                </div>
+              </div>
+            }
+            actions={
+              <>
+                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(category)}>
+                  <BiEdit />
+                </button>
+                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(category._id)}>
+                  <BiTrash />
+                </button>
+              </>
+            }
+          />
+        ))}
       </div>
 
       {/* Add / Edit Category Drawer */}

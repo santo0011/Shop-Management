@@ -159,7 +159,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
               <div className="col-4">
                 <div className="form-group">
                   <label className="form-label"><BiDollar style={{ marginRight: '4px' }} />Price <span style={{color: 'var(--danger)'}}>*</span></label>
-                  <input type="number" {...field('price')} placeholder="0" />
+                  <input type="number" {...field('price')} placeholder="Enter price" />
                   {errors.price && <div className="invalid-feedback-premium">{errors.price}</div>}
                 </div>
               </div>

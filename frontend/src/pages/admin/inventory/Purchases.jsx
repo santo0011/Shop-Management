@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
 import ProductDrawer from '../../../components/common/ProductDrawer';
 import ProductSearchField from '../../../components/common/ProductSearchField';
+import ExpandableCard from '../../../components/common/ExpandableCard';
 import { showToast } from '../../../utils/toast';
 import {
   BiSearch, BiPlus, BiTrash, BiX, BiCheck, BiShow, BiCalendar, BiNote,
-  BiCreditCard, BiHash, BiUser,
+  BiCreditCard, BiHash, BiUser, BiChevronDown,
 } from 'react-icons/bi';
 import Swal from 'sweetalert2';
 
@@ -29,11 +30,11 @@ const emptyRow = () => ({
   product: null,
   batchNumber: '',
   expiryDate: '',
-  quantity: 1,
-  purchasePrice: 0,
-  sellingPrice: 0,
-  discount: 0,
-  tax: 0,
+  quantity: '',
+  purchasePrice: '',
+  sellingPrice: '',
+  discount: '',
+  tax: '',
 });
 
 const emptyHeader = () => ({
@@ -51,13 +52,178 @@ const rowTotal = (row) => rowBase(row) - rowDiscountAmt(row) + rowTaxAmt(row);
 
 const money = (val) => `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// ─── Mobile Product Card for drawer ──────────────────────────────────────
+const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, updateRow, removeRow, handleSelectProduct, handleCreateNewProduct, handleRowFieldEnter, rowTotal, money, rows }) => {
+  return (
+    <div className={`purchase-mobile-product-card ${isOpen ? 'purchase-mobile-product-card--open' : ''}`}>
+      <div className="purchase-mobile-product-card__header" onClick={onToggle}>
+        <div className="purchase-mobile-product-card__header-left">
+          <span className="purchase-mobile-product-card__header-index">#{index + 1}</span>
+          <span className="purchase-mobile-product-card__header-name">
+            {row.product?.name || (isViewMode ? 'Unknown product' : 'Select product')}
+          </span>
+        </div>
+        <div className="purchase-mobile-product-card__header-right">
+          <span className="purchase-mobile-product-card__header-total">{money(rowTotal(row))}</span>
+          <button className={`purchase-mobile-product-card__toggle ${isOpen ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+            <BiChevronDown />
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="purchase-mobile-product-card__body-wrapper"
+        style={{ maxHeight: isOpen ? 800 : 0 }}
+      >
+        <div className="purchase-mobile-product-card__body">
+          {!isViewMode && (
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Product</label>
+              <ProductSearchField
+                ref={setFieldRef(row.key, 'product')}
+                value={row.product}
+                onSelect={(p) => handleSelectProduct(row.key, p)}
+                onCreateNew={(q) => handleCreateNewProduct(row.key, q)}
+                onEnter={() => handleRowFieldEnter(row.key, 'product')}
+              />
+              {row.product && (
+                <div className="purchase-mobile-product-card__hint">
+                  Unit: {row.product.unit} · Stock: {row.product.stock ?? 0}
+                </div>
+              )}
+            </div>
+          )}
+          {isViewMode && row.product && (
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Product</label>
+              <span className="purchase-mobile-product-card__value">{row.product?.name || 'Unknown product'}</span>
+            </div>
+          )}
+
+          <div className="purchase-mobile-product-card__row-fields">
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Batch No.</label>
+              <input
+                ref={setFieldRef(row.key, 'batchNumber')}
+                className="purchase-mobile-product-card__input"
+                value={row.batchNumber}
+                onChange={(e) => updateRow(row.key, { batchNumber: e.target.value })}
+                disabled={isViewMode}
+                placeholder="Batch"
+              />
+            </div>
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Expiry Date</label>
+              <input
+                ref={setFieldRef(row.key, 'expiryDate')}
+                type="date"
+                className="purchase-mobile-product-card__input"
+                value={row.expiryDate}
+                onChange={(e) => updateRow(row.key, { expiryDate: e.target.value })}
+                disabled={isViewMode}
+              />
+            </div>
+          </div>
+
+          <div className="purchase-mobile-product-card__row-fields purchase-mobile-product-card__row-fields--3col">
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Qty</label>
+              <input
+                ref={setFieldRef(row.key, 'quantity')}
+                type="number"
+                min="1"
+                className="purchase-mobile-product-card__input"
+                placeholder="Qty"
+                value={row.quantity}
+                onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
+                disabled={isViewMode}
+              />
+            </div>
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Purchase Price</label>
+              <input
+                ref={setFieldRef(row.key, 'purchasePrice')}
+                type="number"
+                min="0"
+                className="purchase-mobile-product-card__input"
+                placeholder="Price"
+                value={row.purchasePrice}
+                onChange={(e) => updateRow(row.key, { purchasePrice: e.target.value })}
+                disabled={isViewMode}
+              />
+            </div>
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Selling Price</label>
+              <input
+                ref={setFieldRef(row.key, 'sellingPrice')}
+                type="number"
+                min="0"
+                className="purchase-mobile-product-card__input"
+                placeholder="S.Price"
+                value={row.sellingPrice}
+                onChange={(e) => updateRow(row.key, { sellingPrice: e.target.value })}
+                disabled={isViewMode}
+              />
+            </div>
+          </div>
+
+          <div className="purchase-mobile-product-card__row-fields">
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Discount %</label>
+              <input
+                ref={setFieldRef(row.key, 'discount')}
+                type="number"
+                min="0"
+                className="purchase-mobile-product-card__input"
+                placeholder="Disc %"
+                value={row.discount}
+                onChange={(e) => updateRow(row.key, { discount: e.target.value })}
+                disabled={isViewMode}
+              />
+            </div>
+            <div className="purchase-mobile-product-card__field">
+              <label className="purchase-mobile-product-card__label">Tax %</label>
+              <input
+                ref={setFieldRef(row.key, 'tax')}
+                type="number"
+                min="0"
+                className="purchase-mobile-product-card__input"
+                placeholder="Tax %"
+                value={row.tax}
+                onChange={(e) => updateRow(row.key, { tax: e.target.value })}
+                disabled={isViewMode}
+              />
+            </div>
+          </div>
+
+          <div className="purchase-mobile-product-card__total">
+            <span>Line Total</span>
+            <strong>{money(rowTotal(row))}</strong>
+          </div>
+
+          {!isViewMode && (
+            <button
+              type="button"
+              className="purchase-mobile-product-card__remove"
+              onClick={() => removeRow(row.key)}
+              disabled={rows.length <= 1}
+            >
+              <BiTrash /> Remove Item
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Purchase Entry Drawer (create) / Detail Drawer (view) ────────────────
 const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const isViewMode = !!viewing;
 
   const [header, setHeader] = useState(emptyHeader);
   const [rows, setRows] = useState([emptyRow()]);
-  const [paidAmount, setPaidAmount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState();
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -65,6 +231,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const [categories, setCategories] = useState([]);
 
   const [productDrawer, setProductDrawer] = useState({ open: false, rowKey: null, initialName: '' });
+  const [mobileOpenCards, setMobileOpenCards] = useState({});
 
   const fieldRefs = useRef({});
   const setFieldRef = (rowKey, field) => (el) => { fieldRefs.current[`${rowKey}::${field}`] = el; };
@@ -87,6 +254,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     setSubmitError(null);
     fetchSuppliers();
     fetchCategories();
+    setMobileOpenCards({});
 
     if (viewing) {
       setHeader({
@@ -114,6 +282,10 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
       setPaidAmount(0);
     }
   }, [open, viewing]);
+
+  const toggleMobileCard = (key) => {
+    setMobileOpenCards((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const fetchSuppliers = async () => {
     try {
@@ -152,6 +324,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const addRow = () => {
     const row = emptyRow();
     setRows((prev) => [...prev, row]);
+    setMobileOpenCards((prev) => ({ ...prev, [row.key]: true }));
     setTimeout(() => focusField(row.key, 'product'), 0);
     return row.key;
   };
@@ -334,209 +507,258 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
             </div>
           </div>
 
-          {/* ─── Product Entry Table ───────────────────────────────── */}
-          <div className="purchase-items-header">
-            <label className="form-label mb-0" style={{ fontWeight: 600 }}>Products</label>
-            {!isViewMode && (
-              <button type="button" className="purchase-add-row-btn" onClick={addRow}>
-                <BiPlus /> Add Row
-              </button>
-            )}
-          </div>
-          {errors.items && <div className="invalid-feedback-premium mb-2">{errors.items}</div>}
+          {/* ─── Desktop Product Table ─────────────────────────────── */}
+          <div className="purchase-desktop-section">
+            <div className="purchase-items-header">
+              <label className="form-label mb-0" style={{ fontWeight: 600 }}>Products</label>
+              {!isViewMode && (
+                <button type="button" className="purchase-add-row-btn" onClick={addRow}>
+                  <BiPlus /> Add Row
+                </button>
+              )}
+            </div>
+            {errors.items && <div className="invalid-feedback-premium mb-2">{errors.items}</div>}
 
-          <div className="purchase-items-scroll">
-            <table className="purchase-items-table">
-              <thead>
-                <tr>
-                  <th style={{ minWidth: 180, width: '22%' }}>Product</th>
-                  <th style={{ width: 85 }}>Batch No.</th>
-                  <th style={{ width: 105 }}>Expiry Date</th>
-                  <th style={{ width: 55 }}>Qty</th>
-                  <th style={{ width: 80 }}>Purchase Price</th>
-                  <th style={{ width: 80 }}>Selling Price</th>
-                  <th style={{ width: 65 }}>Discount %</th>
-                  <th style={{ width: 55 }}>Tax %</th>
-                  <th style={{ width: 75 }}>Total</th>
-                  {!isViewMode && <th style={{ width: 32 }} />}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.key}>
-                    <td>
-                      {isViewMode ? (
-                        <span style={{ fontWeight: 600 }}>{row.product?.name || 'Unknown product'}</span>
-                      ) : (
-                        <>
-                          <ProductSearchField
-                            ref={setFieldRef(row.key, 'product')}
-                            value={row.product}
-                            onSelect={(p) => handleSelectProduct(row.key, p)}
-                            onCreateNew={(q) => handleCreateNewProduct(row.key, q)}
-                            onEnter={() => handleRowFieldEnter(row.key, 'product')}
-                          />
-                          {row.product && (
-                            <div className="purchase-row-hint">
-                              Unit: {row.product.unit} · Stock: {row.product.stock ?? 0}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      <input
-                        ref={setFieldRef(row.key, 'batchNumber')}
-                        className="form-control form-control-sm"
-                        value={row.batchNumber}
-                        onChange={(e) => updateRow(row.key, { batchNumber: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'batchNumber'))}
-                        disabled={isViewMode}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        ref={setFieldRef(row.key, 'expiryDate')}
-                        type="date"
-                        className="form-control form-control-sm"
-                        value={row.expiryDate}
-                        onChange={(e) => updateRow(row.key, { expiryDate: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'expiryDate'))}
-                        disabled={isViewMode}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        ref={setFieldRef(row.key, 'quantity')}
-                        type="number"
-                        min="1"
-                        className="form-control form-control-sm"
-                        value={row.quantity}
-                        onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'quantity'))}
-                        disabled={isViewMode}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        ref={setFieldRef(row.key, 'purchasePrice')}
-                        type="number"
-                        min="0"
-                        className="form-control form-control-sm"
-                        value={row.purchasePrice}
-                        onChange={(e) => updateRow(row.key, { purchasePrice: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'purchasePrice'))}
-                        disabled={isViewMode}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        ref={setFieldRef(row.key, 'sellingPrice')}
-                        type="number"
-                        min="0"
-                        className="form-control form-control-sm"
-                        value={row.sellingPrice}
-                        onChange={(e) => updateRow(row.key, { sellingPrice: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'sellingPrice'))}
-                        disabled={isViewMode}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        ref={setFieldRef(row.key, 'discount')}
-                        type="number"
-                        min="0"
-                        className="form-control form-control-sm"
-                        value={row.discount}
-                        onChange={(e) => updateRow(row.key, { discount: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'discount'))}
-                        disabled={isViewMode}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        ref={setFieldRef(row.key, 'tax')}
-                        type="number"
-                        min="0"
-                        className="form-control form-control-sm"
-                        value={row.tax}
-                        onChange={(e) => updateRow(row.key, { tax: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'tax'))}
-                        disabled={isViewMode}
-                      />
-                    </td>
-                    <td className="purchase-row-total">{money(rowTotal(row))}</td>
-                    {!isViewMode && (
-                      <td>
-                        <button
-                          type="button"
-                          className="purchase-remove-row-btn"
-                          onClick={() => removeRow(row.key)}
-                          disabled={rows.length <= 1}
-                          title="Remove row"
-                        >
-                          <BiTrash size={14} />
-                        </button>
-                      </td>
-                    )}
+            <div className="purchase-items-scroll">
+              <table className="purchase-items-table">
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: 180, width: '22%' }}>Product</th>
+                    <th style={{ width: 85 }}>Batch No.</th>
+                    <th style={{ width: 105 }}>Expiry Date</th>
+                    <th style={{ width: 55 }}>Qty</th>
+                    <th style={{ width: 80 }}>Purchase Price</th>
+                    <th style={{ width: 80 }}>Selling Price</th>
+                    <th style={{ width: 65 }}>Discount %</th>
+                    <th style={{ width: 55 }}>Tax %</th>
+                    <th style={{ width: 75 }}>Total</th>
+                    {!isViewMode && <th style={{ width: 32 }} />}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.key}>
+                      <td>
+                        {isViewMode ? (
+                          <span style={{ fontWeight: 600 }}>{row.product?.name || 'Unknown product'}</span>
+                        ) : (
+                          <>
+                            <ProductSearchField
+                              ref={setFieldRef(row.key, 'product')}
+                              value={row.product}
+                              onSelect={(p) => handleSelectProduct(row.key, p)}
+                              onCreateNew={(q) => handleCreateNewProduct(row.key, q)}
+                              onEnter={() => handleRowFieldEnter(row.key, 'product')}
+                            />
+                            {row.product && (
+                              <div className="purchase-row-hint">
+                                Unit: {row.product.unit} · Stock: {row.product.stock ?? 0}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </td>
+                      <td>
+                        <input
+                          ref={setFieldRef(row.key, 'batchNumber')}
+                          className="form-control form-control-sm"
+                          value={row.batchNumber}
+                          onChange={(e) => updateRow(row.key, { batchNumber: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'batchNumber'))}
+                          disabled={isViewMode}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          ref={setFieldRef(row.key, 'expiryDate')}
+                          type="date"
+                          className="form-control form-control-sm"
+                          value={row.expiryDate}
+                          onChange={(e) => updateRow(row.key, { expiryDate: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'expiryDate'))}
+                          disabled={isViewMode}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          ref={setFieldRef(row.key, 'quantity')}
+                          type="number"
+                          min="1"
+                          className="form-control form-control-sm"
+                          value={row.quantity}
+                          onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'quantity'))}
+                          disabled={isViewMode}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          ref={setFieldRef(row.key, 'purchasePrice')}
+                          type="number"
+                          min="0"
+                          className="form-control form-control-sm"
+                          value={row.purchasePrice}
+                          onChange={(e) => updateRow(row.key, { purchasePrice: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'purchasePrice'))}
+                          disabled={isViewMode}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          ref={setFieldRef(row.key, 'sellingPrice')}
+                          type="number"
+                          min="0"
+                          className="form-control form-control-sm"
+                          value={row.sellingPrice}
+                          onChange={(e) => updateRow(row.key, { sellingPrice: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'sellingPrice'))}
+                          disabled={isViewMode}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          ref={setFieldRef(row.key, 'discount')}
+                          type="number"
+                          min="0"
+                          className="form-control form-control-sm"
+                          value={row.discount}
+                          onChange={(e) => updateRow(row.key, { discount: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'discount'))}
+                          disabled={isViewMode}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          ref={setFieldRef(row.key, 'tax')}
+                          type="number"
+                          min="0"
+                          className="form-control form-control-sm"
+                          value={row.tax}
+                          onChange={(e) => updateRow(row.key, { tax: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'tax'))}
+                          disabled={isViewMode}
+                        />
+                      </td>
+                      <td className="purchase-row-total">{money(rowTotal(row))}</td>
+                      {!isViewMode && (
+                        <td>
+                          <button
+                            type="button"
+                            className="purchase-remove-row-btn"
+                            onClick={() => removeRow(row.key)}
+                            disabled={rows.length <= 1}
+                            title="Remove row"
+                          >
+                            <BiTrash size={14} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ─── Mobile Product Cards ──────────────────────────────── */}
+          <div className="purchase-mobile-section">
+            <div className="purchase-items-header">
+              <label className="form-label mb-0" style={{ fontWeight: 600 }}>Products ({rows.length})</label>
+              {!isViewMode && (
+                <button type="button" className="purchase-add-row-btn" onClick={addRow}>
+                  <BiPlus /> Add Item
+                </button>
+              )}
+            </div>
+            {errors.items && <div className="invalid-feedback-premium mb-2">{errors.items}</div>}
+
+            <div className="purchase-mobile-product-cards">
+              {rows.map((row, idx) => (
+                <ProductCard
+                  key={row.key}
+                  row={row}
+                  index={idx}
+                  isViewMode={isViewMode}
+                  isOpen={!!mobileOpenCards[row.key]}
+                  onToggle={() => toggleMobileCard(row.key)}
+                  setFieldRef={setFieldRef}
+                  updateRow={updateRow}
+                  removeRow={removeRow}
+                  handleSelectProduct={handleSelectProduct}
+                  handleCreateNewProduct={handleCreateNewProduct}
+                  handleRowFieldEnter={handleRowFieldEnter}
+                  rowTotal={rowTotal}
+                  money={money}
+                  rows={rows}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* ─── Sticky Summary ────────────────────────────────────────── */}
-        <div className="purchase-summary-bar">
-          <div className="purchase-summary-item">
-            <span>Total Items</span>
-            <strong>{totalItems}</strong>
-          </div>
-          <div className="purchase-summary-item">
-            <span>Subtotal</span>
-            <strong>{money(subtotal)}</strong>
-          </div>
-          <div className="purchase-summary-item">
-            <span>Discount</span>
-            <strong>-{money(discountTotal)}</strong>
-          </div>
-          <div className="purchase-summary-item">
-            <span>Tax</span>
-            <strong>+{money(taxTotal)}</strong>
-          </div>
-          <div className="purchase-summary-item purchase-summary-grand">
-            <span>Grand Total</span>
-            <strong>{money(grandTotal)}</strong>
-          </div>
-          <div className="purchase-summary-item">
-            <span>Previous Due</span>
-            <strong>{money(previousDue)}</strong>
-          </div>
-          <div className="purchase-summary-item purchase-summary-paid">
-            <span>Paid Amount</span>
-            {isViewMode ? <strong>{money(paidAmount)}</strong> : (
-              <input
-                type="number"
-                min="0"
-                className="form-control form-control-sm"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-              />
-            )}
-          </div>
-          <div className="purchase-summary-item purchase-summary-due">
-            <span>Current Due</span>
-            <strong>{money(currentDue)}</strong>
+        {/* ─── Summary ───────────────────────────────────────────────── */}
+        <div className="purchase-summary-card">
+          <div className="purchase-summary-card__body">
+            <div className="purchase-summary-row">
+              <span className="purchase-summary-row__label">Total Items</span>
+              <span className="purchase-summary-row__value">{totalItems}</span>
+            </div>
+            <div className="purchase-summary-row">
+              <span className="purchase-summary-row__label">Discount</span>
+              <span className="purchase-summary-row__value purchase-summary-row__value--danger">-{money(discountTotal)}</span>
+            </div>
+            <div className="purchase-summary-row">
+              <span className="purchase-summary-row__label">Tax</span>
+              <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(taxTotal)}</span>
+            </div>
+            <div className="purchase-summary-divider" />
+            <div className="purchase-summary-row purchase-summary-row--grand">
+              <span className="purchase-summary-row__label purchase-summary-row__label--grand">Grand Total</span>
+              <span className="purchase-summary-row__value purchase-summary-row__value--grand">{money(grandTotal)}</span>
+            </div>
+            <div className="purchase-summary-divider" />
+            <div className="purchase-summary-row">
+              <span className="purchase-summary-row__label">Previous Due</span>
+              <span className="purchase-summary-row__value">{money(previousDue)}</span>
+            </div>
+            <div className="purchase-summary-row purchase-summary-row--paid">
+              <span className="purchase-summary-row__label">Paid Amount</span>
+              {isViewMode ? (
+                <span className="purchase-summary-row__value purchase-summary-row__value--success">{money(paidAmount)}</span>
+              ) : (
+                <input
+                  type="number"
+                  className="purchase-summary-paid-input"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                />
+              )}
+            </div>
+            <div className="purchase-summary-divider" />
+            <div className={`purchase-summary-row purchase-summary-row--due ${currentDue > 0 ? 'purchase-summary-row--due-warning' : ''}`}>
+              <span className="purchase-summary-row__label purchase-summary-row__label--due">Current Due</span>
+              <span className={`purchase-summary-row__value purchase-summary-row__value--due ${currentDue > 0 ? 'purchase-summary-row__value--danger' : 'purchase-summary-row__value--success'}`}>
+                {money(currentDue)}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="drawer-footer">
-          {/* <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
-            {isViewMode ? 'Close' : t('common.cancel')}
-          </button> */}
+        {/* ─── Footer with buttons ──────────────────────────────────── */}
+        <div className="drawer-footer purchase-drawer-footer">
           {!isViewMode && (
-            <button type="button" className="btn-premium btn-premium-primary" onClick={handleSubmit} disabled={saving}>
-              {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> Save Purchase</>}
+            <>
+              <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="button" className="btn-premium btn-premium-primary" onClick={handleSubmit} disabled={saving}>
+                {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> Save Purchase</>}
+              </button>
+            </>
+          )}
+          {isViewMode && (
+            <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
+              Close
             </button>
           )}
         </div>
@@ -663,7 +885,7 @@ const Purchases = () => {
           </p>
         </div>
         <button className="btn-premium btn-premium-primary" onClick={() => { setViewing(null); setDrawerOpen(true); }}>
-          <BiPlus /> Add Purchase
+          <BiPlus /> Add <span className="purchase-btn-full-label">Purchase</span>
         </button>
       </div>
 
@@ -680,8 +902,8 @@ const Purchases = () => {
         </div>
       </div>
 
-      {/* Purchases Table */}
-      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
+      {/* ─── Desktop Table ─────────────────────────────────────────────── */}
+      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -740,6 +962,103 @@ const Purchases = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
+      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
+        {loading ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+          </div>
+        ) : purchases.length === 0 ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
+            No purchases found
+          </div>
+        ) : purchases.map((purchase) => (
+          <ExpandableCard
+            key={purchase._id}
+            compact={
+              <>
+                <div className="expandable-card__compact-row">
+                  <span className="expandable-card__name">{purchase.supplier?.name || 'Unknown'}</span>
+                  <span className="expandable-card__price">{money(purchase.totalAmount)}</span>
+                </div>
+                <div className="expandable-card__meta">
+                  <span className="expandable-card__meta-item">
+                    <BiHash />
+                    <span>{purchase.purchaseNo}</span>
+                  </span>
+                  <span className="expandable-card__meta-item">
+                    <BiCalendar />
+                    <span>{new Date(purchase.purchaseDate || purchase.createdAt).toLocaleDateString()}</span>
+                  </span>
+                </div>
+                <div className="expandable-card__compact-row" style={{ marginTop: '0.15rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Payment Status</span>
+                  <span>{getStatusBadge(purchase.paymentStatus)}</span>
+                </div>
+              </>
+            }
+            expanded={
+              <div className="expandable-card__rows">
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Supplier Invoice No.</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{purchase.supplierInvoiceNo || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Total Items</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{purchase.totalItems || purchase.items?.length || 0}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Paid Amount</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{money(purchase.paidAmount)}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Due Amount</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value" style={purchase.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>{money(purchase.dueAmount)}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Payment Method</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value" style={{ textTransform: 'capitalize' }}>{(purchase.paymentMethod || '-').replace(/_/g, ' ')}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Notes</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{purchase.notes || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Created By</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{purchase.createdBy?.name || purchase.createdBy || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Created Date</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{new Date(purchase.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            }
+            actions={
+              <>
+                <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(purchase)}>
+                  <BiShow />
+                </button>
+                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => { setViewing(purchase); setDrawerOpen(true); }}>
+                  <BiCheck />
+                </button>
+                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => confirmDelete(purchase)}>
+                  <BiTrash />
+                </button>
+              </>
+            }
+          />
+        ))}
       </div>
 
       {/* Add Purchase / View Purchase Drawer */}

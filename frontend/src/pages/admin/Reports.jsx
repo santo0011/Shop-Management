@@ -5,10 +5,12 @@ import * as XLSX from 'xlsx';
 import api from '../../services/api';
 import StatCard from '../../components/common/StatCard';
 import DataTable from '../../components/common/DataTable';
+import ExpandableCard from '../../components/common/ExpandableCard';
 import { showToast } from '../../utils/toast';
 import {
   BiCart, BiDollar, BiTrendingUp, BiReceipt, BiGroup, BiError, BiRefresh,
-  BiStar, BiFile, BiFileBlank, BiSpreadsheet,
+  BiStar, BiFile, BiFileBlank, BiSpreadsheet, BiCategory, BiCalendar,
+  BiPackage, BiUser, BiHash, BiTime,
 } from 'react-icons/bi';
 
 // ─── Filter presets ───────────────────────────────────────────
@@ -438,7 +440,7 @@ const Reports = () => {
       </div>
 
       {/* Top 10 Best Selling Products */}
-      <div className="mb-3">
+      <div className="desktop-table mb-3">
         <DataTable
           title="Top 10 Best Selling Products"
           icon={BiStar}
@@ -457,6 +459,62 @@ const Reports = () => {
         />
       </div>
 
+      {/* ─── Mobile: Top Products Cards ────────────────────────────────── */}
+      <div className="mobile-cards mb-3">
+        <h5 className="mb-2" style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+          <BiStar size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+          Top 10 Best Selling Products
+        </h5>
+        {analytics.topProducts.length === 0 ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
+            No sales in this period
+          </div>
+        ) : analytics.topProducts.map((product) => (
+          <ExpandableCard
+            key={product.productId}
+            compact={
+              <>
+                <div className="expandable-card__compact-row">
+                  <span className="expandable-card__name">{product.name}</span>
+                  <span className="expandable-card__price">{product.quantity} sold</span>
+                </div>
+                <div className="expandable-card__meta">
+                  <span className="expandable-card__meta-item">
+                    <BiCategory />
+                    <span>{product.category || '-'}</span>
+                  </span>
+                </div>
+              </>
+            }
+            expanded={
+              <div className="expandable-card__rows">
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Product</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{product.name}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Category</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{product.category || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Qty Sold</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{product.quantity}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Revenue</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{money(product.revenue)}</span>
+                </div>
+              </div>
+            }
+          />
+        ))}
+      </div>
+
       {/* One-line period summary (replaces the old per-day table) */}
       <div className="reports-summary-line mb-3">
         <BiTrendingUp />
@@ -469,7 +527,7 @@ const Reports = () => {
       </div>
 
       {/* Recent Sales */}
-      <div>
+      <div className="desktop-table">
         <DataTable
           title="Recent Sales"
           icon={BiReceipt}
@@ -500,6 +558,76 @@ const Reports = () => {
             },
           ]}
         />
+      </div>
+
+      {/* ─── Mobile: Recent Sales Cards ────────────────────────────────── */}
+      <div className="mobile-cards">
+        <h5 className="mb-2" style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+          <BiReceipt size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+          Recent Sales
+        </h5>
+        {analytics.recentTransactions.length === 0 ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🧾</div>
+            No transactions in this period
+          </div>
+        ) : analytics.recentTransactions.map((tx) => {
+          const st = STATUS_STYLES[tx.paymentStatus] || STATUS_STYLES.paid;
+          return (
+            <ExpandableCard
+              key={tx._id}
+              compact={
+                <>
+                  <div className="expandable-card__compact-row">
+                    <span className="expandable-card__name">{tx.invoiceNo || 'N/A'}</span>
+                    <span className="expandable-card__price">{money(tx.totalAmount)}</span>
+                  </div>
+                  <div className="expandable-card__meta">
+                    <span className="expandable-card__meta-item">
+                      <BiUser />
+                      <span>{tx.customer?.name || 'Walk-in'}</span>
+                    </span>
+                    <span className="reports-status-pill" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
+                  </div>
+                </>
+              }
+              expanded={
+                <div className="expandable-card__rows">
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Invoice</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{tx.invoiceNo || 'N/A'}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Date</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{formatDateTime(tx.createdAt)}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Customer</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{tx.customer?.name || 'Walk-in Customer'}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Amount</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{money(tx.totalAmount)}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Payment</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{PAYMENT_METHOD_ICONS[tx.paymentMethod] || '💵'} {PAYMENT_METHOD_LABELS[tx.paymentMethod] || tx.paymentMethod}</span>
+                  </div>
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">Status</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value"><span className="reports-status-pill" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span>
+                  </div>
+                </div>
+              }
+            />
+          );
+        })}
       </div>
     </div>
   );

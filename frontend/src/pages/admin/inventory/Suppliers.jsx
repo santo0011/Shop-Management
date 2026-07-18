@@ -2,10 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
 import Swal from 'sweetalert2';
+import ExpandableCard from '../../../components/common/ExpandableCard';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
-  BiError, BiMessageSquare, BiRefresh, BiInfoCircle
+  BiError, BiMessageSquare, BiRefresh, BiInfoCircle,
+  BiPhone, BiEnvelope, BiMapPin, BiBuilding, BiDollar,
+  BiCalendar, BiUser
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
 
@@ -82,72 +85,83 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     }
   };
 
+  const inputStyle = { padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px', height: '40px' };
+  const labelStyle = { fontSize: '0.72rem', marginBottom: '0.2rem' };
+  const errorStyle = { fontSize: '0.7rem', marginTop: '0.1rem' };
+
   const field = (name) => ({
     className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
     value: form[name],
     onChange: (e) => handleChange(name, e.target.value),
+    style: inputStyle,
   });
 
   return (
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
-        <div className="drawer-header">
-          <h5>{editing ? 'Edit Supplier' : 'Add Supplier'}</h5>
-          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        <div className="drawer-header" style={{ padding: '0.85rem 1.25rem', minHeight: 'auto' }}>
+          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? 'Edit Supplier' : 'Add Supplier'}</h5>
+          <button className="btn-close-premium" onClick={onClose} style={{ width: '32px', height: '32px' }}><BiX /></button>
         </div>
-        <div className="drawer-body">
+        <div className="drawer-body supplier-drawer-body" style={{ padding: '0.85rem 1rem 0.4rem 1rem' }}>
           {submitError && (
-            <div className="alert alert-danger" style={{ fontSize: '0.85rem', padding: '0.75rem 1rem' }}>
+            <div style={{
+              padding: '0.5rem 0.75rem',
+              borderRadius: 'var(--border-radius-sm)',
+              background: 'var(--glow-danger)',
+              color: 'var(--danger)',
+              fontWeight: 500,
+              marginBottom: '0.6rem',
+              fontSize: '0.78rem',
+            }}>
               {submitError}
             </div>
           )}
           <form onSubmit={handleSubmit} id="supplier-form" noValidate>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.name')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
-                  <input {...field('name')} placeholder="Enter supplier name" />
-                  {errors.name && <div className="invalid-feedback-premium">{errors.name}</div>}
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {/* Supplier Name - full width */}
+              <div>
+                <label className="form-label" style={labelStyle}>{t('auth.name')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input {...field('name')} placeholder="Enter supplier name" />
+                {errors.name && <div className="invalid-feedback-premium" style={errorStyle}>{errors.name}</div>}
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.name')} (BN)</label>
+              {/* 2-col row: Name (BN) + Phone */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label className="form-label" style={labelStyle}>{t('auth.name')} (BN)</label>
                   <input {...field('nameBn')} placeholder="সাপ্লায়ারের নাম লিখুন" />
                 </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('auth.phone')} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <div>
+                  <label className="form-label" style={labelStyle}>{t('auth.phone')} <span style={{ color: 'var(--danger)' }}>*</span></label>
                   <input {...field('phone')} placeholder="Enter phone number" />
-                  {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
+                  {errors.phone && <div className="invalid-feedback-premium" style={errorStyle}>{errors.phone}</div>}
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">Email</label>
+              {/* 2-col row: Email + Company */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label className="form-label" style={labelStyle}>Email</label>
                   <input type="email" {...field('email')} placeholder="Enter email address" />
                 </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">Company</label>
+                <div>
+                  <label className="form-label" style={labelStyle}>Company</label>
                   <input {...field('company')} placeholder="Enter company name" />
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">Address</label>
+              {/* 2-col row: Address (full width span) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={labelStyle}>Address</label>
                   <input {...field('address')} placeholder="Enter address" />
                 </div>
               </div>
             </div>
           </form>
         </div>
-        <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="submit" form="supplier-form" className="btn-premium btn-premium-primary" disabled={saving}>
+        <div className="drawer-footer supplier-drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>{t('common.cancel')}</button>
+          <button type="submit" form="supplier-form" className="btn-premium btn-premium-primary" disabled={saving} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
             {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
           </button>
         </div>
@@ -763,8 +777,8 @@ const Suppliers = () => {
         </div>
       </div>
 
-      {/* Suppliers Table */}
-      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
+      {/* ─── Desktop Table ─────────────────────────────────────────────── */}
+      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -818,6 +832,88 @@ const Suppliers = () => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
+      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
+        {loading ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+          </div>
+        ) : suppliers.length === 0 ? (
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
+            No suppliers found
+          </div>
+        ) : suppliers.map((supplier) => (
+          <ExpandableCard
+            key={supplier._id}
+            compact={
+              <>
+                <div className="expandable-card__compact-row">
+                  <span className="expandable-card__name">{supplier.name}</span>
+                  <span className="expandable-card__price">₹{supplier.dueAmount || 0}</span>
+                </div>
+                <div className="expandable-card__meta">
+                  <span className="expandable-card__meta-item">
+                    <BiPhone />
+                    <strong>{supplier.phone}</strong>
+                  </span>
+                  {supplier.email && (
+                    <span className="expandable-card__meta-item">
+                      <BiEnvelope />
+                      <span>{supplier.email}</span>
+                    </span>
+                  )}
+                </div>
+              </>
+            }
+            expanded={
+              <div className="expandable-card__rows">
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Phone</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{supplier.phone}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Email</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{supplier.email || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Company</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{supplier.company || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Address</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{supplier.address || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Due Amount</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value" style={supplier.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{supplier.dueAmount || 0}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{new Date(supplier.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            }
+            actions={
+              <>
+                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(supplier)}>
+                  <BiEdit />
+                </button>
+                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(supplier._id)}>
+                  <BiTrash />
+                </button>
+              </>
+            }
+          />
+        ))}
       </div>
 
       {/* Add / Edit Supplier Drawer */}

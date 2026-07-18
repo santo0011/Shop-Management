@@ -92,20 +92,22 @@ const PrinterSettingsModal = ({ currentSettings, onSelect, onClose }) => {
           <button className="printer-settings-close" onClick={onClose}><BiX size={20} /></button>
         </div>
         <div className="printer-settings-body">
-          <div className="printer-settings-group">
-            <label className="printer-settings-label">Paper Size</label>
-            <div className="printer-settings-options">
-              {PRINTER_SIZES.map(s => (
-                <button key={s.key} className={`printer-settings-option ${size === s.key ? 'active' : ''}`} onClick={() => setSize(s.key)}>{s.icon}<span>{s.label}</span></button>
-              ))}
+          <div className="printer-settings-mobile-row">
+            <div className="printer-settings-group printer-settings-group--half">
+              <label className="printer-settings-label">Paper Size</label>
+              <div className="printer-settings-options">
+                {PRINTER_SIZES.map(s => (
+                  <button key={s.key} className={`printer-settings-option ${size === s.key ? 'active' : ''}`} onClick={() => setSize(s.key)}>{s.icon}<span>{s.label}</span></button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="printer-settings-group">
-            <label className="printer-settings-label">Invoice Template</label>
-            <div className="printer-settings-options">
-              {INVOICE_TEMPLATES.map(t => (
-                <button key={t.key} className={`printer-settings-option ${template === t.key ? 'active' : ''}`} onClick={() => setTemplate(t.key)}>{t.icon}<span>{t.label}</span></button>
-              ))}
+            <div className="printer-settings-group printer-settings-group--half">
+              <label className="printer-settings-label">Invoice Design</label>
+              <div className="printer-settings-options">
+                {INVOICE_TEMPLATES.map(t => (
+                  <button key={t.key} className={`printer-settings-option ${template === t.key ? 'active' : ''}`} onClick={() => setTemplate(t.key)}>{t.icon}<span>{t.label}</span></button>
+                ))}
+              </div>
             </div>
           </div>
           <div className="printer-settings-preview-hint"><BiQr size={16} /><span>Invoice will include a QR code for easy tracking</span></div>
@@ -362,7 +364,7 @@ const POS = () => {
   const customerSearchRef = useRef(null);
   const customerDropdownRef = useRef(null);
   const [paymentMethod, setPaymentMethod] = useState(getLastPayment);
-  const [paidAmount, setPaidAmount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState('');
   const [showInvoice, setShowInvoice] = useState(false);
   const [lastSale, setLastSale] = useState(null);
   const [shopInfo, setShopInfo] = useState(null);
@@ -465,7 +467,7 @@ const POS = () => {
 
   const clearCart = () => {
     setCart([]);
-    setPaidAmount(0);
+    setPaidAmount('');
     setCustomer('');
     setDiscountValue(0);
     setDiscountMode('percent');
@@ -483,8 +485,8 @@ const POS = () => {
   const taxableAmount = subtotal - totalDiscount;
   const tax = taxableAmount > 0 ? taxableAmount * (taxRate / 100) : 0;
   const grandTotal = subtotal + tax - totalDiscount;
-  const dueAmount = Math.max(0, grandTotal - paidAmount);
-  const change = Math.max(0, paidAmount - grandTotal);
+  const dueAmount = Math.max(0, grandTotal - Number(paidAmount || 0));
+  const change = Math.max(0, Number(paidAmount || 0) - grandTotal);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => { if (paidAmount === 0 && grandTotal > 0) setPaidAmount(grandTotal); }, [grandTotal]);
@@ -791,7 +793,7 @@ const POS = () => {
                 <button className={`pos-discount-mode-btn ${discountMode === 'percent' ? 'active' : ''}`} onClick={() => setDiscountMode('percent')}>%</button>
                 <button className={`pos-discount-mode-btn ${discountMode === 'fixed' ? 'active' : ''}`} onClick={() => setDiscountMode('fixed')}>₹</button>
               </div>
-              <input type="number" className="pos-discount-input" value={discountValue} onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value)))} min="0" placeholder="0" />
+            <input type="number" className="pos-discount-input" value={discountValue} onChange={(e) => setDiscountValue(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} min="0" placeholder="Discount" />
             </div>
             <div className="pos-quick-amounts">
               {quickDiscounts.map(d => (
@@ -819,7 +821,7 @@ const POS = () => {
           </div>
           <div className="pos-paid-section">
             <label className="pos-payment-label">Paid Amount</label>
-            <div className="pos-paid-input-group"><span className="pos-paid-currency">₹</span><input type="number" className="pos-paid-input" value={paidAmount} onChange={(e) => setPaidAmount(Number(e.target.value))} placeholder="0.00" /></div>
+            <div className="pos-paid-input-group"><span className="pos-paid-currency">₹</span><input type="number" className="pos-paid-input" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} placeholder="Enter amount" /></div>
             <div className="pos-quick-amounts">
               <button className="pos-quick-amt-btn pos-quick-amt-exact" onClick={() => setPaidAmount(grandTotal)}><BiCheck /> Exact</button>
               {quickAmounts.map(amt => <button key={amt} className={`pos-quick-amt-btn ${paidAmount === amt ? 'active' : ''}`} onClick={() => setPaidAmount(amt)}>₹{amt}</button>)}
