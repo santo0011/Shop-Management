@@ -1442,22 +1442,6 @@ select:-webkit-autofill {
   padding-right: 12px;
 }
 
-/* Small inline spinner shown inside page-level search boxes while a
-   search/filter/pagination request is in flight (never the full-page loader). */
-.search-box-spinner {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
-  border: 2px solid rgba(var(--primary-rgb), 0.2);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  pointer-events: none;
-}
-
 /* Subtle "table is refreshing" indicator (thin progress bar), used instead of
    the full-page loader for filter/pagination/sort/refresh actions. */
 .table-container {
@@ -7033,4 +7017,518 @@ select:-webkit-autofill {
     justify-content: center;
     text-align: center;
   }
+}
+
+/* ==========================================
+   PURCHASE ENTRY DRAWER — invoice-style,
+   compact, keyboard-driven multi-row entry.
+   ========================================== */
+.purchase-drawer {
+  width: 980px;
+}
+
+.purchase-drawer-body {
+  padding: 1.25rem;
+}
+
+.purchase-alert-error {
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius-md);
+  background: var(--glow-danger);
+  color: var(--danger);
+  font-weight: 500;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.purchase-header-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.purchase-header-notes {
+  grid-column: span 3;
+}
+
+/* Compact header form fields inside the purchase drawer */
+.purchase-header-grid .form-label {
+  font-size: 0.8rem;
+  margin-bottom: 0.3rem;
+}
+
+.purchase-header-grid .form-control,
+.purchase-header-grid .form-select {
+  height: 36px;
+  font-size: 0.82rem;
+  padding: 0 0.75rem;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+}
+
+.purchase-header-grid .form-group {
+  margin-bottom: 0;
+}
+
+.purchase-items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.purchase-add-row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.3rem 0.75rem;
+  border: none;
+  border-radius: var(--border-radius-md);
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.purchase-add-row-btn:hover {
+  background: rgba(var(--primary-rgb), 0.2);
+}
+
+.purchase-items-scroll {
+  max-height: 46vh;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+}
+
+.purchase-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  table-layout: auto;
+}
+
+.purchase-items-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.45rem 0.4rem;
+  font-weight: 600;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.purchase-items-table tbody td {
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+
+.purchase-items-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.purchase-items-table tbody tr:hover {
+  background: var(--bg-card-hover);
+}
+
+/* Compact inputs inside the purchase items table */
+.purchase-items-table .form-control-sm,
+.purchase-items-table .form-control {
+  height: 30px;
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  line-height: 1.4;
+  border-radius: 6px;
+}
+
+/* Date inputs need slightly different padding for the calendar icon */
+.purchase-items-table input[type="date"].form-control-sm {
+  padding: 2px 4px 2px 6px;
+  min-height: 30px;
+}
+
+/* Number inputs - right-align for cleaner look */
+.purchase-items-table input[type="number"].form-control-sm {
+  text-align: right;
+}
+
+/* The product search input inside the table cell */
+.purchase-items-table .psf-input {
+  height: 30px;
+  font-size: 0.78rem;
+  padding: 0 30px 0 30px;
+}
+
+.purchase-row-hint {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.purchase-row-total {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  padding-top: 0.45rem !important;
+  text-align: right;
+  font-size: 0.8rem;
+}
+
+.purchase-remove-row-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.purchase-remove-row-btn:hover:not(:disabled) {
+  background: var(--glow-danger);
+}
+
+.purchase-remove-row-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ─── Sticky Summary Bar ─────────────────────────────────────── */
+.purchase-summary-bar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+}
+
+.purchase-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-width: 80px;
+}
+
+.purchase-summary-item strong {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.purchase-summary-item input {
+  width: 100px;
+  height: 30px;
+  font-size: 0.78rem;
+}
+
+.purchase-summary-grand strong {
+  color: var(--primary);
+  font-size: 0.9rem;
+}
+
+.purchase-summary-due strong {
+  color: var(--danger);
+}
+
+@media (max-width: 575.98px) {
+  .purchase-drawer {
+    width: 100vw;
+  }
+
+  .purchase-header-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .purchase-header-notes {
+    grid-column: span 1;
+  }
+}
+
+/* ==========================================
+   PRODUCT SEARCH FIELD — Modern Autocomplete
+   (product name / barcode / SKU lookup with
+   inline "Create New Product" option).
+   ========================================== */
+
+/* ─── Wrapper ───────────────────────────────────────────── */
+.psf-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* ─── Input Group ────────────────────────────────────────── */
+.psf-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.psf-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  pointer-events: none;
+  z-index: 2;
+  line-height: 1;
+}
+
+.psf-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 32px 0 32px;
+  font-size: 0.82rem;
+  font-family: var(--font-family);
+  font-weight: 500;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  color: var(--text-primary);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.psf-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+  background: var(--bg-card);
+}
+
+.psf-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ─── Loading Spinner ─────────────────────────────────────── */
+.psf-spinner {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(var(--primary-rgb), 0.2);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  pointer-events: none;
+  flex-shrink: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+/* ─── Dropdown ────────────────────────────────────────────── */
+.psf-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 9999;
+  padding: 4px;
+  animation: psfFadeIn 0.12s ease-out;
+}
+
+/* Portal variant — rendered at document.body with fixed positioning.
+   Uses the same visual styles but positioned via JS to avoid clipping
+   by any parent with overflow: hidden/auto. */
+.psf-dropdown-portal {
+  position: fixed;
+  z-index: 99999;
+  animation: psfFadeIn 0.12s ease-out;
+}
+
+@keyframes psfFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.psf-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.psf-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.psf-dropdown::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+/* ─── Dropdown Option ─────────────────────────────────────── */
+.psf-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: background 0.1s ease;
+  user-select: none;
+}
+
+.psf-option.active {
+  background: rgba(var(--primary-rgb), 0.08);
+}
+
+.psf-option:not(.active):hover {
+  background: var(--bg-card-hover);
+}
+
+/* ─── Option Icon ─────────────────────────────────────────── */
+.psf-option-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary);
+  font-size: 0.95rem;
+  margin-top: 2px;
+}
+
+.psf-create-icon {
+  background: rgba(var(--primary-rgb), 0.06);
+  color: var(--primary);
+}
+
+/* ─── Option Content ──────────────────────────────────────── */
+.psf-option-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.psf-option-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.psf-option-details {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  line-height: 1.3;
+}
+
+.psf-option-detail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.psf-option-detail-item strong {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ─── Option Meta (Stock + Price) ─────────────────────────── */
+.psf-option-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.psf-option-stock {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.psf-option-stock strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.psf-option-price {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+/* ─── Text Highlight ──────────────────────────────────────── */
+.psf-highlight {
+  background: rgba(var(--primary-rgb), 0.15);
+  color: var(--primary);
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* ─── Empty State ─────────────────────────────────────────── */
+.psf-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.psf-empty svg {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+/* ─── Create New Row ──────────────────────────────────────── */
+.psf-option-create {
+  border-top: 1px solid var(--border-light);
+  margin-top: 2px;
+  padding-top: 10px;
+}
+
+.psf-option-create.active {
+  background: rgba(var(--primary-rgb), 0.08);
 }

@@ -194,8 +194,8 @@ const searchProducts = async (req, res) => {
       query.$or = [
         { name: { $regex: q, $options: 'i' } },
         { nameBn: { $regex: q, $options: 'i' } },
-        { barcode: q },
-        { sku: q },
+        { barcode: { $regex: q, $options: 'i' } },
+        { sku: { $regex: q, $options: 'i' } },
       ];
     }
     if (category) query.category = category;

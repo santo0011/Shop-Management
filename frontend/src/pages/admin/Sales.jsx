@@ -1065,7 +1065,6 @@ const Sales = () => {
           <div className="sales-filter search-box">
             <BiSearch className="search-icon" />
             <input className="form-control sales-filter-input" placeholder="Search by Invoice, Customer Name or Phone..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            {searching && <span className="search-box-spinner" aria-hidden="true" />}
           </div>
           <div className="sales-filter">
             <BiCalendar size={14} className="sales-filter-icon-abs" />

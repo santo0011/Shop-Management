@@ -6,6 +6,14 @@ const purchaseItemSchema = new mongoose.Schema({
     ref: 'Product',
     required: true,
   },
+  batchNumber: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  expiryDate: {
+    type: Date,
+  },
   quantity: {
     type: Number,
     required: true,
@@ -22,6 +30,14 @@ const purchaseItemSchema = new mongoose.Schema({
   sellingPrice: {
     type: Number,
     required: true,
+  },
+  discount: {
+    type: Number,
+    default: 0,
+  },
+  tax: {
+    type: Number,
+    default: 0,
   },
   total: {
     type: Number,
@@ -40,9 +56,14 @@ const purchaseSchema = new mongoose.Schema({
     ref: 'Supplier',
     required: true,
   },
-  invoiceNo: {
+  purchaseNo: {
     type: String,
     required: true,
+  },
+  supplierInvoiceNo: {
+    type: String,
+    trim: true,
+    default: '',
   },
   purchaseDate: {
     type: Date,
@@ -97,5 +118,14 @@ const purchaseSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+purchaseSchema.index({ shop: 1, purchaseNo: 1 }, { unique: true });
+// A supplier invoice number only needs to be unique per supplier, and is
+// optional — the partial filter excludes purchases that left it blank so
+// empty strings never collide with each other.
+purchaseSchema.index(
+  { shop: 1, supplier: 1, supplierInvoiceNo: 1 },
+  { unique: true, partialFilterExpression: { supplierInvoiceNo: { $ne: '' } } }
+);
 
 module.exports = mongoose.model('Purchase', purchaseSchema);

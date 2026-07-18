@@ -760,7 +760,6 @@ const Suppliers = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {searching && <span className="search-box-spinner" aria-hidden="true" />}
         </div>
       </div>
 

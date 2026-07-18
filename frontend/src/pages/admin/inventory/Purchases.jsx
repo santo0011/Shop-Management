@@ -1,98 +1,209 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
-import { BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow } from 'react-icons/bi';
+import ProductDrawer from '../../../components/common/ProductDrawer';
+import ProductSearchField from '../../../components/common/ProductSearchField';
+import { showToast } from '../../../utils/toast';
+import {
+  BiSearch, BiPlus, BiTrash, BiX, BiCheck, BiShow, BiCalendar, BiNote,
+  BiCreditCard, BiHash, BiUser,
+} from 'react-icons/bi';
 import Swal from 'sweetalert2';
 
-const emptyForm = {
-  supplier: '', invoiceNo: '', items: [{ product: '', quantity: 1, purchasePrice: 0 }],
-  totalAmount: 0, paidAmount: 0, dueAmount: 0, paymentStatus: 'unpaid', notes: '',
-};
+// ─── Constants ────────────────────────────────────────────────────────────
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'mobile_banking', label: 'Mobile Banking' },
+  { value: 'due', label: 'Due' },
+];
 
-const REQUIRED_FIELDS = ['supplier', 'invoiceNo'];
+const ROW_FIELDS = ['batchNumber', 'expiryDate', 'quantity', 'purchasePrice', 'sellingPrice', 'discount', 'tax'];
 
-const validateField = (name, value) => {
-  switch (name) {
-    case 'supplier':
-      return value ? '' : 'Supplier is required';
-    case 'invoiceNo':
-      return String(value || '').trim() ? '' : 'Invoice number is required';
-    default:
-      return '';
-  }
-};
+let rowKeySeq = 0;
+const makeRowKey = () => `row-${Date.now()}-${rowKeySeq++}`;
 
-const PurchaseDrawer = ({ open, onClose, onSuccess, editing, t }) => {
-  const [form, setForm] = useState(emptyForm);
+const emptyRow = () => ({
+  key: makeRowKey(),
+  product: null,
+  batchNumber: '',
+  expiryDate: '',
+  quantity: 1,
+  purchasePrice: 0,
+  sellingPrice: 0,
+  discount: 0,
+  tax: 0,
+});
+
+const emptyHeader = () => ({
+  supplier: '',
+  supplierInvoiceNo: '',
+  purchaseDate: new Date().toISOString().slice(0, 10),
+  paymentMethod: 'cash',
+  notes: '',
+});
+
+const rowBase = (row) => Number(row.purchasePrice || 0) * Number(row.quantity || 0);
+const rowDiscountAmt = (row) => rowBase(row) * (Number(row.discount || 0) / 100);
+const rowTaxAmt = (row) => (rowBase(row) - rowDiscountAmt(row)) * (Number(row.tax || 0) / 100);
+const rowTotal = (row) => rowBase(row) - rowDiscountAmt(row) + rowTaxAmt(row);
+
+const money = (val) => `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// ─── Purchase Entry Drawer (create) / Detail Drawer (view) ────────────────
+const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
+  const isViewMode = !!viewing;
+
+  const [header, setHeader] = useState(emptyHeader);
+  const [rows, setRows] = useState([emptyRow()]);
+  const [paidAmount, setPaidAmount] = useState(0);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
+  const [categories, setCategories] = useState([]);
+
+  const [productDrawer, setProductDrawer] = useState({ open: false, rowKey: null, initialName: '' });
+
+  const fieldRefs = useRef({});
+  const setFieldRef = (rowKey, field) => (el) => { fieldRefs.current[`${rowKey}::${field}`] = el; };
+  const focusField = (rowKey, field) => { fieldRefs.current[`${rowKey}::${field}`]?.focus(); };
+
+  const units = [
+    { value: 'kg', label: t('units.kg') },
+    { value: 'gram', label: t('units.gram') },
+    { value: 'liter', label: t('units.liter') },
+    { value: 'ml', label: t('units.ml') },
+    { value: 'piece', label: t('units.piece') },
+    { value: 'packet', label: t('units.packet') },
+    { value: 'box', label: t('units.box') },
+    { value: 'carton', label: t('units.carton') },
+  ];
 
   useEffect(() => {
     if (!open) return;
     setErrors({});
     setSubmitError(null);
     fetchSuppliers();
-    setForm(editing ? {
-      supplier: editing.supplier?._id || editing.supplier || '',
-      invoiceNo: editing.invoiceNo || '',
-      items: editing.items?.length ? editing.items.map(i => ({
-        product: i.product?._id || i.product || '',
-        quantity: i.quantity || 1,
-        purchasePrice: i.purchasePrice || 0,
-      })) : [{ product: '', quantity: 1, purchasePrice: 0 }],
-      totalAmount: editing.totalAmount || 0,
-      paidAmount: editing.paidAmount || 0,
-      dueAmount: editing.dueAmount || 0,
-      paymentStatus: editing.paymentStatus || 'unpaid',
-      notes: editing.notes || '',
-    } : emptyForm);
-  }, [open, editing]);
+    fetchCategories();
+
+    if (viewing) {
+      setHeader({
+        supplier: viewing.supplier?._id || viewing.supplier || '',
+        supplierInvoiceNo: viewing.supplierInvoiceNo || '',
+        purchaseDate: viewing.purchaseDate ? viewing.purchaseDate.slice(0, 10) : '',
+        paymentMethod: viewing.paymentMethod || 'cash',
+        notes: viewing.notes || '',
+      });
+      setRows((viewing.items || []).map((i) => ({
+        key: makeRowKey(),
+        product: i.product && typeof i.product === 'object' ? i.product : { _id: i.product, name: 'Unknown product' },
+        batchNumber: i.batchNumber || '',
+        expiryDate: i.expiryDate ? String(i.expiryDate).slice(0, 10) : '',
+        quantity: i.quantity,
+        purchasePrice: i.purchasePrice,
+        sellingPrice: i.sellingPrice,
+        discount: i.discount || 0,
+        tax: i.tax || 0,
+      })));
+      setPaidAmount(viewing.paidAmount || 0);
+    } else {
+      setHeader(emptyHeader());
+      setRows([emptyRow()]);
+      setPaidAmount(0);
+    }
+  }, [open, viewing]);
 
   const fetchSuppliers = async () => {
     try {
-      const { data } = await api.get('/suppliers');
+      const { data } = await api.get('/suppliers?limit=10000');
       setSuppliers(Array.isArray(data) ? data : data.suppliers || []);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
-  const handleChange = (name, value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
+  const fetchCategories = async () => {
+    try {
+      const { data } = await api.get('/categories');
+      setCategories(Array.isArray(data) ? data : data.categories || []);
+    } catch (err) { console.error(err); }
+  };
+
+  const selectedSupplierData = useMemo(
+    () => suppliers.find((s) => s._id === header.supplier) || (viewing?.supplier && typeof viewing.supplier === 'object' ? viewing.supplier : null),
+    [suppliers, header.supplier, viewing]
+  );
+
+  const handleHeaderChange = (name, value) => {
+    setHeader((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => {
       if (!(name in prev)) return prev;
-      const msg = validateField(name, value);
       const next = { ...prev };
-      if (msg) next[name] = msg; else delete next[name];
+      delete next[name];
       return next;
     });
     if (submitError) setSubmitError(null);
   };
 
-  const handleItemChange = (index, field, value) => {
-    const items = [...form.items];
-    items[index] = { ...items[index], [field]: value };
-    setForm((prev) => ({ ...prev, items }));
+  const updateRow = (key, patch) => {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
 
-  const addItem = () => {
-    setForm((prev) => ({ ...prev, items: [...prev.items, { product: '', quantity: 1, purchasePrice: 0 }] }));
+  const addRow = () => {
+    const row = emptyRow();
+    setRows((prev) => [...prev, row]);
+    setTimeout(() => focusField(row.key, 'product'), 0);
+    return row.key;
   };
 
-  const removeItem = (index) => {
-    if (form.items.length <= 1) return;
-    setForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  const removeRow = (key) => {
+    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== key) : prev));
   };
+
+  const handleSelectProduct = (rowKey, product) => {
+    updateRow(rowKey, {
+      product,
+      purchasePrice: product.purchasePrice || 0,
+      sellingPrice: product.sellingPrice || 0,
+    });
+    setTimeout(() => focusField(rowKey, 'batchNumber'), 0);
+  };
+
+  const handleCreateNewProduct = (rowKey, query) => {
+    setProductDrawer({ open: true, rowKey, initialName: query });
+  };
+
+  const handleProductCreated = (product) => {
+    if (productDrawer.rowKey) {
+      handleSelectProduct(productDrawer.rowKey, product);
+    }
+    setProductDrawer({ open: false, rowKey: null, initialName: '' });
+  };
+
+  const handleRowFieldEnter = (rowKey, field) => {
+    const idx = ROW_FIELDS.indexOf(field);
+    if (idx < ROW_FIELDS.length - 1) {
+      focusField(rowKey, ROW_FIELDS[idx + 1]);
+    } else {
+      addRow();
+    }
+  };
+
+  // ─── Totals ─────────────────────────────────────────────────────────
+  const validRows = useMemo(() => rows.filter((r) => r.product), [rows]);
+  const totalItems = useMemo(() => validRows.reduce((sum, r) => sum + Number(r.quantity || 0), 0), [validRows]);
+  const subtotal = useMemo(() => validRows.reduce((sum, r) => sum + rowBase(r), 0), [validRows]);
+  const discountTotal = useMemo(() => validRows.reduce((sum, r) => sum + rowDiscountAmt(r), 0), [validRows]);
+  const taxTotal = useMemo(() => validRows.reduce((sum, r) => sum + rowTaxAmt(r), 0), [validRows]);
+  const grandTotal = subtotal - discountTotal + taxTotal;
+  const previousDue = selectedSupplierData?.dueAmount || 0;
+  const currentDue = Math.max(0, grandTotal - Number(paidAmount || 0));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
-    REQUIRED_FIELDS.forEach((field) => {
-      const msg = validateField(field, form[field]);
-      if (msg) newErrors[field] = msg;
-    });
+    if (!header.supplier) newErrors.supplier = 'Supplier is required';
+    if (validRows.length === 0) newErrors.items = 'Add at least one product';
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -101,11 +212,32 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     setSaving(true);
     setSubmitError(null);
     try {
-      if (editing) {
-        await api.put(`/purchases/${editing._id}`, form);
-      } else {
-        await api.post('/purchases', form);
-      }
+      const payload = {
+        supplier: header.supplier,
+        supplierInvoiceNo: header.supplierInvoiceNo.trim(),
+        purchaseDate: header.purchaseDate,
+        paymentMethod: header.paymentMethod,
+        notes: header.notes,
+        items: validRows.map((r) => ({
+          product: r.product._id,
+          batchNumber: r.batchNumber || '',
+          expiryDate: r.expiryDate || undefined,
+          quantity: Number(r.quantity) || 1,
+          unit: r.product.unit,
+          purchasePrice: Number(r.purchasePrice) || 0,
+          sellingPrice: Number(r.sellingPrice) || 0,
+          discount: Number(r.discount) || 0,
+          tax: Number(r.tax) || 0,
+          total: rowTotal(r),
+        })),
+        subtotal,
+        discount: discountTotal,
+        tax: taxTotal,
+        totalAmount: grandTotal,
+        paidAmount: Number(paidAmount) || 0,
+      };
+      const { data } = await api.post('/purchases', payload);
+      showToast.success(`Purchase ${data.purchaseNo} created`);
       onSuccess();
       onClose();
     } catch (err) {
@@ -115,130 +247,317 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     }
   };
 
-  const field = (name) => ({
-    className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
-    value: form[name],
-    onChange: (e) => handleChange(name, e.target.value),
-  });
-
   return (
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
-      <div className={`drawer ${open ? 'open' : ''}`}>
+      <div className={`drawer purchase-drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5>{editing ? 'Edit Purchase' : 'Add Purchase'}</h5>
+          <h5>{isViewMode ? `Purchase ${viewing?.purchaseNo || ''}` : 'New Purchase'}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
-        <div className="drawer-body">
+
+        <div className="drawer-body purchase-drawer-body">
           {submitError && (
-            <div style={{
-              padding: '0.75rem 1rem',
-              borderRadius: 'var(--border-radius-md)',
-              background: 'var(--glow-danger)',
-              color: 'var(--danger)',
-              fontWeight: 500,
-              marginBottom: '1.25rem',
-              fontSize: '0.85rem',
-            }}>
-              {submitError}
-            </div>
+            <div className="purchase-alert-error">{submitError}</div>
           )}
-          <form onSubmit={handleSubmit} id="purchase-form" noValidate>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('purchase.supplier')} <span style={{color: 'var(--danger)'}}>*</span></label>
-                  <select
-                    className={`form-select ${errors.supplier ? 'is-invalid' : ''}`}
-                    value={form.supplier}
-                    onChange={(e) => handleChange('supplier', e.target.value)}
-                  >
-                    <option value="">Select Supplier</option>
-                    {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
-                  </select>
-                  {errors.supplier && <div className="invalid-feedback-premium">{errors.supplier}</div>}
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('purchase.invoiceNo')} <span style={{color: 'var(--danger)'}}>*</span></label>
-                  <input {...field('invoiceNo')} placeholder="Enter invoice number" />
-                  {errors.invoiceNo && <div className="invalid-feedback-premium">{errors.invoiceNo}</div>}
-                </div>
-              </div>
+
+          {/* ─── Header Fields ─────────────────────────────────────── */}
+          <div className="purchase-header-grid">
+            <div className="form-group mb-0">
+              <label className="form-label"><BiUser style={{ marginRight: 4 }} />{t('purchase.supplier')} <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <select
+                className={`form-select ${errors.supplier ? 'is-invalid' : ''}`}
+                value={header.supplier}
+                onChange={(e) => handleHeaderChange('supplier', e.target.value)}
+                disabled={isViewMode}
+              >
+                <option value="">Select Supplier</option>
+                {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
+              </select>
+              {errors.supplier && <div className="invalid-feedback-premium">{errors.supplier}</div>}
             </div>
 
-            <div className="mt-3 mb-2 d-flex align-items-center justify-content-between">
-              <label className="form-label mb-0" style={{ fontWeight: 600 }}>Purchase Items</label>
-              <button type="button" className="btn-premium btn-premium-sm" style={{ background: 'rgba(108, 99, 255, 0.12)', color: 'var(--primary)', border: 'none', padding: '0.3rem 0.75rem', borderRadius: 'var(--border-radius-md)', fontSize: '0.8rem' }} onClick={addItem}>
-                <BiPlus /> Add Item
+            <div className="form-group mb-0">
+              <label className="form-label"><BiHash style={{ marginRight: 4 }} />Purchase No</label>
+              <input
+                className="form-control"
+                value={isViewMode ? viewing?.purchaseNo || '' : 'Auto-generated on save'}
+                readOnly
+                disabled
+                style={{ color: 'var(--text-muted)', background: 'var(--bg-primary)' }}
+              />
+            </div>
+
+            <div className="form-group mb-0">
+              <label className="form-label">Supplier Invoice No</label>
+              <input
+                className="form-control"
+                placeholder="Optional"
+                value={header.supplierInvoiceNo}
+                onChange={(e) => handleHeaderChange('supplierInvoiceNo', e.target.value)}
+                disabled={isViewMode}
+              />
+            </div>
+
+            <div className="form-group mb-0">
+              <label className="form-label"><BiCalendar style={{ marginRight: 4 }} />Purchase Date</label>
+              <input
+                type="date"
+                className="form-control"
+                value={header.purchaseDate}
+                onChange={(e) => handleHeaderChange('purchaseDate', e.target.value)}
+                disabled={isViewMode}
+              />
+            </div>
+
+            <div className="form-group mb-0">
+              <label className="form-label"><BiCreditCard style={{ marginRight: 4 }} />Payment Method</label>
+              <select
+                className="form-select"
+                value={header.paymentMethod}
+                onChange={(e) => handleHeaderChange('paymentMethod', e.target.value)}
+                disabled={isViewMode}
+              >
+                {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group mb-0 purchase-header-notes">
+              <label className="form-label"><BiNote style={{ marginRight: 4 }} />Notes</label>
+              <input
+                className="form-control"
+                placeholder="Optional notes"
+                value={header.notes}
+                onChange={(e) => handleHeaderChange('notes', e.target.value)}
+                disabled={isViewMode}
+              />
+            </div>
+          </div>
+
+          {/* ─── Product Entry Table ───────────────────────────────── */}
+          <div className="purchase-items-header">
+            <label className="form-label mb-0" style={{ fontWeight: 600 }}>Products</label>
+            {!isViewMode && (
+              <button type="button" className="purchase-add-row-btn" onClick={addRow}>
+                <BiPlus /> Add Row
               </button>
-            </div>
+            )}
+          </div>
+          {errors.items && <div className="invalid-feedback-premium mb-2">{errors.items}</div>}
 
-            {form.items.map((item, idx) => (
-              <div key={idx} className="row g-2 mb-2 p-2" style={{ background: 'rgba(108, 99, 255, 0.04)', borderRadius: 'var(--border-radius-md)' }}>
-                <div className="col-5">
-                  <input className="form-control form-control-sm" placeholder="Product ID" value={item.product} onChange={(e) => handleItemChange(idx, 'product', e.target.value)} />
-                </div>
-                <div className="col-3">
-                  <input type="number" className="form-control form-control-sm" placeholder="Qty" value={item.quantity} onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))} min="1" />
-                </div>
-                <div className="col-3">
-                  <input type="number" className="form-control form-control-sm" placeholder="Price" value={item.purchasePrice} onChange={(e) => handleItemChange(idx, 'purchasePrice', Number(e.target.value))} min="0" />
-                </div>
-                <div className="col-1 d-flex align-items-center">
-                  {form.items.length > 1 && (
-                    <button type="button" className="btn btn-sm p-0" style={{ color: 'var(--danger)' }} onClick={() => removeItem(idx)}>
-                      <BiX size={18} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            <div className="row g-3 mt-2">
-              <div className="col-md-4">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('sale.total')}</label>
-                  <input type="number" className="form-control" value={form.totalAmount} onChange={(e) => handleChange('totalAmount', Number(e.target.value))} />
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('common.paid')}</label>
-                  <input type="number" className="form-control" value={form.paidAmount} onChange={(e) => handleChange('paidAmount', Number(e.target.value))} />
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="form-group mb-0">
-                  <label className="form-label">{t('common.status')}</label>
-                  <select className="form-select" value={form.paymentStatus} onChange={(e) => handleChange('paymentStatus', e.target.value)}>
-                    <option value="unpaid">Unpaid</option>
-                    <option value="partial">Partial</option>
-                    <option value="paid">Paid</option>
-                  </select>
-                </div>
-              </div>
-              <div className="col-12">
-                <div className="form-group mb-0">
-                  <label className="form-label">Notes</label>
-                  <textarea className="form-control" rows="2" value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} placeholder="Optional notes" />
-                </div>
-              </div>
-            </div>
-          </form>
+          <div className="purchase-items-scroll">
+            <table className="purchase-items-table">
+              <thead>
+                <tr>
+                  <th style={{ minWidth: 180, width: '22%' }}>Product</th>
+                  <th style={{ width: 85 }}>Batch No.</th>
+                  <th style={{ width: 105 }}>Expiry Date</th>
+                  <th style={{ width: 55 }}>Qty</th>
+                  <th style={{ width: 80 }}>Purchase Price</th>
+                  <th style={{ width: 80 }}>Selling Price</th>
+                  <th style={{ width: 65 }}>Discount %</th>
+                  <th style={{ width: 55 }}>Tax %</th>
+                  <th style={{ width: 75 }}>Total</th>
+                  {!isViewMode && <th style={{ width: 32 }} />}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.key}>
+                    <td>
+                      {isViewMode ? (
+                        <span style={{ fontWeight: 600 }}>{row.product?.name || 'Unknown product'}</span>
+                      ) : (
+                        <>
+                          <ProductSearchField
+                            ref={setFieldRef(row.key, 'product')}
+                            value={row.product}
+                            onSelect={(p) => handleSelectProduct(row.key, p)}
+                            onCreateNew={(q) => handleCreateNewProduct(row.key, q)}
+                            onEnter={() => handleRowFieldEnter(row.key, 'product')}
+                          />
+                          {row.product && (
+                            <div className="purchase-row-hint">
+                              Unit: {row.product.unit} · Stock: {row.product.stock ?? 0}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      <input
+                        ref={setFieldRef(row.key, 'batchNumber')}
+                        className="form-control form-control-sm"
+                        value={row.batchNumber}
+                        onChange={(e) => updateRow(row.key, { batchNumber: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'batchNumber'))}
+                        disabled={isViewMode}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        ref={setFieldRef(row.key, 'expiryDate')}
+                        type="date"
+                        className="form-control form-control-sm"
+                        value={row.expiryDate}
+                        onChange={(e) => updateRow(row.key, { expiryDate: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'expiryDate'))}
+                        disabled={isViewMode}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        ref={setFieldRef(row.key, 'quantity')}
+                        type="number"
+                        min="1"
+                        className="form-control form-control-sm"
+                        value={row.quantity}
+                        onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'quantity'))}
+                        disabled={isViewMode}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        ref={setFieldRef(row.key, 'purchasePrice')}
+                        type="number"
+                        min="0"
+                        className="form-control form-control-sm"
+                        value={row.purchasePrice}
+                        onChange={(e) => updateRow(row.key, { purchasePrice: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'purchasePrice'))}
+                        disabled={isViewMode}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        ref={setFieldRef(row.key, 'sellingPrice')}
+                        type="number"
+                        min="0"
+                        className="form-control form-control-sm"
+                        value={row.sellingPrice}
+                        onChange={(e) => updateRow(row.key, { sellingPrice: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'sellingPrice'))}
+                        disabled={isViewMode}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        ref={setFieldRef(row.key, 'discount')}
+                        type="number"
+                        min="0"
+                        className="form-control form-control-sm"
+                        value={row.discount}
+                        onChange={(e) => updateRow(row.key, { discount: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'discount'))}
+                        disabled={isViewMode}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        ref={setFieldRef(row.key, 'tax')}
+                        type="number"
+                        min="0"
+                        className="form-control form-control-sm"
+                        value={row.tax}
+                        onChange={(e) => updateRow(row.key, { tax: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'tax'))}
+                        disabled={isViewMode}
+                      />
+                    </td>
+                    <td className="purchase-row-total">{money(rowTotal(row))}</td>
+                    {!isViewMode && (
+                      <td>
+                        <button
+                          type="button"
+                          className="purchase-remove-row-btn"
+                          onClick={() => removeRow(row.key)}
+                          disabled={rows.length <= 1}
+                          title="Remove row"
+                        >
+                          <BiTrash size={14} />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* ─── Sticky Summary ────────────────────────────────────────── */}
+        <div className="purchase-summary-bar">
+          <div className="purchase-summary-item">
+            <span>Total Items</span>
+            <strong>{totalItems}</strong>
+          </div>
+          <div className="purchase-summary-item">
+            <span>Subtotal</span>
+            <strong>{money(subtotal)}</strong>
+          </div>
+          <div className="purchase-summary-item">
+            <span>Discount</span>
+            <strong>-{money(discountTotal)}</strong>
+          </div>
+          <div className="purchase-summary-item">
+            <span>Tax</span>
+            <strong>+{money(taxTotal)}</strong>
+          </div>
+          <div className="purchase-summary-item purchase-summary-grand">
+            <span>Grand Total</span>
+            <strong>{money(grandTotal)}</strong>
+          </div>
+          <div className="purchase-summary-item">
+            <span>Previous Due</span>
+            <strong>{money(previousDue)}</strong>
+          </div>
+          <div className="purchase-summary-item purchase-summary-paid">
+            <span>Paid Amount</span>
+            {isViewMode ? <strong>{money(paidAmount)}</strong> : (
+              <input
+                type="number"
+                min="0"
+                className="form-control form-control-sm"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+              />
+            )}
+          </div>
+          <div className="purchase-summary-item purchase-summary-due">
+            <span>Current Due</span>
+            <strong>{money(currentDue)}</strong>
+          </div>
+        </div>
+
         <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="submit" form="purchase-form" className="btn-premium btn-premium-primary" disabled={saving}>
-            {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
-          </button>
+          {/* <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
+            {isViewMode ? 'Close' : t('common.cancel')}
+          </button> */}
+          {!isViewMode && (
+            <button type="button" className="btn-premium btn-premium-primary" onClick={handleSubmit} disabled={saving}>
+              {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> Save Purchase</>}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Nested Add Product drawer, for "+ Create New Product" from the search field */}
+      <ProductDrawer
+        open={productDrawer.open}
+        onClose={() => setProductDrawer({ open: false, rowKey: null, initialName: '' })}
+        onSuccess={handleProductCreated}
+        editing={null}
+        categories={categories}
+        units={units}
+        t={t}
+        initialName={productDrawer.initialName}
+      />
     </>
   );
 };
 
+// ─── Main Purchases Page ───────────────────────────────────────────────────
 const Purchases = () => {
   const { t } = useTranslation();
   const [purchases, setPurchases] = useState([]);
@@ -246,7 +565,7 @@ const Purchases = () => {
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const isFirstLoad = useRef(true);
 
@@ -254,7 +573,7 @@ const Purchases = () => {
     fetchPurchases();
   }, []);
 
-  const fetchPurchases = async () => {
+  const fetchPurchases = useCallback(async () => {
     const silent = !isFirstLoad.current;
     if (silent) setSearching(true); else setLoading(true);
     try {
@@ -266,16 +585,22 @@ const Purchases = () => {
       if (silent) setSearching(false); else setLoading(false);
       isFirstLoad.current = false;
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   useEffect(() => {
     const timer = setTimeout(() => fetchPurchases(), 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [fetchPurchases]);
 
-  const handleEdit = (purchase) => {
-    setEditing(purchase);
-    setDrawerOpen(true);
+  const handleView = async (purchase) => {
+    try {
+      const { data } = await api.get(`/purchases/${purchase._id}`);
+      setViewing(data);
+      setDrawerOpen(true);
+    } catch (err) {
+      showToast.error('Failed to load purchase details');
+    }
   };
 
   const handleDelete = async (id) => {
@@ -291,7 +616,7 @@ const Purchases = () => {
   const confirmDelete = (purchase) => {
     Swal.fire({
       title: 'Delete Purchase?',
-      text: `Are you sure you want to delete purchase "${purchase.invoiceNo}"? This action cannot be undone.`,
+      text: `Are you sure you want to delete purchase "${purchase.purchaseNo}"? This action cannot be undone.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#FF6B6B',
@@ -337,7 +662,7 @@ const Purchases = () => {
             Manage your purchase orders
           </p>
         </div>
-        <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
+        <button className="btn-premium btn-premium-primary" onClick={() => { setViewing(null); setDrawerOpen(true); }}>
           <BiPlus /> Add Purchase
         </button>
       </div>
@@ -348,11 +673,10 @@ const Purchases = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder={`${t('common.search')} purchases...`}
+            placeholder="Search by purchase no, supplier invoice or supplier..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {searching && <span className="search-box-spinner" aria-hidden="true" />}
         </div>
       </div>
 
@@ -362,25 +686,26 @@ const Purchases = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
-                <th>{t('purchase.invoiceNo')}</th>
+                <th>Purchase No</th>
+                <th>Supplier Invoice</th>
                 <th>{t('purchase.supplier')}</th>
                 <th>{t('sale.total')}</th>
                 <th>{t('common.paid')}</th>
                 <th>{t('common.due')}</th>
                 <th>{t('common.status')}</th>
-                <th style={{ width: '140px' }}>{t('common.actions')}</th>
+                <th style={{ width: '100px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> Loading...
                   </td>
                 </tr>
               ) : purchases.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
                     No purchases found
                   </td>
@@ -388,8 +713,9 @@ const Purchases = () => {
               ) : purchases.map((purchase) => (
                 <tr key={purchase._id}>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{purchase.invoiceNo}</div>
+                    <div style={{ fontWeight: 600 }}>{purchase.purchaseNo}</div>
                   </td>
+                  <td>{purchase.supplierInvoiceNo || '-'}</td>
                   <td>{purchase.supplier?.name || '-'}</td>
                   <td>₹{purchase.totalAmount}</td>
                   <td>₹{purchase.paidAmount}</td>
@@ -401,11 +727,8 @@ const Purchases = () => {
                   <td>{getStatusBadge(purchase.paymentStatus)}</td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip="View">
+                      <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(purchase)}>
                         <BiShow />
-                      </button>
-                      <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(purchase)}>
-                        <BiEdit />
                       </button>
                       <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => confirmDelete(purchase)}>
                         <BiTrash />
@@ -419,12 +742,12 @@ const Purchases = () => {
         </div>
       </div>
 
-      {/* Add / Edit Purchase Drawer */}
+      {/* Add Purchase / View Purchase Drawer */}
       <PurchaseDrawer
         open={drawerOpen}
-        onClose={() => { setDrawerOpen(false); setEditing(null); }}
+        onClose={() => { setDrawerOpen(false); setViewing(null); }}
         onSuccess={fetchPurchases}
-        editing={editing}
+        viewing={viewing}
         t={t}
       />
 

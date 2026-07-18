@@ -576,8 +576,7 @@ const POS = () => {
           <div className="pos-search-wrapper">
             <BiSearch className="pos-search-icon" />
             <input ref={searchRef} className="pos-search-input" placeholder={`${t('common.search', 'Search')} by name, barcode or SKU...`} value={search} onChange={(e) => setSearch(e.target.value)} />
-            {searching && <span className="pos-search-spinner" aria-hidden="true" />}
-            {!searching && search && <button className="pos-search-clear" onClick={() => { setSearch(''); setShowTopSelling(true); }}><BiX /></button>}
+            {search && <button className="pos-search-clear" onClick={() => { setSearch(''); setShowTopSelling(true); }}><BiX /></button>}
           </div>
           <div className="pos-search-hints">
             <small><BiBarcode /> Scan barcode or type to search</small>

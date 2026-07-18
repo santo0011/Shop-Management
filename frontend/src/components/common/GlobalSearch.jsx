@@ -158,8 +158,7 @@ const GlobalSearch = () => {
           aria-label="Global search"
           autoComplete="off"
         />
-        {loading && <span className="global-search-spinner" aria-hidden="true" />}
-        {!loading && query && (
+        {query && (
           <button type="button" className="global-search-clear" onClick={clearSearch} aria-label="Clear search">
             <BiX />
           </button>
