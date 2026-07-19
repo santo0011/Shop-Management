@@ -90,6 +90,23 @@ const STATUS_OPTIONS = [
   { key: 'unpaid', label: 'Due' },
 ];
 
+// ─── Date Quick Filters ───────────────────────────────────────
+const DATE_PRESETS = [
+  { key: 'today', label: 'Today' },
+  { key: '7d', label: 'Last 7 Days' },
+  { key: '30d', label: 'Last 30 Days' },
+  { key: 'month', label: 'This Month' },
+  { key: 'custom', label: 'Custom Range' },
+];
+
+// Local calendar date (no timezone shift) — matches what <input type="date"> produces
+const toDateInputValue = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 // ─── Invoice QR Component ────────────────────────────────────
 const SalesInvoiceQR = ({ invoiceNo, size = 60 }) => {
   const chars = (invoiceNo || 'INV').split('');
@@ -927,6 +944,7 @@ const Sales = () => {
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [datePreset, setDatePreset] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1004,6 +1022,27 @@ const Sales = () => {
   const refreshAll = () => {
     fetchSales();
     api.get('/sales/stats', { _skipLoading: true }).then(({ data }) => setStats(data)).catch(() => {});
+  };
+
+  const applyDatePreset = (key) => {
+    setDatePreset(key);
+    if (key === 'custom') return; // just reveal the manual pickers below; leave existing dates as-is
+
+    const now = new Date();
+    let start = new Date(now);
+    const end = new Date(now);
+
+    if (key === '7d') {
+      start.setDate(start.getDate() - 6);
+    } else if (key === '30d') {
+      start.setDate(start.getDate() - 29);
+    } else if (key === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    // 'today' needs no adjustment — start and end are both "now"
+
+    setStartDate(toDateInputValue(start));
+    setEndDate(toDateInputValue(end));
   };
 
   const handleView = (sale) => { setViewingSale(sale); setDrawerOpen(true); };
@@ -1163,10 +1202,10 @@ const Sales = () => {
   };
 
   const statCards = [
-    { label: "Today's Sales", value: stats?.todaySales || 0, icon: BiDollar, color: 'primary' },
-    { label: "Today's Revenue", value: `₹${Number(stats?.todayRevenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, icon: BiTrendingUp, color: 'success' },
-    { label: 'Total Due', value: `₹${Number(stats?.todayDue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, icon: BiWallet, color: 'danger' },
-    { label: 'Transactions', value: stats?.count || 0, icon: BiCart, color: 'warning' },
+    { label: "Today's Sales", value: stats?.todaySales || 0, icon: BiDollar, color: 'primary', isCurrency: true },
+    { label: "Today's Revenue", value: stats?.todayRevenue || 0, icon: BiTrendingUp, color: 'success', isCurrency: true },
+    { label: 'Total Due', value: stats?.todayDue || 0, icon: BiWallet, color: 'danger', isCurrency: true },
+    { label: 'Transactions', value: stats?.count || 0, icon: BiCart, color: 'warning', isCurrency: false },
   ];
 
   return (
@@ -1185,7 +1224,7 @@ const Sales = () => {
       <div className="row g-3 mb-4">
         {statCards.map((card, idx) => (
           <div key={idx} className="col-6 col-md-3">
-            <StatCard icon={card.icon} label={card.label} value={card.value} color={card.color} />
+            <StatCard icon={card.icon} label={card.label} value={card.value} color={card.color} rawValue={card.value} isCurrency={card.isCurrency} />
           </div>
         ))}
       </div>
@@ -1196,14 +1235,40 @@ const Sales = () => {
             <BiSearch className="search-icon" />
             <input className="form-control sales-filter-input" placeholder="Search by Invoice, Customer Name or Phone..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <div className="sales-filter">
-            <BiCalendar size={14} className="sales-filter-icon-abs" />
-            <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+
+          <div className="sales-date-filters-scroll">
+            <div className="sales-date-segmented" role="tablist" aria-label="Date filter">
+              {DATE_PRESETS.map((p, idx) => (
+                <React.Fragment key={p.key}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={datePreset === p.key}
+                    className={`sales-date-pill ${datePreset === p.key ? 'active' : ''}`}
+                    onClick={() => applyDatePreset(p.key)}
+                  >
+                    <BiCalendar />
+                    <span>{p.label}</span>
+                  </button>
+                  {idx === 2 && <span className="sales-date-break" aria-hidden="true" />}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
-          <div className="sales-filter">
-            <BiCalendar size={14} className="sales-filter-icon-abs" />
-            <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </div>
+
+          {datePreset === 'custom' && (
+            <>
+              <div className="sales-filter">
+                <BiCalendar size={14} className="sales-filter-icon-abs" />
+                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div className="sales-filter">
+                <BiCalendar size={14} className="sales-filter-icon-abs" />
+                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+            </>
+          )}
+
           <div className="sales-filter">
             <select className="form-control sales-filter-input" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
               {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}

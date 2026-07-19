@@ -6,6 +6,7 @@ import { updateLanguage } from '../../redux/slices/authSlice';
 import api from '../../services/api';
 import { BiMenu, BiSun, BiMoon, BiUser, BiGlobe, BiLogOut, BiBell } from 'react-icons/bi';
 import GlobalSearch from '../common/GlobalSearch';
+import Swal from 'sweetalert2';
 import { showToast } from '../../utils/toast';
 
 const Header = ({ onToggleSidebar }) => {
@@ -46,9 +47,25 @@ const Header = ({ onToggleSidebar }) => {
   };
 
   const handleLogout = () => {
-    showToast.success('Logged out successfully.');
-    localStorage.clear();
-    window.location.href = '/login';
+    setProfileOpen(false);
+    Swal.fire({
+      title: 'Logout?',
+      text: 'Are you sure you want to logout?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#FF6B6B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, logout',
+      cancelButtonText: 'Cancel',
+      background: 'var(--bg-card)',
+      color: 'var(--text-primary)',
+      reverseButtons: true,
+    }).then((result) => {
+      if (!result.isConfirmed) return;
+      showToast.success('Logged out successfully.');
+      localStorage.clear();
+      window.location.href = '/login';
+    });
   };
 
   return (
@@ -124,7 +141,7 @@ const Header = ({ onToggleSidebar }) => {
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{user?.email}</div>
               </div>
               <div className="dropdown-divider-premium" />
-              <button className="dropdown-item-premium" onClick={handleLogout}>
+              <button className="dropdown-item-premium" onClick={handleLogout} style={{ color: 'var(--danger)' }}>
                 <BiLogOut /> {t('nav.logout')}
               </button>
             </div>

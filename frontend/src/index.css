@@ -549,8 +549,7 @@ body {
 }
 
 .premium-card:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
 }
 
 .premium-card-header {
@@ -580,8 +579,7 @@ body {
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: var(--shadow-card);
 }
 
 .stat-card .stat-icon-wrapper {
@@ -701,6 +699,14 @@ body {
 .stat-card-modern.stat-danger { border-top: 3px solid var(--danger); }
 .stat-card-modern.stat-warning { border-top: 3px solid var(--warning); }
 .stat-card-modern.stat-info { border-top: 3px solid var(--info); }
+
+/* Drop the icon on mobile across every stat card (Dashboard, Reports, Sales)
+   so the value/label get the full card width on small screens. */
+@media (max-width: 767.98px) {
+  .stat-card-modern .stat-icon-wrapper {
+    display: none;
+  }
+}
 
 /* ==========================================
    BUTTONS
@@ -1721,7 +1727,7 @@ select:-webkit-autofill {
 }
 
 .expandable-card:hover {
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: var(--shadow-card);
 }
 
 .expandable-card--open {
@@ -2460,8 +2466,8 @@ select:-webkit-autofill {
   overflow-y: auto;
   padding: 12px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
   align-content: start;
 }
 
@@ -2486,7 +2492,7 @@ select:-webkit-autofill {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 12px 10px;
+  padding: 8px 8px;
   border-radius: var(--border-radius-md);
   background: var(--bg-input);
   border: 1px solid var(--border-light);
@@ -2508,16 +2514,16 @@ select:-webkit-autofill {
 }
 
 .pos-product-icon {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--border-radius-sm);
   background: rgba(var(--primary-rgb), 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
+  font-size: 1.05rem;
   color: var(--primary);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .pos-product-info {
@@ -2526,26 +2532,26 @@ select:-webkit-autofill {
 }
 
 .pos-product-name {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.3;
+  line-height: 1.25;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
 }
 
 .pos-product-price {
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: var(--primary);
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .pos-product-stock {
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .stock-badge {
@@ -3592,7 +3598,7 @@ select:-webkit-autofill {
    black text, light-gray borders) regardless
    of the app's Dark Mode. This block defines
    its own tokens (--inv-*) instead of reusing
-   the global --bg-*/--text-*/--border-* theme
+   the global --bg-* / --text-* / --border-* theme
    tokens, and is intentionally NOT gated by
    [data-theme="dark"] so it applies the same
    way no matter what theme is active. Anything
@@ -4352,6 +4358,177 @@ select:-webkit-autofill {
 
 [data-theme="dark"] .printer-settings-preview-hint {
   background: rgba(var(--primary-rgb), 0.08);
+}
+
+/* ─── Mobile Top Selling Products (Compact List) ──────── */
+.pos-top-selling-mobile {
+  display: none;
+}
+
+@media (max-width: 575.98px) {
+  .pos-top-selling-mobile {
+    display: block;
+    padding: 8px 8px 8px;
+  }
+
+  .pos-top-selling-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pos-top-selling-mobile-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: rgba(23, 132, 245, 0.06);
+    border: 1px solid rgba(139, 90, 43, 0.4);
+    box-shadow: 0 2px 6px rgba(23, 132, 245, 0.18);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .pos-top-selling-mobile-item:active {
+    transform: scale(0.98);
+    background: rgba(23, 132, 245, 0.12);
+    box-shadow: 0 2px 8px rgba(23, 132, 245, 0.3);
+  }
+
+  .pos-top-selling-mobile-rank {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: rgba(var(--primary-rgb), 0.1);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .pos-top-selling-mobile-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .pos-top-selling-mobile-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  .pos-top-selling-mobile-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 6px;
+    min-width: 0;
+  }
+
+  .pos-top-selling-mobile-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .pos-top-selling-mobile-stat-label {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .pos-top-selling-mobile-stat-value {
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pos-top-selling-mobile-stat-value--price {
+    color: var(--primary);
+  }
+
+  .pos-top-selling-mobile-stat-value--sold {
+    color: var(--warning);
+  }
+
+  .pos-top-selling-mobile-stat-value--stock {
+    color: var(--secondary);
+  }
+
+  .pos-top-selling-mobile-add {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    border: none;
+    background: rgba(var(--primary-rgb), 0.1);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+  }
+
+  .pos-top-selling-mobile-add:active {
+    background: var(--primary);
+    color: #fff;
+    transform: scale(0.9);
+  }
+
+  .pos-top-selling-mobile-view-all {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    padding: 7px 10px;
+    margin-top: 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .pos-top-selling-mobile-view-all:active {
+    background: var(--bg-card-hover);
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+
+  /* Hide desktop grid on mobile when top selling section is present */
+  .pos-top-selling-mobile ~ .pos-product-grid {
+    display: none;
+  }
+
+  /* Show grid on mobile when no top selling section (search mode) */
+  .pos-product-grid:only-child {
+    display: grid;
+  }
 }
 
 /* ==========================================
@@ -5661,12 +5838,18 @@ select:-webkit-autofill {
 
 @media (max-width: 575.98px) {
   .pos-customer-modern-header {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
     gap: 6px;
   }
 
   .pos-customer-search-area {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pos-customer-header-right {
+    flex-shrink: 0;
   }
 
   .pos-customer-dropdown-modern {
@@ -5689,7 +5872,6 @@ select:-webkit-autofill {
 
 /* ─── Page Layout ─────────────────────────────────────────── */
 .sales-page {
-  animation: fadeIn 0.3s ease;
 }
 
 /* ─── Header ──────────────────────────────────────────────── */
@@ -5824,8 +6006,7 @@ select:-webkit-autofill {
 }
 
 .sales-stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: var(--shadow-card);
 }
 
 .sales-stat-top {
@@ -5906,6 +6087,77 @@ select:-webkit-autofill {
 .sales-filter .search-icon {
   top: 50%;
   transform: translateY(-50%);
+}
+
+/* ─── Date Quick Filters — segmented pill toolbar (matches the
+   Dashboard/Reports segmented controls for a consistent app feel) ── */
+.sales-date-filters-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.sales-date-filters-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.sales-date-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 38px;
+  background: var(--bg-input);
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+
+.sales-date-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font-family);
+  transition: background var(--transition-base), color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.sales-date-pill svg {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.sales-date-pill:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.sales-date-pill.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(var(--primary-rgb), 0.35);
+}
+
+.sales-date-pill.active:hover {
+  color: #fff;
+}
+
+/* Forces the mobile wrap to split exactly 3 + 2 (Today/Last 7/Last 30 on
+   row one, This Month/Custom Range on row two) regardless of pill text
+   width. No effect on desktop, where the toolbar stays a single row. */
+.sales-date-break {
+  display: none;
 }
 
 /* ─── Table Container ──────────────────────────────────────── */
@@ -6991,6 +7243,49 @@ select:-webkit-autofill {
     min-width: 140px;
     flex: 1 1 calc(50% - 0.5rem);
   }
+
+  .sales-date-filters-scroll {
+    flex: 1 1 100%;
+  }
+}
+
+/* Mobile: wrap the date pills onto multiple rows instead of scrolling */
+@media (max-width: 767.98px) {
+  .sales-date-filters-scroll {
+    overflow-x: visible;
+    width: 100%;
+  }
+
+  .sales-date-segmented {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    height: auto;
+  }
+
+  .sales-date-pill {
+    height: 32px;
+    padding: 0 10px;
+    gap: 4px;
+    font-size: 0.72rem;
+  }
+
+  .sales-date-pill svg {
+    font-size: 0.82rem;
+  }
+
+  .sales-date-break {
+    display: block;
+    flex-basis: 100%;
+    width: 100%;
+    height: 0;
+  }
+
+  .sales-filter.search-box .sales-filter-input {
+    height: 46px;
+    font-size: 0.9rem;
+  }
 }
 
 @media (max-width: 575.98px) {
@@ -7097,6 +7392,48 @@ select:-webkit-autofill {
   gap: 1.5rem;
 }
 
+.settings-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--glow-primary);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.settings-card-header h5 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.settings-card-header p {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .settings-field-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -7131,23 +7468,6 @@ select:-webkit-autofill {
 }
 
 @media (max-width: 767.98px) {
-  .settings-layout {
-    flex-direction: column;
-  }
-
-  .settings-sidebar {
-    position: static;
-    width: 100%;
-    flex-direction: row;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .settings-nav-item {
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
   .settings-save-bar {
     flex-wrap: wrap;
   }
@@ -7156,6 +7476,116 @@ select:-webkit-autofill {
     margin-right: 0;
     width: 100%;
     order: 2;
+  }
+}
+
+/* ─── Mobile accordion (replaces sidebar/content layout below 768px) ─── */
+.settings-accordion {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .settings-layout {
+    display: none;
+  }
+
+  .settings-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .settings-accordion-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+  }
+
+  .settings-accordion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .settings-accordion-item.open .settings-accordion-header {
+    border-bottom: 1px solid var(--border-color);
+    color: var(--primary);
+  }
+
+  .settings-accordion-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .settings-accordion-header-left svg {
+    font-size: 1.15rem;
+    color: var(--primary);
+    flex-shrink: 0;
+  }
+
+  .settings-accordion-chevron {
+    color: var(--text-muted);
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  .settings-accordion-item.open .settings-accordion-chevron {
+    color: var(--primary);
+    transform: rotate(180deg);
+  }
+
+  .settings-accordion-body {
+    padding-top: 0.25rem;
+  }
+
+  /* The section content re-uses .settings-card designed for the desktop panel;
+     strip its own chrome so it sits flush inside the accordion row instead of
+     nesting a card inside a card. The header is hidden since the accordion
+     row already shows the icon + label. */
+  .settings-accordion-body .settings-card {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .settings-accordion-body .settings-card-header {
+    display: none;
+  }
+
+  .settings-accordion-body .p-4 {
+    padding: 0.5rem 1rem 1rem;
+  }
+
+  .settings-accordion-body > div {
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  .settings-accordion-save {
+    padding: 0 1rem 1rem;
+  }
+
+  .settings-accordion-save .btn-premium {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -7236,42 +7666,15 @@ select:-webkit-autofill {
 /* ==========================================
    REPORTS PAGE — Filter Bar & Status Pills
    ========================================== */
+.reports-filter-card-body {
+  padding: 1rem 1.25rem;
+}
+
 .reports-filter-bar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.reports-filter-presets {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.reports-preset-btn {
-  padding: 6px 16px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border-color);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  font-family: var(--font-family);
-  white-space: nowrap;
-}
-
-.reports-preset-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.reports-preset-btn.active {
-  border-color: var(--primary);
-  background: rgba(var(--primary-rgb), 0.1);
-  color: var(--primary);
 }
 
 .reports-payment-select {
@@ -7326,13 +7729,28 @@ select:-webkit-autofill {
 }
 
 @media (max-width: 767.98px) {
+  .reports-filter-card-body {
+    padding: 0.75rem 0.6rem;
+  }
+
   .reports-filter-bar {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.85rem;
+  }
+
+  .reports-payment-select {
+    max-width: none;
+    width: 100%;
   }
 
   .reports-export-group {
-    justify-content: flex-start;
+    justify-content: stretch;
+  }
+
+  .reports-export-group .btn-premium {
+    flex: 1 1 0;
+    justify-content: center;
   }
 
   .data-table-search {
@@ -8867,32 +9285,39 @@ select:-webkit-autofill {
   margin: 6px 0;
 }
 
-/* ─── Donut Chart Container ────────────────────────────────── */
+/* ─── Donut Chart Container ──────────────────────────────────
+   Stacked layout: donut centered on top, legend list underneath —
+   each legend row gets the card's full width instead of fighting
+   the chart for horizontal space. */
 .dashboard-donut-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 16px;
   width: 100%;
 }
 
-.dashboard-donut-container .recharts-wrapper {
-  flex-shrink: 0;
+.dashboard-donut-chart-wrap {
+  flex: 0 0 auto;
+  width: 190px;
+  height: 190px;
 }
 
 /* ─── Donut Legend ─────────────────────────────────────────── */
 .dashboard-donut-legend {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 
 .dashboard-donut-legend-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: var(--border-radius-sm);
   background: var(--bg-primary);
   transition: background var(--transition-fast);
@@ -8913,8 +9338,10 @@ select:-webkit-autofill {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-primary);
-  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-donut-legend-value {
@@ -8923,19 +9350,19 @@ select:-webkit-autofill {
   color: var(--text-primary);
   font-family: var(--font-mono);
   white-space: nowrap;
+  text-align: right;
 }
 
 .dashboard-donut-legend-pct {
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--text-muted);
-  min-width: 36px;
+  min-width: 38px;
   text-align: right;
 }
 
 /* ─── Dashboard Modern Wrapper ─────────────────────────────── */
 .dashboard-modern {
-  animation: dashboardFadeIn 0.3s ease-out;
 }
 
 @keyframes dashboardFadeIn {
@@ -9051,28 +9478,48 @@ select:-webkit-autofill {
 }
 
 .login-brand-shape--1 {
-  width: 400px;
-  height: 400px;
-  background: rgba(255, 255, 255, 0.06);
-  top: -100px;
-  right: -80px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+  top: -150px;
+  right: -100px;
+  animation: loginFloat 8s ease-in-out infinite;
 }
 
 .login-brand-shape--2 {
-  width: 250px;
-  height: 250px;
-  background: rgba(255, 255, 255, 0.05);
-  bottom: 60px;
-  left: -60px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
+  bottom: 80px;
+  left: -80px;
+  animation: loginFloat 10s ease-in-out infinite reverse;
 }
 
 .login-brand-shape--3 {
-  width: 180px;
-  height: 180px;
-  background: rgba(255, 255, 255, 0.07);
-  top: 40%;
-  left: 60%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, transparent 70%);
+  top: 35%;
+  left: 55%;
   animation: loginFloat 6s ease-in-out infinite;
+}
+
+.login-brand-shape--4 {
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+  top: 15%;
+  right: 20%;
+  animation: loginFloat 7s ease-in-out infinite 1s;
+}
+
+.login-brand-shape--5 {
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.09) 0%, transparent 70%);
+  bottom: 25%;
+  right: 30%;
+  animation: loginFloat 5s ease-in-out infinite 0.5s;
 }
 
 @keyframes loginFloat {
@@ -9093,35 +9540,37 @@ select:-webkit-autofill {
 }
 
 .login-brand-logo-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
+  font-size: 1.4rem;
   font-weight: 800;
   color: #fff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .login-brand-title {
-  font-size: 2.2rem;
+  font-size: 2.4rem;
   font-weight: 800;
   margin: 0 0 0.75rem;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
   color: #fff;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
 }
 
 .login-brand-subtitle {
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 1.05rem;
+  line-height: 1.65;
   margin: 0 0 2rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.8);
   font-weight: 400;
 }
 
@@ -9136,83 +9585,101 @@ select:-webkit-autofill {
 .login-brand-feature {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: all 0.25s ease;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .login-brand-feature:hover {
-  background: rgba(255, 255, 255, 0.18);
-  transform: translateX(6px);
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(8px);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .login-brand-feature-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 1.05rem;
   flex-shrink: 0;
   color: #fff;
 }
 
 .login-brand-feature span {
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.95);
 }
 
-/* Author credit — matches feature card styling */
-.login-brand-author {
-  display: flex;
+/* ─── Developer Badge (Desktop) ─────────────────── */
+.login-brand-badge-wrapper {
+  margin-top: 0.5rem;
+}
+
+.dev-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: default;
   max-width: fit-content;
-  transition: all 0.25s ease;
 }
 
-.login-brand-author:hover {
-  background: rgba(255, 255, 255, 0.18);
-  transform: translateX(6px);
+.dev-badge:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
-.login-brand-author-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #6C63FF, #00D9A6);
+.dev-badge-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 1.1rem;
   color: #fff;
   flex-shrink: 0;
 }
 
-.login-brand-author-name {
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.95);
-  line-height: 1.3;
+.dev-badge-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-.login-brand-author-role {
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.95);
+.dev-badge-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+.dev-badge-role {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.3;
 }
 
 /* ─── Right Login Form Panel ────────────────────── */
@@ -9571,38 +10038,68 @@ select:-webkit-autofill {
   100% { width: 0; }
 }
 
-/* Language switcher */
+/* Language switcher — rounded segmented pill toggle, text-based (no flags) */
 .login-lang-switcher {
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   margin-top: 1.5rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--border-color);
 }
 
+.login-lang-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 200ms ease;
+}
+
+.login-lang-toggle {
+  display: inline-flex;
+  gap: 3px;
+  background: var(--bg-input);
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+}
+
 .login-lang-btn {
   padding: 6px 16px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  border: none;
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.8rem;
   font-weight: 600;
   font-family: var(--font-family);
   cursor: pointer;
-  transition: all 200ms;
+  white-space: nowrap;
+  transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
 }
 
 .login-lang-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
 }
 
 .login-lang-btn.active {
-  border-color: var(--primary);
-  background: rgba(var(--primary-rgb), 0.1);
-  color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(var(--primary-rgb), 0.35);
+}
+
+.login-lang-btn.active:hover {
+  color: #fff;
+}
+
+/* Mobile Developer Badge (hidden on desktop) */
+.login-mobile-badge-wrapper {
+  display: none;
 }
 
 /* ─── Responsive ────────────────────────────────── */
@@ -9620,7 +10117,7 @@ select:-webkit-autofill {
 
   /* Dark mode mobile background */
   [data-theme="dark"] .login-page {
-    background: linear-gradient(135deg, #1a1a3e 0%, #0d0d20 50%, #1a1a3e 100%);
+    background: linear-gradient(135deg, #0f0f23 0%, #0a0a1a 50%, #151530 100%);
   }
 
   /* Floating decorative shapes on mobile */
@@ -9665,21 +10162,27 @@ select:-webkit-autofill {
     padding: 1.75rem 1.5rem;
     max-width: 400px;
     width: 100%;
-    border-radius: 22px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 24px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     animation: loginFormFadeIn 0.4s ease-out;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     max-height: 95dvh;
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .login-form-card::-webkit-scrollbar {
+    display: none;
   }
 
   /* Dark mode card */
   [data-theme="dark"] .login-form-card {
-    background: rgba(26, 26, 62, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    background: rgba(26, 26, 62, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   }
 
   .login-form-logo {
@@ -9759,6 +10262,48 @@ select:-webkit-autofill {
     font-size: 0.78rem;
     padding: 5px 14px;
   }
+
+  /* Show mobile badge */
+  .login-mobile-badge-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .login-mobile-badge-wrapper .dev-badge {
+    background: rgba(108, 99, 255, 0.06);
+    border-color: rgba(108, 99, 255, 0.12);
+    box-shadow: 0 2px 12px rgba(108, 99, 255, 0.06);
+  }
+
+  .login-mobile-badge-wrapper .dev-badge:hover {
+    background: rgba(108, 99, 255, 0.1);
+    border-color: rgba(108, 99, 255, 0.2);
+  }
+
+  .login-mobile-badge-wrapper .dev-badge-icon {
+    background: linear-gradient(135deg, rgba(108, 99, 255, 0.15), rgba(0, 217, 166, 0.1));
+    color: var(--primary);
+  }
+
+  .login-mobile-badge-wrapper .dev-badge-name {
+    color: var(--text-primary);
+  }
+
+  .login-mobile-badge-wrapper .dev-badge-role {
+    color: var(--text-muted);
+  }
+
+  [data-theme="dark"] .login-mobile-badge-wrapper .dev-badge {
+    background: rgba(108, 99, 255, 0.08);
+    border-color: rgba(108, 99, 255, 0.15);
+  }
+
+  [data-theme="dark"] .login-mobile-badge-wrapper .dev-badge:hover {
+    background: rgba(108, 99, 255, 0.12);
+  }
 }
 
 @media (max-width: 575.98px) {
@@ -9768,7 +10313,7 @@ select:-webkit-autofill {
 
   .login-form-card {
     padding: 1.25rem 1rem;
-    border-radius: 18px;
+    border-radius: 20px;
   }
 
   .login-form-logo {
@@ -9834,5 +10379,29 @@ select:-webkit-autofill {
   .login-lang-btn {
     font-size: 0.72rem;
     padding: 4px 10px;
+  }
+
+  .login-mobile-badge-wrapper {
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+  }
+
+  .login-mobile-badge-wrapper .dev-badge {
+    padding: 8px 14px;
+    gap: 8px;
+  }
+
+  .login-mobile-badge-wrapper .dev-badge-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+
+  .login-mobile-badge-wrapper .dev-badge-name {
+    font-size: 0.75rem;
+  }
+
+  .login-mobile-badge-wrapper .dev-badge-role {
+    font-size: 0.65rem;
   }
 }

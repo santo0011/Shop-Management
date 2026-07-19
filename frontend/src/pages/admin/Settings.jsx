@@ -8,19 +8,29 @@ import { showToast } from '../../utils/toast';
 import {
   BiSave, BiTag, BiReceipt, BiStore, BiBarcode, BiCloudDownload, BiCloudUpload,
   BiShieldQuarter, BiUserCircle, BiLockAlt, BiEnvelope, BiPhone, BiImage,
-  BiHide, BiShow,
+  BiHide, BiShow, BiChevronDown,
 } from 'react-icons/bi';
 
 const SECTIONS = [
-  { key: 'shop', label: 'Shop Information', icon: BiStore },
-  { key: 'tax', label: 'Tax & VAT', icon: BiTag },
-  { key: 'invoice', label: 'Invoice & Print', icon: BiReceipt },
-  { key: 'barcode', label: 'Barcode Settings', icon: BiBarcode },
-  { key: 'backup', label: 'Backup & Restore', icon: BiCloudDownload },
-  { key: 'security', label: 'Security', icon: BiShieldQuarter },
-  { key: 'profile', label: 'Profile', icon: BiUserCircle },
-  { key: 'password', label: 'Change Password', icon: BiLockAlt },
+  { key: 'shop', label: 'Shop Information', icon: BiStore, description: 'Basic details shown on invoices and receipts' },
+  { key: 'tax', label: 'Tax & VAT', icon: BiTag, description: 'The tax rate applied to every POS sale' },
+  { key: 'invoice', label: 'Invoice & Print', icon: BiReceipt, description: 'Numbering and footer message for invoices' },
+  { key: 'barcode', label: 'Barcode Settings', icon: BiBarcode, description: 'Default format used when generating product barcodes' },
+  { key: 'backup', label: 'Backup & Restore', icon: BiCloudDownload, description: 'Export or import your shop data as a JSON file' },
+  { key: 'security', label: 'Security', icon: BiShieldQuarter, description: 'Account activity and active sessions' },
+  { key: 'profile', label: 'Profile', icon: BiUserCircle, description: 'Your personal name, phone, and avatar' },
+  { key: 'password', label: 'Change Password', icon: BiLockAlt, description: "Use a strong password that you don't use elsewhere" },
 ];
+
+const SectionHeader = ({ icon: Icon, title, description }) => (
+  <div className="settings-card-header">
+    <div className="settings-card-icon"><Icon /></div>
+    <div>
+      <h5>{title}</h5>
+      {description && <p>{description}</p>}
+    </div>
+  </div>
+);
 
 const BARCODE_FORMATS = [
   { value: 'CODE128', label: 'CODE128' },
@@ -36,6 +46,7 @@ const Settings = () => {
   const dispatch = useDispatch();
 
   const [activeSection, setActiveSection] = useState('shop');
+  const [mobileExpanded, setMobileExpanded] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -308,12 +319,12 @@ const Settings = () => {
     );
   }
 
-  const renderSection = () => {
-    switch (activeSection) {
+  const renderSection = (key) => {
+    switch (key) {
       case 'shop':
         return (
-          <div className="table-container">
-            <div className="table-header"><h5><BiStore /> Shop Information</h5></div>
+          <div className="settings-card">
+            <SectionHeader icon={BiStore} title="Shop Information" description="Basic details shown on invoices and receipts" />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
@@ -363,8 +374,8 @@ const Settings = () => {
 
       case 'tax':
         return (
-          <div className="table-container">
-            <div className="table-header"><h5><BiTag /> {t('settings.taxSettings')}</h5></div>
+          <div className="settings-card">
+            <SectionHeader icon={BiTag} title={t('settings.taxSettings')} description="The tax rate applied to every POS sale" />
             <div className="p-4">
               <div className="mb-3">
                 <label className="form-label">Tax Rate (%)</label>
@@ -413,8 +424,8 @@ const Settings = () => {
 
       case 'invoice':
         return (
-          <div className="table-container">
-            <div className="table-header"><h5><BiReceipt /> {t('settings.invoiceSettings')}</h5></div>
+          <div className="settings-card">
+            <SectionHeader icon={BiReceipt} title={t('settings.invoiceSettings')} description="Numbering and footer message for invoices" />
             <div className="p-4">
               <div className="mb-3">
                 <label className="form-label">Invoice Number Prefix</label>
@@ -448,8 +459,8 @@ const Settings = () => {
 
       case 'barcode':
         return (
-          <div className="table-container">
-            <div className="table-header"><h5><BiBarcode /> Barcode Settings</h5></div>
+          <div className="settings-card">
+            <SectionHeader icon={BiBarcode} title="Barcode Settings" description="Default format used when generating product barcodes" />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
@@ -483,8 +494,8 @@ const Settings = () => {
       case 'backup':
         return (
           <>
-            <div className="table-container mb-4">
-              <div className="table-header"><h5><BiCloudDownload /> Download Backup</h5></div>
+            <div className="settings-card mb-4">
+              <SectionHeader icon={BiCloudDownload} title="Download Backup" description="Export your shop data as a single JSON file" />
               <div className="p-4">
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
                   Export your shop information, products, categories, suppliers, and customers as a single JSON file.
@@ -494,8 +505,8 @@ const Settings = () => {
                 </button>
               </div>
             </div>
-            <div className="table-container">
-              <div className="table-header"><h5><BiCloudUpload /> Restore from Backup</h5></div>
+            <div className="settings-card">
+              <SectionHeader icon={BiCloudUpload} title="Restore from Backup" description="Import products, categories, suppliers, and customers" />
               <div className="p-4">
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
                   Upload a previously downloaded backup file to restore your products, categories, suppliers, and customers. Matching records are overwritten.
@@ -517,8 +528,8 @@ const Settings = () => {
 
       case 'security':
         return (
-          <div className="table-container">
-            <div className="table-header"><h5><BiShieldQuarter /> Security</h5></div>
+          <div className="settings-card">
+            <SectionHeader icon={BiShieldQuarter} title="Security" description="Account activity and active sessions" />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
@@ -552,8 +563,8 @@ const Settings = () => {
 
       case 'profile':
         return (
-          <div className="table-container">
-            <div className="table-header"><h5><BiUserCircle /> Profile</h5></div>
+          <div className="settings-card">
+            <SectionHeader icon={BiUserCircle} title="Profile" description="Your personal name, phone, and avatar" />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
@@ -579,51 +590,8 @@ const Settings = () => {
 
       case 'password':
         return (
-          <div
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--border-radius-lg)',
-              boxShadow: 'var(--shadow-card)',
-              overflow: 'hidden',
-              maxWidth: '520px',
-            }}
-          >
-            {/* ── Header ── */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '20px 24px',
-                borderBottom: '1px solid var(--border-color)',
-              }}
-            >
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: 'var(--glow-primary)',
-                  color: 'var(--primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.25rem',
-                  flexShrink: 0,
-                }}
-              >
-                <BiLockAlt />
-              </div>
-              <div>
-                <h5 style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
-                  Change Password
-                </h5>
-                <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  Use a strong password that you don't use elsewhere
-                </p>
-              </div>
-            </div>
+          <div className="settings-card" style={{ maxWidth: '520px' }}>
+            <SectionHeader icon={BiLockAlt} title="Change Password" description="Use a strong password that you don't use elsewhere" />
 
             {/* ── Fields ── */}
             <div style={{ padding: '20px 24px 16px' }}>
@@ -766,7 +734,7 @@ const Settings = () => {
         </aside>
 
         <div className="settings-content">
-          {renderSection()}
+          {renderSection(activeSection)}
 
           {saveAction && (
             <div className="settings-save-bar">
@@ -777,6 +745,38 @@ const Settings = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Mobile accordion — replaces the sidebar/content layout below 768px */}
+      <div className="settings-accordion">
+        {SECTIONS.map(section => {
+          const isOpen = mobileExpanded === section.key;
+          const sectionSaveAction = SAVE_ACTIONS[section.key];
+          return (
+            <div key={section.key} className={`settings-accordion-item ${isOpen ? 'open' : ''}`}>
+              <button
+                type="button"
+                className="settings-accordion-header"
+                onClick={() => setMobileExpanded(isOpen ? null : section.key)}
+              >
+                <span className="settings-accordion-header-left"><section.icon /> {section.label}</span>
+                <BiChevronDown className="settings-accordion-chevron" />
+              </button>
+              {isOpen && (
+                <div className="settings-accordion-body">
+                  {renderSection(section.key)}
+                  {sectionSaveAction && (
+                    <div className="settings-accordion-save">
+                      <button type="button" className="btn-premium btn-premium-primary" onClick={sectionSaveAction.onSave} disabled={saving}>
+                        {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiSave /> {sectionSaveAction.label}</>}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

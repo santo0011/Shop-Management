@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import Chart from 'react-apexcharts';
+import useCountUp from '../../hooks/useCountUp';
 import {
   BiStore, BiCheckCircle, BiTime, BiDollar, BiCreditCard, BiCalendar, BiError, BiRefresh
 } from 'react-icons/bi';
@@ -85,6 +86,16 @@ const SuperDashboard = () => {
     { icon: BiCalendar, label: 'Expiring Soon', value: data?.expiringSoon || 0, color: 'warning' },
   ];
 
+  // Count-up animated values — only animate when data changes
+  const animatedValues = {
+    totalShops: useCountUp(data?.totalShops || 0),
+    activeShops: useCountUp(data?.activeShops || 0),
+    trialShops: useCountUp(data?.trialShops || 0),
+    totalRevenue: useCountUp(data?.totalRevenue || 0),
+    activeSubscriptions: useCountUp(data?.activeSubscriptions || 0),
+    expiringSoon: useCountUp(data?.expiringSoon || 0),
+  };
+
   return (
     <div>
       {/* Page Header */}
@@ -120,7 +131,16 @@ const SuperDashboard = () => {
                 </div>
                 <div>
                   <div className="stat-value" style={{ fontSize: '1.4rem', marginBottom: 0 }}>
-                    {card.prefix || ''}{Number(card.value).toLocaleString('en-IN')}
+                    {card.prefix || ''}
+                    {(() => {
+                      const key = card.label === 'Total Shops' ? 'totalShops'
+                        : card.label === 'Active Shops' ? 'activeShops'
+                        : card.label === 'Trial Shops' ? 'trialShops'
+                        : card.label === 'Total Revenue' ? 'totalRevenue'
+                        : card.label === 'Active Subscriptions' ? 'activeSubscriptions'
+                        : 'expiringSoon';
+                      return Number(animatedValues[key]).toLocaleString('en-IN');
+                    })()}
                   </div>
                   <div className="stat-label" style={{ fontSize: '0.78rem' }}>{card.label}</div>
                 </div>

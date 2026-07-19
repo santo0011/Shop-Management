@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
-import { BiEnvelope, BiArrowBack, BiCheckCircle, BiMailSend } from 'react-icons/bi';
+import { BiEnvelope, BiArrowBack, BiCheckCircle, BiMailSend, BiGlobe } from 'react-icons/bi';
 
 const ForgotPassword = () => {
   const { t, i18n } = useTranslation();
@@ -136,8 +136,11 @@ const ForgotPassword = () => {
               </div>
 
               <div className="login-lang-switcher">
-                <button className={`login-lang-btn ${i18n.language === 'bn' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('bn')}>🇧🇩 বাংলা</button>
-                <button className={`login-lang-btn ${i18n.language === 'en' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('en')}>🇬🇧 English</button>
+                <span className="login-lang-icon" aria-hidden="true"><BiGlobe /></span>
+                <div className="login-lang-toggle" role="group" aria-label="Select language">
+                  <button type="button" className={`login-lang-btn ${i18n.language === 'en' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('en')}>English</button>
+                  <button type="button" className={`login-lang-btn ${i18n.language === 'bn' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('bn')}>বাংলা</button>
+                </div>
               </div>
             </>
           )}

@@ -12,7 +12,7 @@ import {
 // Recharts
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, Legend
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, Legend, LabelList
 } from 'recharts';
 
 // ─── Payment Method Icons ────────────────────────────────────
@@ -50,6 +50,9 @@ const CHART_COLORS = {
 const PIE_COLORS = ['#6C63FF', '#00D9A6', '#FFB545', '#FF6B6B', '#17A2B8'];
 
 const CATEGORY_COLORS = ['#6C63FF', '#00D9A6', '#FFB545', '#FF6B6B', '#17A2B8', '#FF6B9D'];
+
+// ─── Top Products Chart Palette (one color per product bar) ──
+const TOP_PRODUCTS_COLORS = ['#2a78d6', '#1baf7a', '#eb6834', '#7c5cd6', '#e34948'];
 
 // ─── Format helpers ─────────────────────────────────────────
 const formatDate = (dateStr) => {
@@ -119,6 +122,18 @@ const CustomAreaTooltip = ({ active, payload, label }) => {
   );
 };
 
+const TopProductsYAxisTick = ({ x, y, payload, index, textColor }) => {
+  const color = TOP_PRODUCTS_COLORS[index % TOP_PRODUCTS_COLORS.length];
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <circle cx={-108} cy={0} r={4} fill={color} />
+      <text x={-98} y={0} dy={4} textAnchor="start" fontSize={11} fontWeight={600} fill={textColor}>
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
 const CustomBarTooltip = ({ active, payload, label }) => {
   if (!active || !payload || !payload.length) return null;
   return (
@@ -131,6 +146,25 @@ const CustomBarTooltip = ({ active, payload, label }) => {
           <strong>{entry.name === 'Revenue' ? formatCurrency(entry.value) : entry.value}</strong>
         </div>
       ))}
+    </div>
+  );
+};
+
+const CustomTopProductsTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="dashboard-tooltip">
+      <div className="dashboard-tooltip-date" style={{ marginBottom: 4 }}>{label}</div>
+      {payload.map((entry, idx) => {
+        const color = TOP_PRODUCTS_COLORS[(entry.payload?._index ?? 0) % TOP_PRODUCTS_COLORS.length];
+        return (
+          <div key={idx} className="dashboard-tooltip-row" style={{ color }}>
+            <span className="dashboard-tooltip-dot" style={{ background: color }} />
+            <span>{entry.name}: </span>
+            <strong>{Number(entry.value).toLocaleString('en-IN')}</strong>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -261,10 +295,11 @@ const Dashboard = () => {
 
   // ─── Top Products Data ─────────────────────────────────────
   const topProductsData = useMemo(() => {
-    return topProducts.slice(0, 5).map(p => ({
+    return topProducts.slice(0, 5).map((p, index) => ({
       name: p.name?.length > 20 ? p.name.substring(0, 20) + '...' : p.name || 'Unknown',
       'Quantity Sold': p.totalQuantity || 0,
       Revenue: p.totalRevenue || 0,
+      _index: index,
     }));
   }, [topProducts]);
 
@@ -503,9 +538,18 @@ const Dashboard = () => {
                   <BarChart
                     data={topProductsData}
                     layout="vertical"
-                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-                    barSize={28}
+                    margin={{ top: 5, right: 38, left: 10, bottom: 5 }}
+                    barSize={20}
+                    barCategoryGap="28%"
                   >
+                    <defs>
+                      {TOP_PRODUCTS_COLORS.map((color, index) => (
+                        <linearGradient key={index} id={`topProductBarGradient-${index}`} x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={color} stopOpacity={0.75} />
+                          <stop offset="100%" stopColor={color} stopOpacity={1} />
+                        </linearGradient>
+                      ))}
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
                     <XAxis
                       type="number"
@@ -516,18 +560,28 @@ const Dashboard = () => {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      tick={{ fill: textColor, fontSize: 11 }}
+                      tick={<TopProductsYAxisTick textColor={textColor} />}
                       tickLine={false}
                       axisLine={false}
                       width={120}
                     />
-                    <Tooltip content={<CustomBarTooltip />} />
+                    <Tooltip content={<CustomTopProductsTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
                     <Bar
                       dataKey="Quantity Sold"
-                      fill={CHART_COLORS.primary}
-                      radius={[0, 6, 6, 0]}
-                      animationDuration={800}
-                    />
+                      radius={[0, 8, 8, 0]}
+                      animationDuration={900}
+                      animationEasing="ease-out"
+                    >
+                      {topProductsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={`url(#topProductBarGradient-${index})`} />
+                      ))}
+                      <LabelList
+                        dataKey="Quantity Sold"
+                        position="right"
+                        formatter={(val) => Number(val).toLocaleString('en-IN')}
+                        style={{ fill: textColor, fontSize: 11, fontWeight: 700 }}
+                      />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -552,26 +606,28 @@ const Dashboard = () => {
             <div className="premium-card-body">
               {paymentData.length > 0 ? (
                 <div className="dashboard-donut-container">
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={paymentData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={65}
-                        outerRadius={100}
-                        paddingAngle={3}
-                        dataKey="value"
-                        animationDuration={800}
-                        animationBegin={0}
-                      >
-                        {paymentData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomPieTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="dashboard-donut-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={paymentData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={62}
+                          outerRadius={92}
+                          paddingAngle={3}
+                          dataKey="value"
+                          animationDuration={800}
+                          animationBegin={0}
+                        >
+                          {paymentData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomPieTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                   <div className="dashboard-donut-legend">
                     {paymentData.map((entry, index) => (
                       <div key={index} className="dashboard-donut-legend-item">

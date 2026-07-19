@@ -3,8 +3,6 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSelector, useDispatch } from 'react-redux';
 import { toggleTheme } from '../../redux/slices/themeSlice';
-import { logout } from '../../redux/slices/authSlice';
-import Swal from 'sweetalert2';
 import { showToast } from '../../utils/toast';
 import {
   BiGridAlt, BiStore, BiSun, BiMoon,
@@ -81,27 +79,9 @@ const SuperAdminLayout = () => {
   };
 
   const handleLogout = () => {
-    Swal.fire({
-      title: 'Are you sure?',
-      text: 'You will be logged out from the system.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#FF6B6B',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, logout!',
-      cancelButtonText: 'Cancel',
-      background: 'var(--bg-card)',
-      color: 'var(--text-primary)',
-      reverseButtons: true,
-      iconColor: '#FF6B6B',
-    }).then((result) => {
-      if (result.isConfirmed) {
-        showToast.success('Logged out successfully.');
-        dispatch(logout());
-        localStorage.clear();
-        navigate('/login', { replace: true });
-      }
-    });
+    showToast.success('Logged out successfully.');
+    localStorage.clear();
+    window.location.href = '/login';
   };
 
   const toggleSidebar = () => {

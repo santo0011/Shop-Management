@@ -14,10 +14,18 @@ const getReportsAnalytics = async (req, res) => {
     const shopId = req.user.shop;
     const { startDate, endDate, paymentMethod } = req.query;
 
+    // The client sends precise, timezone-correct instants (e.g. "today"
+    // 00:00:00.000-23:59:59.999 in the shop's local time, already converted
+    // to UTC). Re-running .setHours() on them here would reinterpret those
+    // instants in the SERVER process's own timezone instead, silently
+    // shifting the boundary whenever the server isn't running in the same
+    // zone as the shop — most visible on the "Today" filter, where a shift
+    // of even a few hours can push the whole day out of range. Only fall
+    // back to a padded default when the client didn't supply a date at all.
     const end = endDate ? new Date(endDate) : new Date();
-    end.setHours(23, 59, 59, 999);
+    if (!endDate) end.setHours(23, 59, 59, 999);
     const start = startDate ? new Date(startDate) : new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
-    start.setHours(0, 0, 0, 0);
+    if (!startDate) start.setHours(0, 0, 0, 0);
 
     const match = { shop: shopId, saleDate: { $gte: start, $lte: end } };
     if (paymentMethod && paymentMethod !== 'all') match.paymentMethod = paymentMethod;

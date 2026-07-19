@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // ─── Compact number formatting for mobile ──────────────────
 const formatCompact = (num, isCurrency) => {
@@ -13,20 +13,25 @@ const formatCompact = (num, isCurrency) => {
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
 // ─── Animated Number ───────────────────────────────────────
-const AnimatedNumber = ({ value, duration = 1000, isCurrency = false }) => {
-  const [displayValue, setDisplayValue] = useState(0);
+const AnimatedNumber = ({ value, duration = 400, isCurrency = false }) => {
+  const [displayValue, setDisplayValue] = useState(value);
   const startTimeRef = useRef(null);
   const rafRef = useRef(null);
   const prevValueRef = useRef(value);
+  const hasAnimatedRef = useRef(false);
 
   useEffect(() => {
     // Only animate if value actually changed
     if (prevValueRef.current === value) return;
     prevValueRef.current = value;
+    hasAnimatedRef.current = false;
 
-    const startValue = displayValue;
+    const startValue = 0;
     const diff = value - startValue;
-    if (diff === 0) return;
+    if (diff === 0) {
+      setDisplayValue(value);
+      return;
+    }
 
     startTimeRef.current = null;
 
@@ -43,6 +48,7 @@ const AnimatedNumber = ({ value, duration = 1000, isCurrency = false }) => {
         rafRef.current = requestAnimationFrame(animate);
       } else {
         setDisplayValue(value);
+        hasAnimatedRef.current = true;
       }
     };
 
@@ -52,11 +58,6 @@ const AnimatedNumber = ({ value, duration = 1000, isCurrency = false }) => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [value, duration]);
-
-  // On first mount, jump to value immediately (no animation from 0)
-  useEffect(() => {
-    setDisplayValue(value);
-  }, []);
 
   const prefix = isCurrency ? '₹' : '';
   const formatted = prefix + Number(displayValue).toLocaleString('en-IN', {
@@ -111,11 +112,7 @@ const StatCard = ({ icon: Icon, label, value, color = 'primary', rawValue, isCur
               whiteSpace: 'nowrap',
             }}
           >
-            {isMobile ? (
-              displayValue
-            ) : (
-              <AnimatedNumber value={numericValue} duration={1000} isCurrency={isCurrency} />
-            )}
+            <AnimatedNumber value={numericValue} duration={400} isCurrency={isCurrency} />
           </div>
           <div
             className="stat-label"

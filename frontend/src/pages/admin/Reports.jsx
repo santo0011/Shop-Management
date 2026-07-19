@@ -16,10 +16,10 @@ import {
 // ─── Filter presets ───────────────────────────────────────────
 const PRESETS = [
   { key: 'today', label: 'Today' },
-  { key: '7d', label: '7 Days' },
-  { key: '30d', label: '30 Days' },
+  { key: '7d', label: 'Last 7 Days' },
+  { key: '30d', label: 'Last 30 Days' },
   { key: 'month', label: 'This Month' },
-  { key: 'custom', label: 'Custom' },
+  { key: 'custom', label: 'Custom Range' },
 ];
 
 const PAYMENT_METHODS = [
@@ -33,6 +33,9 @@ const PAYMENT_METHODS = [
 
 const PAYMENT_METHOD_ICONS = { cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦', due: '🧾' };
 const PAYMENT_METHOD_LABELS = { cash: 'Cash', card: 'Card', upi: 'UPI', mobile_banking: 'Mobile Banking', due: 'Due' };
+
+// ─── Top Products Chart Palette (one color per product bar) ──
+const TOP_PRODUCTS_COLORS = ['#2a78d6', '#1baf7a', '#eb6834', '#7c5cd6', '#e34948'];
 
 const STATUS_STYLES = {
   paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: 'Paid' },
@@ -190,14 +193,15 @@ const Reports = () => {
 
   const topProductsChartOptions = useMemo(() => ({
     chart: { type: 'bar', height: 320, toolbar: { show: false }, foreColor: chartColors.textSecondary },
-    plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: '55%' } },
+    plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: '55%', distributed: true } },
     dataLabels: { enabled: true, style: { fontSize: '11px', fontWeight: 600, colors: [theme === 'dark' ? '#fff' : '#1a1a2e'] } },
+    legend: { show: false },
     xaxis: { categories: analytics.topProducts.map(p => p.name), labels: { style: { fontSize: '11px' } } },
     yaxis: { labels: { style: { fontSize: '11px' } } },
     tooltip: { y: { formatter: (val) => `${val} sold` } },
     grid: { borderColor: chartColors.gridColor },
     theme: { mode: theme },
-    colors: [chartColors.secondary],
+    colors: TOP_PRODUCTS_COLORS,
   }), [analytics, theme]);
 
   const topProductsChartSeries = useMemo(() => [
@@ -347,27 +351,39 @@ const Reports = () => {
 
       {/* Filter Bar */}
       <div className="premium-card mb-3">
-        <div className="premium-card-body" style={{ padding: '1rem 1.25rem' }}>
+        <div className="premium-card-body reports-filter-card-body">
           <div className="reports-filter-bar">
-            <div className="reports-filter-presets">
-              {PRESETS.map(p => (
-                <button
-                  key={p.key}
-                  type="button"
-                  className={`reports-preset-btn ${filters.preset === p.key ? 'active' : ''}`}
-                  onClick={() => setFilters(f => ({ ...f, preset: p.key }))}
-                >
-                  {p.label}
-                </button>
-              ))}
+            <div className="sales-date-filters-scroll">
+              <div className="sales-date-segmented" role="tablist" aria-label="Report period">
+                {PRESETS.map((p, idx) => (
+                  <React.Fragment key={p.key}>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={filters.preset === p.key}
+                      className={`sales-date-pill ${filters.preset === p.key ? 'active' : ''}`}
+                      onClick={() => setFilters(f => ({ ...f, preset: p.key }))}
+                    >
+                      <BiCalendar />
+                      <span>{p.label}</span>
+                    </button>
+                    {idx === 2 && <span className="sales-date-break" aria-hidden="true" />}
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
 
             {filters.preset === 'custom' && (
-              <div className="d-flex align-items-center gap-2 flex-wrap">
-                <input type="date" className="form-control" style={{ maxWidth: 160 }} value={filters.customStart} onChange={e => setFilters(f => ({ ...f, customStart: e.target.value }))} />
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>to</span>
-                <input type="date" className="form-control" style={{ maxWidth: 160 }} value={filters.customEnd} onChange={e => setFilters(f => ({ ...f, customEnd: e.target.value }))} />
-              </div>
+              <>
+                <div className="sales-filter">
+                  <BiCalendar size={14} className="sales-filter-icon-abs" />
+                  <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={filters.customStart} onChange={e => setFilters(f => ({ ...f, customStart: e.target.value }))} />
+                </div>
+                <div className="sales-filter">
+                  <BiCalendar size={14} className="sales-filter-icon-abs" />
+                  <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={filters.customEnd} onChange={e => setFilters(f => ({ ...f, customEnd: e.target.value }))} />
+                </div>
+              </>
             )}
 
             <select

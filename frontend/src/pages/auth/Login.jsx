@@ -6,7 +6,7 @@ import { loginStart, loginSuccess, loginFailure } from '../../redux/slices/authS
 import { setTheme } from '../../redux/slices/themeSlice';
 import { showToast } from '../../utils/toast';
 import api from '../../services/api';
-import { BiShow, BiHide, BiEnvelope, BiLockAlt, BiCheck, BiCart, BiPackage, BiBarChartAlt, BiGroup, BiShield } from 'react-icons/bi';
+import { BiShow, BiHide, BiEnvelope, BiLockAlt, BiCheck, BiCart, BiPackage, BiBarChartAlt, BiGroup, BiShield, BiCodeAlt, BiGlobe } from 'react-icons/bi';
 
 const Login = () => {
   const { t, i18n } = useTranslation();
@@ -60,6 +60,18 @@ const Login = () => {
     { icon: BiShield, label: 'Secure & Reliable' },
   ];
 
+  const DeveloperBadge = () => (
+    <div className="dev-badge">
+      <div className="dev-badge-icon">
+        <BiCodeAlt />
+      </div>
+      <div className="dev-badge-text">
+        <span className="dev-badge-name">Created by Santo Biswas</span>
+        <span className="dev-badge-role">Software Developer</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="login-page">
       {/* ─── Left Brand Panel ─── */}
@@ -68,6 +80,8 @@ const Login = () => {
         <div className="login-brand-shape login-brand-shape--1" />
         <div className="login-brand-shape login-brand-shape--2" />
         <div className="login-brand-shape login-brand-shape--3" />
+        <div className="login-brand-shape login-brand-shape--4" />
+        <div className="login-brand-shape login-brand-shape--5" />
 
         <div className="login-brand-content">
           {/* Logo */}
@@ -93,13 +107,9 @@ const Login = () => {
             ))}
           </div>
 
-          {/* Author credit */}
-          <div className="login-brand-author">
-            <div className="login-brand-author-avatar">SB</div>
-            <div>
-              <div className="login-brand-author-name">Santo Biswas</div>
-              <div className="login-brand-author-role">Software Developer</div>
-            </div>
+          {/* Desktop Developer Badge */}
+          <div className="login-brand-badge-wrapper">
+            <DeveloperBadge />
           </div>
         </div>
       </div>
@@ -215,18 +225,30 @@ const Login = () => {
 
           {/* Language Switcher */}
           <div className="login-lang-switcher">
-            <button
-              className={`login-lang-btn ${i18n.language === 'bn' ? 'active' : ''}`}
-              onClick={() => i18n.changeLanguage('bn')}
-            >
-              🇧🇩 বাংলা
-            </button>
-            <button
-              className={`login-lang-btn ${i18n.language === 'en' ? 'active' : ''}`}
-              onClick={() => i18n.changeLanguage('en')}
-            >
-              🇬🇧 English
-            </button>
+            <span className="login-lang-icon" aria-hidden="true">
+              <BiGlobe />
+            </span>
+            <div className="login-lang-toggle" role="group" aria-label="Select language">
+              <button
+                type="button"
+                className={`login-lang-btn ${i18n.language === 'en' ? 'active' : ''}`}
+                onClick={() => i18n.changeLanguage('en')}
+              >
+                English
+              </button>
+              <button
+                type="button"
+                className={`login-lang-btn ${i18n.language === 'bn' ? 'active' : ''}`}
+                onClick={() => i18n.changeLanguage('bn')}
+              >
+                বাংলা
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Developer Badge */}
+          <div className="login-mobile-badge-wrapper">
+            <DeveloperBadge />
           </div>
         </div>
       </div>
