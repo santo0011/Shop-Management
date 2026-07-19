@@ -223,7 +223,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
 
   const [header, setHeader] = useState(emptyHeader);
   const [rows, setRows] = useState([emptyRow()]);
-  const [paidAmount, setPaidAmount] = useState();
+  const [paidAmount, setPaidAmount] = useState('');
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -279,7 +279,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     } else {
       setHeader(emptyHeader());
       setRows([emptyRow()]);
-      setPaidAmount(0);
+      setPaidAmount('');
     }
   }, [open, viewing]);
 
@@ -336,8 +336,8 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const handleSelectProduct = (rowKey, product) => {
     updateRow(rowKey, {
       product,
-      purchasePrice: product.purchasePrice || 0,
-      sellingPrice: product.sellingPrice || 0,
+      purchasePrice: product.purchasePrice || '',
+      sellingPrice: product.sellingPrice || '',
     });
     setTimeout(() => focusField(rowKey, 'batchNumber'), 0);
   };

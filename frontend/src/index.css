@@ -8378,3 +8378,627 @@ select:-webkit-autofill {
 .psf-option-create.active {
   background: rgba(var(--primary-rgb), 0.08);
 }
+
+/* ==========================================
+   RECENT PAYMENTS — Dashboard Section
+   ========================================== */
+
+/* ─── Section Container ───────────────────────────────────── */
+.rp-section {
+  overflow: hidden;
+}
+
+/* ─── Header Icon ─────────────────────────────────────────── */
+.rp-header-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--border-radius-md);
+  background: rgba(108, 99, 255, 0.1);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* ─── View All Button ─────────────────────────────────────── */
+.rp-view-all-btn {
+  white-space: nowrap;
+}
+
+/* ─── Filter Bar ──────────────────────────────────────────── */
+.rp-filter-bar {
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rp-filter-chip {
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-family);
+}
+
+.rp-filter-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.rp-filter-chip--active {
+  border-color: var(--primary);
+  background: rgba(108, 99, 255, 0.1);
+  color: var(--primary);
+}
+
+/* ─── Body ────────────────────────────────────────────────── */
+.rp-body {
+  padding: 0.75rem 1.25rem;
+}
+
+.rp-empty {
+  text-align: center;
+  padding: 1.5rem 0;
+  color: var(--text-muted);
+}
+
+/* ─── Desktop List ────────────────────────────────────────── */
+.rp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ─── List Row ────────────────────────────────────────────── */
+.rp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--border-radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rp-row:hover {
+  border-color: rgba(108, 99, 255, 0.25);
+  box-shadow: 0 2px 8px rgba(108, 99, 255, 0.08);
+  background: var(--bg-card-hover);
+}
+
+.rp-row:active {
+  transform: scale(0.995);
+}
+
+/* Avatar */
+.rp-row__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Info */
+.rp-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rp-row__name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rp-row__name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.rp-row__new-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(0, 217, 166, 0.15);
+  color: #00D9A6;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.rp-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.rp-row__meta-item {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.rp-row__meta-item svg {
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.rp-row__meta-dot {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* Right side */
+.rp-row__right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.rp-row__amount {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.rp-row__badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.rp-row__method {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.rp-row__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+/* ─── Mobile Cards ────────────────────────────────────── */
+
+.rp-mobile {
+  display: none;
+}
+
+.rp-mobile-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rp-mobile-card:hover {
+  border-color: rgba(108, 99, 255, 0.2);
+  box-shadow: var(--shadow-md);
+}
+
+.rp-mobile-card:active {
+  transform: scale(0.995);
+}
+
+/* Top row — name + amount */
+.rp-mobile-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.rp-mobile-card__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rp-mobile-card__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.rp-mobile-card__name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rp-mobile-card__name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-mobile-card__new-badge {
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(0, 217, 166, 0.15);
+  color: #00D9A6;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.rp-mobile-card__amount {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Bottom row — method + date + status */
+.rp-mobile-card__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.rp-mobile-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rp-mobile-card__meta-item {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.rp-mobile-card__meta-dot {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.rp-mobile-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Responsive: hide desktop list on mobile, show cards */
+@media (max-width: 768px) {
+  .rp-list {
+    display: none;
+  }
+
+  .rp-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .rp-body {
+    padding: 0.65rem 0.85rem;
+  }
+
+  .rp-filter-bar {
+    padding: 0.5rem 0.85rem;
+  }
+
+  .rp-filter-chip {
+    font-size: 0.68rem;
+    padding: 3px 10px;
+  }
+}
+
+/* ==========================================
+   DASHBOARD MODERN — Chart & Tooltip Styles
+   ========================================== */
+
+/* ─── Chart Card ──────────────────────────────────────────── */
+.dashboard-chart-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-chart-card .premium-card-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  min-height: 350px;
+}
+
+.dashboard-chart-card .premium-card-body > div {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Period Filter Buttons ────────────────────────────────── */
+.dashboard-period-filter {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-input);
+  padding: 3px;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.dashboard-period-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-family);
+  white-space: nowrap;
+}
+
+.dashboard-period-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.dashboard-period-btn.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.3);
+}
+
+/* ─── Custom Tooltips ─────────────────────────────────────── */
+.dashboard-tooltip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.78rem;
+  min-width: 160px;
+}
+
+.dashboard-tooltip-date {
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dashboard-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.dashboard-tooltip-row strong {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-left: auto;
+}
+
+.dashboard-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dashboard-tooltip-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 6px 0;
+}
+
+/* ─── Donut Chart Container ────────────────────────────────── */
+.dashboard-donut-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.dashboard-donut-container .recharts-wrapper {
+  flex-shrink: 0;
+}
+
+/* ─── Donut Legend ─────────────────────────────────────────── */
+.dashboard-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-primary);
+  transition: background var(--transition-fast);
+}
+
+.dashboard-donut-legend-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.dashboard-donut-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dashboard-donut-legend-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-donut-legend-value {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.dashboard-donut-legend-pct {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ─── Dashboard Modern Wrapper ─────────────────────────────── */
+.dashboard-modern {
+  animation: dashboardFadeIn 0.3s ease-out;
+}
+
+@keyframes dashboardFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Badge Variants ──────────────────────────────────────── */
+.badge-primary {
+  background: rgba(108, 99, 255, 0.12);
+  color: #6C63FF;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.badge-success {
+  background: rgba(0, 217, 166, 0.12);
+  color: #00D9A6;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* ─── Responsive Dashboard ─────────────────────────────────── */
+@media (max-width: 1199.98px) {
+  .dashboard-period-btn {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+  }
+
+  .dashboard-donut-container {
+    flex-direction: column;
+  }
+
+  .dashboard-donut-legend {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .dashboard-donut-legend-item {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    gap: 4px;
+  }
+
+  .dashboard-donut-legend-value {
+    font-size: 0.65rem;
+  }
+
+  .dashboard-donut-legend-pct {
+    font-size: 0.6rem;
+    min-width: 28px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .dashboard-chart-card .premium-card-body {
+    padding: 0.65rem;
+    min-height: 280px;
+  }
+
+  .dashboard-chart-card .premium-card-header {
+    padding: 0.85rem 0.85rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .dashboard-period-filter {
+    width: 100%;
+  }
+
+  .dashboard-period-btn {
+    flex: 1;
+    text-align: center;
+    font-size: 0.65rem;
+    padding: 4px 4px;
+  }
+}

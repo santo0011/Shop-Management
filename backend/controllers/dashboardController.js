@@ -84,20 +84,12 @@ const getDashboardStats = async (req, res) => {
 const getSalesChart = async (req, res) => {
   try {
     const shopId = req.user.shop;
-    const { period = 'daily' } = req.query;
+    const { period = 'daily', days } = req.query;
     let startDate;
 
-    if (period === 'daily') {
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-    } else if (period === 'monthly') {
-      startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
-    }
-
-    const groupFormat = period === 'daily'
-      ? { $dateToString: { format: '%Y-%m-%d', date: '$saleDate' } }
-      : { $dateToString: { format: '%Y-%m', date: '$saleDate' } };
+    const numDays = days ? parseInt(days) : 30;
+    startDate = new Date();
+    startDate.setDate(startDate.getDate() - numDays);
 
     const salesData = await Sale.aggregate([
       {
@@ -108,15 +100,32 @@ const getSalesChart = async (req, res) => {
       },
       {
         $group: {
-          _id: groupFormat,
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$saleDate' } },
           total: { $sum: '$totalAmount' },
           count: { $sum: 1 },
+          profit: { $sum: { $subtract: ['$totalAmount', '$discount'] } },
         },
       },
       { $sort: { _id: 1 } },
     ]);
 
-    res.json(salesData);
+    // Generate date range with zeros for missing days
+    const result = [];
+    const current = new Date(startDate);
+    const today = new Date();
+    while (current <= today) {
+      const dateStr = current.toISOString().split('T')[0];
+      const found = salesData.find(d => d._id === dateStr);
+      result.push({
+        date: dateStr,
+        sales: found ? found.total : 0,
+        orders: found ? found.count : 0,
+        profit: found ? found.profit : 0,
+      });
+      current.setDate(current.getDate() + 1);
+    }
+
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -166,6 +175,134 @@ const getTopProducts = async (req, res) => {
   }
 };
 
+const getProfitExpense = async (req, res) => {
+  try {
+    const shopId = req.user.shop;
+    const months = 6;
+    const result = [];
+
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const [salesAgg] = await Sale.aggregate([
+        { $match: { shop: shopId, saleDate: { $gte: monthStart, $lte: monthEnd } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]);
+
+      const [purchasesAgg] = await Purchase.aggregate([
+        { $match: { shop: shopId, purchaseDate: { $gte: monthStart, $lte: monthEnd } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]);
+
+      const sales = salesAgg?.total || 0;
+      const expenses = purchasesAgg?.total || 0;
+      const profit = sales - expenses;
+
+      result.push({
+        month: d.toLocaleString('default', { month: 'short' }),
+        profit: Math.round(profit * 100) / 100,
+        expenses: Math.round(expenses * 100) / 100,
+        revenue: Math.round(sales * 100) / 100,
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getPaymentDistribution = async (req, res) => {
+  try {
+    const shopId = req.user.shop;
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const distribution = await Sale.aggregate([
+      { $match: { shop: shopId, saleDate: { $gte: startOfMonth } } },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          total: { $sum: '$totalAmount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const paymentLabels = {
+      cash: 'Cash',
+      card: 'Card',
+      upi: 'UPI',
+      mobile_banking: 'Bank',
+      due: 'Other',
+    };
+
+    const result = distribution.map(d => ({
+      name: paymentLabels[d._id] || d._id,
+      value: d.total,
+      count: d.count,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getSalesByCategory = async (req, res) => {
+  try {
+    const shopId = req.user.shop;
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const salesByCategory = await Sale.aggregate([
+      { $match: { shop: shopId, saleDate: { $gte: startOfMonth } } },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'items.product',
+          foreignField: '_id',
+          as: 'product',
+        },
+      },
+      { $unwind: '$product' },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'product.category',
+          foreignField: '_id',
+          as: 'category',
+        },
+      },
+      { $unwind: '$category' },
+      {
+        $group: {
+          _id: '$category.name',
+          total: { $sum: '$items.total' },
+          quantity: { $sum: '$items.quantity' },
+        },
+      },
+      { $sort: { total: -1 } },
+    ]);
+
+    const result = salesByCategory.map(c => ({
+      name: c._id,
+      revenue: Math.round(c.total * 100) / 100,
+      quantity: c.quantity,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const getRecentTransactions = async (req, res) => {
   try {
     const shopId = req.user.shop;
@@ -182,4 +319,4 @@ const getRecentTransactions = async (req, res) => {
   }
 };
 
-module.exports = { getDashboardStats, getSalesChart, getTopProducts, getRecentTransactions };
+module.exports = { getDashboardStats, getSalesChart, getTopProducts, getProfitExpense, getPaymentDistribution, getSalesByCategory, getRecentTransactions };

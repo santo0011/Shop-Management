@@ -364,7 +364,7 @@ const POS = () => {
   const customerSearchRef = useRef(null);
   const customerDropdownRef = useRef(null);
   const [paymentMethod, setPaymentMethod] = useState(getLastPayment);
-  const [paidAmount, setPaidAmount] = useState('');
+  const [paidAmount, setPaidAmount] = useState(0);
   const [showInvoice, setShowInvoice] = useState(false);
   const [lastSale, setLastSale] = useState(null);
   const [shopInfo, setShopInfo] = useState(null);
@@ -467,7 +467,7 @@ const POS = () => {
 
   const clearCart = () => {
     setCart([]);
-    setPaidAmount('');
+    setPaidAmount(0);
     setCustomer('');
     setDiscountValue(0);
     setDiscountMode('percent');
@@ -821,7 +821,7 @@ const POS = () => {
           </div>
           <div className="pos-paid-section">
             <label className="pos-payment-label">Paid Amount</label>
-            <div className="pos-paid-input-group"><span className="pos-paid-currency">₹</span><input type="number" className="pos-paid-input" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} placeholder="Enter amount" /></div>
+            <div className="pos-paid-input-group"><span className="pos-paid-currency">₹</span><input type="number" className="pos-paid-input" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value === '' ? 0 : Number(e.target.value))} placeholder="Enter amount" /></div>
             <div className="pos-quick-amounts">
               <button className="pos-quick-amt-btn pos-quick-amt-exact" onClick={() => setPaidAmount(grandTotal)}><BiCheck /> Exact</button>
               {quickAmounts.map(amt => <button key={amt} className={`pos-quick-amt-btn ${paidAmount === amt ? 'active' : ''}`} onClick={() => setPaidAmount(amt)}>₹{amt}</button>)}

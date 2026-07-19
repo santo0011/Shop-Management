@@ -10,7 +10,7 @@ import { showToast } from '../../utils/toast';
 import {
   BiCart, BiDollar, BiTrendingUp, BiReceipt, BiGroup, BiError, BiRefresh,
   BiStar, BiFile, BiFileBlank, BiSpreadsheet, BiCategory, BiCalendar,
-  BiPackage, BiUser, BiHash, BiTime,
+  BiPackage, BiUser, BiHash, BiTime, BiCreditCard,
 } from 'react-icons/bi';
 
 // ─── Filter presets ───────────────────────────────────────────
@@ -206,12 +206,12 @@ const Reports = () => {
 
   // ─── Summary cards (reuses the shared StatCard component) ─────────────
   const summaryCards = [
-    { icon: BiCart, label: 'Total Sales', value: money(analytics.summary.totalSales), color: 'primary' },
-    { icon: BiDollar, label: 'Total Revenue', value: money(analytics.summary.totalRevenue), color: 'success' },
-    { icon: BiTrendingUp, label: 'Total Profit', value: money(analytics.summary.totalProfit), color: 'info' },
-    { icon: BiReceipt, label: 'Total Orders', value: count(analytics.summary.totalOrders), color: 'warning' },
-    { icon: BiGroup, label: 'Total Customers', value: count(analytics.summary.totalCustomers), color: 'primary' },
-    { icon: BiError, label: 'Low Stock Products', value: count(analytics.summary.lowStockProducts), color: 'danger' },
+    { icon: BiCart, label: 'Total Sales', value: money(analytics.summary.totalSales), color: 'primary', rawValue: analytics.summary.totalSales, isCurrency: true },
+    { icon: BiDollar, label: 'Total Revenue', value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
+    { icon: BiTrendingUp, label: 'Total Profit', value: money(analytics.summary.totalProfit), color: 'info', rawValue: analytics.summary.totalProfit, isCurrency: true },
+    { icon: BiReceipt, label: 'Total Orders', value: count(analytics.summary.totalOrders), color: 'warning', rawValue: analytics.summary.totalOrders, isCurrency: false },
+    { icon: BiCreditCard, label: 'Total Due Amount', value: money(analytics.summary.totalDue), color: 'warning', rawValue: analytics.summary.totalDue, isCurrency: true },
+    { icon: BiError, label: 'Low Stock Products', value: count(analytics.summary.lowStockProducts), color: 'danger', rawValue: analytics.summary.lowStockProducts, isCurrency: false },
   ];
 
   // ─── Export ─────────────────────────────────────────────────────────
@@ -278,7 +278,7 @@ const Reports = () => {
         `Total Revenue: ${money(s.totalRevenue)}`,
         `Total Profit: ${money(s.totalProfit)}`,
         `Total Orders: ${count(s.totalOrders)}`,
-        `Total Customers: ${count(s.totalCustomers)}`,
+        `Total Due Amount: ${money(s.totalDue)}`,
         `Low Stock Products: ${count(s.lowStockProducts)}`,
       ];
       summaryLines.forEach((line) => { doc.text(line, 14, y); y += 6; });
@@ -340,7 +340,7 @@ const Reports = () => {
       <div className="row g-3 mb-3">
         {summaryCards.map((card, index) => (
           <div key={index} className="col-6 col-md-4">
-            <StatCard icon={card.icon} label={card.label} value={card.value} color={card.color} />
+            <StatCard icon={card.icon} label={card.label} value={card.value} color={card.color} rawValue={card.rawValue} isCurrency={card.isCurrency} />
           </div>
         ))}
       </div>

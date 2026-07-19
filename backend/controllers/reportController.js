@@ -31,6 +31,8 @@ const getReportsAnalytics = async (req, res) => {
       paymentBreakdownAgg,
       recentTransactions,
       lowStockList,
+      customerDueAgg,
+      supplierDueAgg,
     ] = await Promise.all([
       // Gross sales + refunds (returns.totalRefund summed per sale via the
       // $sum *expression* operator, which totals an array field in-place).
@@ -84,6 +86,14 @@ const getReportsAnalytics = async (req, res) => {
         .select('name category stock minStock unit')
         .sort({ stock: 1 })
         .limit(50),
+      Customer.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
+      ]),
+      Supplier.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
+      ]),
     ]);
 
     const totalSales = totalsAgg[0]?.totalSales || 0;
@@ -111,6 +121,8 @@ const getReportsAnalytics = async (req, res) => {
       unit: p.unit,
     }));
 
+    const totalDue = (customerDueAgg[0]?.total || 0) + (supplierDueAgg[0]?.total || 0);
+
     res.json({
       range: { startDate: start.toISOString(), endDate: end.toISOString() },
       summary: {
@@ -120,6 +132,7 @@ const getReportsAnalytics = async (req, res) => {
         totalProfit,
         totalCustomers: distinctCustomers.length,
         lowStockProducts: lowStockProducts.length,
+        totalDue,
       },
       daily,
       topProducts: topProductsAgg,

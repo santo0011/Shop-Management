@@ -14,8 +14,15 @@ const Header = ({ onToggleSidebar }) => {
   const { user } = useSelector((state) => state.auth);
   const [langOpen, setLangOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const langRef = useRef(null);
   const profileRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -54,7 +61,7 @@ const Header = ({ onToggleSidebar }) => {
         </button>
       </div>
 
-      <GlobalSearch />
+      {!isMobile && <GlobalSearch />}
 
       <div className="header-right">
         {/* Language Switcher */}
