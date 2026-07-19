@@ -6,7 +6,7 @@ import { loginStart, loginSuccess, loginFailure } from '../../redux/slices/authS
 import { setTheme } from '../../redux/slices/themeSlice';
 import { showToast } from '../../utils/toast';
 import api from '../../services/api';
-import { BiShow, BiHide, BiEnvelope, BiLockAlt, BiCheck, BiCart, BiPackage, BiBarChartAlt, BiGroup, BiShield, BiCodeAlt, BiGlobe } from 'react-icons/bi';
+import { BiShow, BiHide, BiEnvelope, BiLockAlt, BiCheck, BiCart, BiCodeAlt, BiGlobe } from 'react-icons/bi';
 
 const Login = () => {
   const { t, i18n } = useTranslation();
@@ -52,12 +52,12 @@ const Login = () => {
     }
   };
 
-  const features = [
-    { icon: BiCart, label: 'Fast Billing' },
-    { icon: BiPackage, label: 'Inventory Management' },
-    { icon: BiBarChartAlt, label: 'Sales & Reports' },
-    { icon: BiGroup, label: 'Customer & Supplier Management' },
-    { icon: BiShield, label: 'Secure & Reliable' },
+  const previewBars = [42, 68, 50, 85, 62, 96, 74];
+
+  const trustStats = [
+    { value: '500+', label: 'Shops Trust Us' },
+    { value: '50K+', label: 'Orders Processed' },
+    { value: '24/7', label: 'Support' },
   ];
 
   const DeveloperBadge = () => (
@@ -85,25 +85,62 @@ const Login = () => {
 
         <div className="login-brand-content">
           {/* Logo */}
-          <div className="login-brand-logo">
-            <div className="login-brand-logo-icon">GS</div>
+          <div className="login-brand-logo-row">
+            <div className="login-brand-logo">
+              <div className="login-brand-logo-icon">GS</div>
+            </div>
+            <span className="login-brand-logo-word">{t('app.shortName')}</span>
           </div>
 
           {/* Welcome */}
-          <h1 className="login-brand-title">Welcome Back!</h1>
+          <h1 className="login-brand-title">Run your store<br />like a pro.</h1>
           <p className="login-brand-subtitle">
-            Build and manage your business with a modern Grocery POS & Inventory Management System.
+            Billing, inventory, and sales — all in one place, built for busy grocery shops.
           </p>
 
-          {/* Feature highlights */}
-          <div className="login-brand-features">
-            {features.map((feat, idx) => (
-              <div key={idx} className="login-brand-feature">
-                <div className="login-brand-feature-icon">
-                  <feat.icon />
-                </div>
-                <span>{feat.label}</span>
+          {/* Live-looking dashboard preview mockup */}
+          <div className="login-brand-preview">
+            <div className="login-brand-preview-header">
+              <span className="login-brand-preview-dot login-brand-preview-dot--red" />
+              <span className="login-brand-preview-dot login-brand-preview-dot--yellow" />
+              <span className="login-brand-preview-dot login-brand-preview-dot--green" />
+              <span className="login-brand-preview-title">Today's Overview</span>
+            </div>
+            <div className="login-brand-preview-stats">
+              <div className="login-brand-preview-stat">
+                <span className="login-brand-preview-stat-label">Sales</span>
+                <span className="login-brand-preview-stat-value">₹48,320</span>
               </div>
+              <div className="login-brand-preview-stat">
+                <span className="login-brand-preview-stat-label">Orders</span>
+                <span className="login-brand-preview-stat-value">186</span>
+              </div>
+              <div className="login-brand-preview-stat">
+                <span className="login-brand-preview-stat-label">Profit</span>
+                <span className="login-brand-preview-stat-value">₹12,940</span>
+              </div>
+            </div>
+            <div className="login-brand-preview-chart">
+              {previewBars.map((h, idx) => (
+                <span
+                  key={idx}
+                  className="login-brand-preview-bar"
+                  style={{ '--bar-h': `${h}%`, animationDelay: `${0.5 + idx * 0.08}s` }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Trust stats */}
+          <div className="login-brand-trust-row">
+            {trustStats.map((stat, idx) => (
+              <React.Fragment key={stat.label}>
+                {idx > 0 && <span className="login-brand-trust-divider" />}
+                <div className="login-brand-trust-item">
+                  <span className="login-brand-trust-value">{stat.value}</span>
+                  <span className="login-brand-trust-label">{stat.label}</span>
+                </div>
+              </React.Fragment>
             ))}
           </div>
 
