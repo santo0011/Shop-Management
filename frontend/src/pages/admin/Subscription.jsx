@@ -15,14 +15,14 @@ const Subscription = () => {
 
   const fetchPlans = async () => {
     try {
-      const { data } = await api.get('/plans');
+      const { data } = await api.get('/plans', { _skipLoading: true });
       setPlans(data);
     } catch (err) { console.error(err); }
   };
 
   const fetchStatus = async () => {
     try {
-      const { data } = await api.get('/subscription/status');
+      const { data } = await api.get('/subscription/status', { _skipLoading: true });
       setStatus(data);
     } catch (err) { console.error(err); }
   };

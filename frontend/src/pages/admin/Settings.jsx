@@ -8,6 +8,7 @@ import { showToast } from '../../utils/toast';
 import {
   BiSave, BiTag, BiReceipt, BiStore, BiBarcode, BiCloudDownload, BiCloudUpload,
   BiShieldQuarter, BiUserCircle, BiLockAlt, BiEnvelope, BiPhone, BiImage,
+  BiHide, BiShow,
 } from 'react-icons/bi';
 
 const SECTIONS = [
@@ -48,6 +49,7 @@ const Settings = () => {
   const [profileForm, setProfileForm] = useState({ name: '', phone: '', avatar: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
+  const [showPassword, setShowPassword] = useState({ current: false, new: false, confirm: false });
   const [downloadingBackup, setDownloadingBackup] = useState(false);
   const [restoreFile, setRestoreFile] = useState(null);
   const [restoring, setRestoring] = useState(false);
@@ -577,24 +579,160 @@ const Settings = () => {
 
       case 'password':
         return (
-          <div className="table-container">
-            <div className="table-header"><h5><BiLockAlt /> Change Password</h5></div>
-            <div className="p-4">
-              <div className="mb-3">
-                <label className="form-label">Current Password</label>
-                <input type="password" className="form-control" style={{ maxWidth: '320px' }} value={passwordForm.currentPassword} onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} autoComplete="current-password" />
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--border-radius-lg)',
+              boxShadow: 'var(--shadow-card)',
+              overflow: 'hidden',
+              maxWidth: '520px',
+            }}
+          >
+            {/* ── Header ── */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '20px 24px',
+                borderBottom: '1px solid var(--border-color)',
+              }}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: 'var(--glow-primary)',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.25rem',
+                  flexShrink: 0,
+                }}
+              >
+                <BiLockAlt />
               </div>
-              <div className="mb-3">
-                <label className="form-label">New Password</label>
-                <input type="password" className="form-control" style={{ maxWidth: '320px' }} value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} autoComplete="new-password" />
+              <div>
+                <h5 style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                  Change Password
+                </h5>
+                <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Use a strong password that you don't use elsewhere
+                </p>
               </div>
-              <div className="mb-3">
-                <label className="form-label">Confirm New Password</label>
-                <input type="password" className="form-control" style={{ maxWidth: '320px' }} value={passwordForm.confirmPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} autoComplete="new-password" />
-                <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: 4, display: 'block' }}>
-                  Must be at least 6 characters.
-                </small>
-              </div>
+            </div>
+
+            {/* ── Fields ── */}
+            <div style={{ padding: '20px 24px 16px' }}>
+              {[
+                { key: 'current', label: 'Current Password', field: 'currentPassword', autoComplete: 'current-password' },
+                { key: 'new', label: 'New Password', field: 'newPassword', autoComplete: 'new-password' },
+                { key: 'confirm', label: 'Confirm New Password', field: 'confirmPassword', autoComplete: 'new-password' },
+              ].map(({ key, label, field, autoComplete }) => (
+                <div key={key} style={{ marginBottom: key === 'confirm' ? '12px' : '20px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      marginBottom: '6px',
+                    }}
+                  >
+                    {label}
+                  </label>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: 'var(--bg-input)',
+                      border: '1.5px solid var(--border-color)',
+                      borderRadius: 'var(--border-radius-sm)',
+                      transition: 'all 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+                      overflow: 'hidden',
+                    }}
+                    className="password-input-wrapper"
+                  >
+                    <span
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 42,
+                        flexShrink: 0,
+                        color: 'var(--text-muted)',
+                        fontSize: '1.05rem',
+                      }}
+                    >
+                      <BiLockAlt />
+                    </span>
+                    <input
+                      type={showPassword[key] ? 'text' : 'password'}
+                      value={passwordForm[field]}
+                      onChange={e => setPasswordForm({ ...passwordForm, [field]: e.target.value })}
+                      autoComplete={autoComplete}
+                      placeholder={key === 'current' ? 'Enter current password' : key === 'new' ? 'Enter new password' : 'Confirm new password'}
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        outline: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.875rem',
+                        fontFamily: 'var(--font-family)',
+                        padding: '10px 0',
+                        minHeight: 42,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(prev => ({ ...prev, [key]: !prev[key] }))}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 40,
+                        flexShrink: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontSize: '1.15rem',
+                        cursor: 'pointer',
+                        padding: 0,
+                        transition: 'color 200ms',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                      tabIndex={-1}
+                    >
+                      {showPassword[key] ? <BiHide /> : <BiShow />}
+                    </button>
+                  </div>
+                  {key === 'confirm' && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: '0.75rem',
+                        color: passwordForm.newPassword && passwordForm.newPassword.length >= 6
+                          ? 'var(--secondary)'
+                          : 'var(--text-muted)',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
+                        <path d="M12 6v6l4 2"/>
+                      </svg>
+                      <span>Must be at least 6 characters.</span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         );

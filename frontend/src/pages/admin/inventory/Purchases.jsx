@@ -797,9 +797,10 @@ const Purchases = () => {
 
   const fetchPurchases = useCallback(async () => {
     const silent = !isFirstLoad.current;
+    // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/purchases?search=${search}`, { _skipLoading: silent });
+      const { data } = await api.get(`/purchases?search=${search}`, { _skipLoading: true });
       setPurchases(data.purchases);
     } catch (err) {
       console.error(err);

@@ -5,6 +5,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { toggleTheme } from '../../redux/slices/themeSlice';
 import { logout } from '../../redux/slices/authSlice';
 import Swal from 'sweetalert2';
+import { showToast } from '../../utils/toast';
 import {
   BiGridAlt, BiStore, BiSun, BiMoon,
   BiMenu, BiGlobe, BiUser, BiX,
@@ -73,7 +74,7 @@ const SuperAdminLayout = () => {
     setLangOpen(false);
     try {
       const api = (await import('../../services/api')).default;
-      await api.put('/auth/profile', { language: lang });
+      await api.put('/auth/profile', { language: lang }, { _skipLoading: true });
     } catch (err) {
       console.error('Failed to save language preference');
     }
@@ -95,6 +96,7 @@ const SuperAdminLayout = () => {
       iconColor: '#FF6B6B',
     }).then((result) => {
       if (result.isConfirmed) {
+        showToast.success('Logged out successfully.');
         dispatch(logout());
         localStorage.clear();
         navigate('/login', { replace: true });

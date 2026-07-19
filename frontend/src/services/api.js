@@ -11,7 +11,14 @@ const api = axios.create({
   },
 });
 
-// Track pending requests count to avoid flickering
+/**
+ * Track pending requests with a counter so the global overlay only
+ * disappears when ALL requests have completed (avoids flickering when
+ * multiple endpoints are called in parallel).
+ *
+ * The LoadingOverlay component handles its own show-delay to prevent
+ * flashing for fast operations — no artificial delay is needed here.
+ */
 let pendingRequests = 0;
 
 // Request interceptor to add token and show loading
@@ -22,12 +29,12 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Don't show loading for token refresh requests
+    // Don't show loading for token refresh requests or skip-marked ones
     if (!config._skipLoading) {
-      pendingRequests++;
-      if (pendingRequests === 1) {
+      if (pendingRequests === 0) {
         store.dispatch(showLoading());
       }
+      pendingRequests++;
     }
 
     return config;
@@ -35,15 +42,18 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const safeHideLoading = () => {
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  if (pendingRequests === 0) {
+    store.dispatch(hideLoading());
+  }
+};
+
 // Response interceptor for token refresh and loading management
 api.interceptors.response.use(
   (response) => {
-    // Don't hide loading for token refresh requests
     if (!response.config._skipLoading) {
-      pendingRequests = Math.max(0, pendingRequests - 1);
-      if (pendingRequests === 0) {
-        store.dispatch(hideLoading());
-      }
+      safeHideLoading();
     }
     return response;
   },
@@ -52,10 +62,7 @@ api.interceptors.response.use(
 
     // Hide loading for failed requests
     if (originalRequest && !originalRequest._skipLoading) {
-      pendingRequests = Math.max(0, pendingRequests - 1);
-      if (pendingRequests === 0) {
-        store.dispatch(hideLoading());
-      }
+      safeHideLoading();
     }
 
     if (error.response?.status === 401 && error.response?.data?.expired && !originalRequest._retry) {

@@ -74,7 +74,7 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
         phone: form.phone,
         password: form.password,
         address: form.address,
-      });
+      }, { _skipLoading: true });
       setForm({ shopName: '', ownerName: '', email: '', phone: '', password: '', address: '' });
       setErrors({});
       onSuccess();
@@ -226,7 +226,7 @@ const ManageShops = () => {
     const silent = !isFirstLoad.current;
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/shops?search=${debouncedSearch}`, { _skipLoading: silent });
+      const { data } = await api.get(`/shops?search=${debouncedSearch}`, { _skipLoading: true });
       setShops(data.shops || []);
     } catch (err) {
       console.error(err);
@@ -253,7 +253,7 @@ const ManageShops = () => {
     setViewShopData(null);
     setViewShopError(null);
     try {
-      const { data } = await api.get(`/shops/${shop._id}`);
+      const { data } = await api.get(`/shops/${shop._id}`, { _skipLoading: true });
       setViewShopData(data);
     } catch (err) {
       setViewShopError(err.response?.data?.message || 'Failed to load shop details');
@@ -264,7 +264,7 @@ const ManageShops = () => {
 
   const toggleStatus = async (id) => {
     try {
-      await api.put(`/shops/${id}/toggle-status`);
+      await api.put(`/shops/${id}/toggle-status`, {}, { _skipLoading: true });
       fetchShops();
     } catch (err) {
       console.error(err);
@@ -273,7 +273,7 @@ const ManageShops = () => {
 
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/shops/${id}`);
+      await api.delete(`/shops/${id}`, { _skipLoading: true });
       setDeleteConfirm(null);
       fetchShops();
     } catch (err) {
@@ -640,7 +640,7 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
         email: form.email,
         phone: form.phone,
         address: form.address,
-      });
+      }, { _skipLoading: true });
       onSuccess();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update shop');

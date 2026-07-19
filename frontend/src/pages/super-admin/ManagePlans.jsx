@@ -94,9 +94,9 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
     setError(null);
     try {
       if (editing) {
-        await api.put(`/plans/${plan._id}`, form);
+        await api.put(`/plans/${plan._id}`, form, { _skipLoading: true });
       } else {
-        await api.post('/plans', form);
+        await api.post('/plans', form, { _skipLoading: true });
       }
       setErrors({});
       onSuccess();
@@ -232,7 +232,7 @@ const ManagePlans = () => {
   const fetchPlans = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/plans/all');
+      const { data } = await api.get('/plans/all', { _skipLoading: true });
       setPlans(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -255,7 +255,7 @@ const ManagePlans = () => {
 
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/plans/${id}`);
+      await api.delete(`/plans/${id}`, { _skipLoading: true });
       setDeleteConfirm(null);
       fetchPlans();
     } catch (err) {

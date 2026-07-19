@@ -20,18 +20,18 @@ export const showToast = {
     Toast.fire({
       icon: 'success',
       title: message,
-      background: '#10B981',
-      color: '#fff',
-      iconColor: '#fff',
+      background: '#fff',
+      color: '#1a1a2e',
+      iconColor: '#10B981',
     });
   },
   error: (message) => {
     Toast.fire({
       icon: 'error',
       title: message,
-      background: '#EF4444',
-      color: '#fff',
-      iconColor: '#fff',
+      background: '#fff',
+      color: '#1a1a2e',
+      iconColor: '#EF4444',
       timer: 5000,
     });
   },
@@ -39,9 +39,9 @@ export const showToast = {
     Toast.fire({
       icon: 'warning',
       title: message,
-      background: '#F59E0B',
-      color: '#fff',
-      iconColor: '#fff',
+      background: '#fff',
+      color: '#1a1a2e',
+      iconColor: '#F59E0B',
       timer: 4000,
     });
   },
@@ -49,9 +49,9 @@ export const showToast = {
     Toast.fire({
       icon: 'info',
       title: message,
-      background: '#3B82F6',
-      color: '#fff',
-      iconColor: '#fff',
+      background: '#fff',
+      color: '#1a1a2e',
+      iconColor: '#3B82F6',
     });
   },
 };

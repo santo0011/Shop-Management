@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const connectDB = require('./config/db');
+const { verifyConnection: verifyMailConnection } = require('./config/mail');
 const seedSuperAdmin = require('./utils/seedSuperAdmin');
 
 // Import routes
@@ -27,6 +28,8 @@ const app = express();
 // Connect to MongoDB and seed initial data
 connectDB().then(() => {
   seedSuperAdmin();
+  // Verify SMTP connection (non-blocking — logs warning on failure)
+  verifyMailConnection();
 });
 
 // Middleware

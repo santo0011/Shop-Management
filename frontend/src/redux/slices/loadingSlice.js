@@ -1,9 +1,15 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+/**
+ * Global loading state.
+ *
+ * The `api.js` interceptor is the **sole** dispatcher of these actions.
+ * It uses its own `pendingRequests` counter to decide when to show/hide.
+ * This slice simply reflects that state — no duplicate counter here.
+ */
 const initialState = {
   globalLoading: false,
-  loadingCount: 0,
-  text: 'Loading...',
+  text: 'Please wait...',
 };
 
 const loadingSlice = createSlice({
@@ -11,23 +17,16 @@ const loadingSlice = createSlice({
   initialState,
   reducers: {
     showLoading: (state, action) => {
-      state.loadingCount += 1;
       state.globalLoading = true;
-      if (action.payload) {
-        state.text = action.payload;
-      }
+      state.text = action.payload || 'Please wait...';
     },
     hideLoading: (state) => {
-      state.loadingCount = Math.max(0, state.loadingCount - 1);
-      if (state.loadingCount === 0) {
-        state.globalLoading = false;
-        state.text = 'Loading...';
-      }
+      state.globalLoading = false;
+      state.text = 'Please wait...';
     },
     resetLoading: (state) => {
       state.globalLoading = false;
-      state.loadingCount = 0;
-      state.text = 'Loading...';
+      state.text = 'Please wait...';
     },
   },
 });

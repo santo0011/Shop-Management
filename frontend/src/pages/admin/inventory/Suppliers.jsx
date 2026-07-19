@@ -712,9 +712,10 @@ const Suppliers = () => {
 
   const fetchSuppliers = async () => {
     const silent = !isFirstLoad.current;
+    // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/suppliers?search=${search}`, { _skipLoading: silent });
+      const { data } = await api.get(`/suppliers?search=${search}`, { _skipLoading: true });
       setSuppliers(data.suppliers);
     } catch (err) {
       console.error(err);

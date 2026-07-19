@@ -6,6 +6,7 @@ import { updateLanguage } from '../../redux/slices/authSlice';
 import api from '../../services/api';
 import { BiMenu, BiSun, BiMoon, BiUser, BiGlobe, BiLogOut, BiBell } from 'react-icons/bi';
 import GlobalSearch from '../common/GlobalSearch';
+import { showToast } from '../../utils/toast';
 
 const Header = ({ onToggleSidebar }) => {
   const { t, i18n } = useTranslation();
@@ -45,6 +46,7 @@ const Header = ({ onToggleSidebar }) => {
   };
 
   const handleLogout = () => {
+    showToast.success('Logged out successfully.');
     localStorage.clear();
     window.location.href = '/login';
   };

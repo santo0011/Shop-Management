@@ -136,7 +136,7 @@ const Reports = () => {
     try {
       const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
       if (filters.paymentMethod !== 'all') params.append('paymentMethod', filters.paymentMethod);
-      const { data } = await api.get(`/reports/analytics?${params.toString()}`, { _skipLoading: !isFirstLoad });
+      const { data } = await api.get(`/reports/analytics?${params.toString()}`, { _skipLoading: true });
       setAnalytics(data);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to load report data');

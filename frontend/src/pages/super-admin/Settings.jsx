@@ -15,7 +15,7 @@ const SuperAdminSettings = () => {
     const newTheme = mode === 'light' ? 'dark' : 'light';
     dispatch(setTheme(newTheme));
     try {
-      api.put('/auth/profile', { theme: newTheme });
+      api.put('/auth/profile', { theme: newTheme }, { _skipLoading: true });
     } catch (err) {
       console.error('Failed to save theme preference');
     }
@@ -24,7 +24,7 @@ const SuperAdminSettings = () => {
   const handleLanguageChange = async (lang) => {
     i18n.changeLanguage(lang);
     try {
-      await api.put('/auth/profile', { language: lang });
+      await api.put('/auth/profile', { language: lang }, { _skipLoading: true });
     } catch (err) {
       console.error('Failed to save language preference');
     }

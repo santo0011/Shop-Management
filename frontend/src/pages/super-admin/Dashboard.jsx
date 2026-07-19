@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import Chart from 'react-apexcharts';
@@ -9,25 +9,21 @@ import {
 const SuperDashboard = () => {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchData = useCallback(async () => {
     setError(null);
     try {
-      const { data: result } = await api.get('/super-admin/dashboard');
+      const { data: result } = await api.get('/super-admin/dashboard', { _skipLoading: true });
       setData(result);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const getTheme = () => {
     try {
@@ -80,21 +76,6 @@ const SuperDashboard = () => {
     data: data?.shopGrowth?.map(r => r.count) || [],
   }], [data?.shopGrowth]);
 
-  if (loading) return null;
-
-  if (error) {
-    return (
-      <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-        <div className="premium-card p-5 text-center" style={{ maxWidth: '500px' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--danger)' }}><BiError /></div>
-          <h5 className="mb-2" style={{ fontWeight: 700 }}>Failed to Load Dashboard</h5>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{error}</p>
-          <button className="btn-premium btn-premium-primary" onClick={fetchDashboardData}><BiRefresh /> Retry</button>
-        </div>
-      </div>
-    );
-  }
-
   const statCards = [
     { icon: BiStore, label: 'Total Shops', value: data?.totalShops || 0, color: 'primary' },
     { icon: BiCheckCircle, label: 'Active Shops', value: data?.activeShops || 0, color: 'success' },
@@ -114,12 +95,21 @@ const SuperDashboard = () => {
             Business overview at a glance
           </p>
         </div>
-        <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={fetchDashboardData}>
+        <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={fetchData}>
           <BiRefresh /> Refresh
         </button>
       </div>
 
-      {/* Stat Cards - 3 per row */}
+      {/* Error Banner */}
+      {error && (
+        <div className="d-flex align-items-center gap-2 mb-4 p-3" style={{ background: 'var(--glow-danger)', borderRadius: 'var(--border-radius-md)', color: 'var(--danger)', fontSize: '0.85rem' }}>
+          <BiError style={{ fontSize: '1.2rem', flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>{error}</span>
+          <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={fetchData}><BiRefresh /> Retry</button>
+        </div>
+      )}
+
+      {/* Stat Cards */}
       <div className="row g-3 mb-4">
         {statCards.map((card, index) => (
           <div key={index} className="col-md-4">
@@ -140,7 +130,7 @@ const SuperDashboard = () => {
         ))}
       </div>
 
-      {/* Charts - 2 in a row */}
+      {/* Charts */}
       <div className="row g-3">
         <div className="col-lg-6">
           <div className="premium-card">

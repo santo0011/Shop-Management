@@ -638,9 +638,10 @@ const Categories = () => {
 
   const fetchCategories = async () => {
     const silent = !isFirstLoad.current;
+    // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get('/categories', { _skipLoading: silent });
+      const { data } = await api.get('/categories', { _skipLoading: true });
       setCategories(data);
     } catch (err) {
       console.error(err);

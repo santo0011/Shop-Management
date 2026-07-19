@@ -54,9 +54,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   const loadReferenceData = async () => {
     try {
       const [catRes, supRes, prodRes] = await Promise.all([
-        api.get('/categories?limit=10000'),
-        api.get('/suppliers?limit=10000'),
-        api.get('/products?limit=10000'),
+        api.get('/categories?limit=10000', { _skipLoading: true }),
+        api.get('/suppliers?limit=10000', { _skipLoading: true }),
+        api.get('/products?limit=10000', { _skipLoading: true }),
       ]);
       setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data.categories || []);
       setSuppliers(supRes.data.suppliers || []);
@@ -692,6 +692,7 @@ const Products = () => {
     const openId = location.state?.openProductId;
     if (!openId) return;
     window.history.replaceState({}, document.title);
+    // Fetch single product — no global loader needed, drawer handles its own loading
     api.get(`/products/${openId}`, { _skipLoading: true })
       .then(({ data }) => { setEditing(data); setDrawerOpen(true); })
       .catch((err) => console.error(err));
@@ -701,9 +702,10 @@ const Products = () => {
     // Only the very first load shows the full-page loader; searches/refreshes
     // stay silent and use the inline search spinner + table indicator instead.
     const silent = !isFirstLoad.current;
+    // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/products?search=${search}`, { _skipLoading: silent });
+      const { data } = await api.get(`/products?search=${search}`, { _skipLoading: true });
       setProducts(data.products);
     } catch (err) {
       console.error(err);
@@ -715,7 +717,7 @@ const Products = () => {
 
   const fetchCategories = async () => {
     try {
-      const { data } = await api.get('/categories');
+      const { data } = await api.get('/categories', { _skipLoading: true });
       setCategories(data);
     } catch (err) {
       console.error(err);

@@ -358,9 +358,10 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     const silent = !isFirstLoad.current;
+    // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/customers?search=${search}`, { _skipLoading: silent });
+      const { data } = await api.get(`/customers?search=${search}`, { _skipLoading: true });
       setCustomers(data.customers);
     } catch (err) {
       console.error(err);

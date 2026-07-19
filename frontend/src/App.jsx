@@ -10,6 +10,8 @@ import SuperAdminLayout from './components/layout/SuperAdminLayout';
 
 // Auth Pages
 import Login from './pages/auth/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin Pages
 import Dashboard from './pages/admin/Dashboard';
@@ -99,6 +101,8 @@ function App() {
               : <Login />
           } 
         />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         {/* Super Admin Routes */}
         <Route 

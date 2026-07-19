@@ -414,8 +414,8 @@ const POS = () => {
   useEffect(() => {
     loadTopSelling();
     loadRecentSales();
-    api.get('/customers?limit=50').then(({ data }) => setCustomers(data.customers || [])).catch(() => {});
-    api.get('/shops/my').then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
+    api.get('/customers?limit=50', { _skipLoading: true }).then(({ data }) => setCustomers(data.customers || [])).catch(() => {});
+    api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -425,8 +425,8 @@ const POS = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const loadTopSelling = async () => { try { const { data } = await api.get('/sales/top-selling?limit=20'); setTopSelling(Array.isArray(data) ? data : []); } catch (err) { console.error(err); } };
-  const loadRecentSales = async () => { try { const { data } = await api.get('/sales/recent?limit=5'); setRecentSales(data.sales || []); } catch (err) { console.error(err); } };
+  const loadTopSelling = async () => { try { const { data } = await api.get('/sales/top-selling?limit=20', { _skipLoading: true }); setTopSelling(Array.isArray(data) ? data : []); } catch (err) { console.error(err); } };
+  const loadRecentSales = async () => { try { const { data } = await api.get('/sales/recent?limit=5', { _skipLoading: true }); setRecentSales(data.sales || []); } catch (err) { console.error(err); } };
   const searchProducts = async () => {
     setSearching(true);
     try {

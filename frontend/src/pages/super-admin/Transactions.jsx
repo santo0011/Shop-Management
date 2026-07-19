@@ -9,7 +9,7 @@ const Transactions = () => {
   useEffect(() => {
     const fetch = async () => {
       try {
-        const { data } = await api.get('/subscription/all');
+        const { data } = await api.get('/subscription/all', { _skipLoading: true });
         setSubscriptions(data.subscriptions);
       } catch (err) { console.error(err); }
     };

@@ -952,11 +952,12 @@ const Sales = () => {
   }, [search]);
 
   useEffect(() => {
-    api.get('/shops/my').then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
+    api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
   }, []);
 
   useEffect(() => {
-    api.get('/sales/stats', { _skipLoading: !isFirstLoad.current }).then(({ data }) => setStats(data)).catch(() => {});
+    // Always skip global loading overlay — this page uses its own table loader
+    api.get('/sales/stats', { _skipLoading: true }).then(({ data }) => setStats(data)).catch(() => {});
   }, []);
 
   // Only the very first load shows the full-page loader; subsequent fetches
@@ -972,7 +973,7 @@ const Sales = () => {
       if (paymentStatus) params.append('paymentStatus', paymentStatus);
       params.append('page', page);
       params.append('limit', 20);
-      const { data } = await api.get(`/sales?${params.toString()}`, { _skipLoading: silent });
+      const { data } = await api.get(`/sales?${params.toString()}`, { _skipLoading: true });
       setSales(data.sales || []);
       setTotalPages(data.pages || 1);
       setTotal(data.total || 0);
