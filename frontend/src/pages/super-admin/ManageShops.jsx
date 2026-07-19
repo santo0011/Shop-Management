@@ -6,18 +6,18 @@ import { BiSearch, BiPlus, BiStore, BiX, BiUser, BiPhone, BiEnvelope, BiMap, BiL
 
 const REQUIRED_SHOP_FIELDS = ['shopName', 'ownerName', 'phone', 'email', 'password'];
 
-const validateShopField = (name, value) => {
+const validateShopField = (t, name, value) => {
   switch (name) {
     case 'shopName':
-      return String(value || '').trim() ? '' : 'Shop name is required';
+      return String(value || '').trim() ? '' : t('manageShopsPage.shopNameRequired');
     case 'ownerName':
-      return String(value || '').trim() ? '' : 'Owner name is required';
+      return String(value || '').trim() ? '' : t('manageShopsPage.ownerNameRequired');
     case 'phone':
-      return String(value || '').trim() ? '' : 'Phone number is required';
+      return String(value || '').trim() ? '' : t('manageShopsPage.phoneRequired');
     case 'email':
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || '') ? '' : 'Enter a valid email address';
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || '') ? '' : t('auth.invalidEmail');
     case 'password':
-      return value && value.length >= 6 ? '' : 'Password must be at least 6 characters';
+      return value && value.length >= 6 ? '' : t('auth.passwordMinLength');
     case 'address':
       return '';
     default:
@@ -44,7 +44,7 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => {
       if (!(name in prev)) return prev;
-      const msg = validateShopField(name, value);
+      const msg = validateShopField(t, name, value);
       const next = { ...prev };
       if (msg) next[name] = msg; else delete next[name];
       return next;
@@ -56,7 +56,7 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
     e.preventDefault();
     const newErrors = {};
     REQUIRED_SHOP_FIELDS.forEach((field) => {
-      const msg = validateShopField(field, form[field]);
+      const msg = validateShopField(t, field, form[field]);
       if (msg) newErrors[field] = msg;
     });
     if (Object.keys(newErrors).length > 0) {
@@ -80,7 +80,7 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create shop');
+      setError(err.response?.data?.message || t('manageShopsPage.createShopFailed'));
     } finally {
       setLoading(false);
     }
@@ -96,12 +96,12 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
 
   function getPlaceholder(name) {
     switch (name) {
-      case 'shopName': return 'Enter shop name';
-      case 'ownerName': return 'Enter owner name';
-      case 'phone': return 'Phone number';
-      case 'email': return 'Email address';
-      case 'password': return 'Set initial password';
-      case 'address': return 'Enter shop address';
+      case 'shopName': return t('manageShopsPage.shopNamePlaceholder');
+      case 'ownerName': return t('manageShopsPage.ownerNamePlaceholder');
+      case 'phone': return t('manageShopsPage.phonePlaceholder');
+      case 'email': return t('manageShopsPage.emailPlaceholder');
+      case 'password': return t('manageShopsPage.setPasswordPlaceholder');
+      case 'address': return t('manageShopsPage.addressPlaceholder');
       default: return '';
     }
   }
@@ -111,7 +111,7 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />Add New Shop</h5>
+          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />{t('manageShopsPage.addNewShop')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
@@ -130,47 +130,47 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
           )}
           <form onSubmit={handleSubmit} id="add-shop-form" noValidate>
             <div className="form-group">
-              <label className="form-label"><BiStore style={{ marginRight: '6px' }} />Shop Name <span style={{color: 'var(--danger)'}}>*</span></label>
+              <label className="form-label"><BiStore style={{ marginRight: '6px' }} />{t('manageShopsPage.shopName')} <span style={{color: 'var(--danger)'}}>*</span></label>
               <input {...field('shopName')} />
               {errors.shopName && <div className="invalid-feedback-premium">{errors.shopName}</div>}
             </div>
             <div className="form-group">
-              <label className="form-label"><BiUser style={{ marginRight: '6px' }} />Owner Name <span style={{color: 'var(--danger)'}}>*</span></label>
+              <label className="form-label"><BiUser style={{ marginRight: '6px' }} />{t('manageShopsPage.ownerName')} <span style={{color: 'var(--danger)'}}>*</span></label>
               <input {...field('ownerName')} />
               {errors.ownerName && <div className="invalid-feedback-premium">{errors.ownerName}</div>}
             </div>
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="form-group">
-                  <label className="form-label"><BiPhone style={{ marginRight: '6px' }} />Phone <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <label className="form-label"><BiPhone style={{ marginRight: '6px' }} />{t('auth.phone')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input type="tel" {...field('phone')} />
                   {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
                 </div>
               </div>
               <div className="col-md-6">
                 <div className="form-group">
-                  <label className="form-label"><BiEnvelope style={{ marginRight: '6px' }} />Email <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <label className="form-label"><BiEnvelope style={{ marginRight: '6px' }} />{t('auth.email')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input type="email" {...field('email')} />
                   {errors.email && <div className="invalid-feedback-premium">{errors.email}</div>}
                 </div>
               </div>
             </div>
             <div className="form-group">
-              <label className="form-label"><BiLock style={{ marginRight: '6px' }} />Password <span style={{color: 'var(--danger)'}}>*</span></label>
+              <label className="form-label"><BiLock style={{ marginRight: '6px' }} />{t('auth.password')} <span style={{color: 'var(--danger)'}}>*</span></label>
               <input type="password" {...field('password')} />
               {errors.password && <div className="invalid-feedback-premium">{errors.password}</div>}
             </div>
             <div className="form-group">
-              <label className="form-label"><BiMap style={{ marginRight: '6px' }} />Address</label>
-              <textarea className={`form-control ${errors.address ? 'is-invalid' : ''}`} name="address" value={form.address} onChange={handleChange} placeholder="Enter shop address" rows={3} />
+              <label className="form-label"><BiMap style={{ marginRight: '6px' }} />{t('manageShopsPage.address')}</label>
+              <textarea className={`form-control ${errors.address ? 'is-invalid' : ''}`} name="address" value={form.address} onChange={handleChange} placeholder={t('manageShopsPage.addressPlaceholder')} rows={3} />
               {errors.address && <div className="invalid-feedback-premium">{errors.address}</div>}
             </div>
           </form>
         </div>
         <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" form="add-shop-form" className="btn-premium btn-premium-primary" disabled={loading}>
-            {loading ? <><span className="spinner-border spinner-border-sm" /> Creating...</> : <><BiCheck /> Create Shop</>}
+            {loading ? <><span className="spinner-border spinner-border-sm" /> {t('manageShopsPage.creating')}</> : <><BiCheck /> {t('manageShopsPage.createShop')}</>}
           </button>
         </div>
       </div>
@@ -179,8 +179,8 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
 };
 
 // Helper to safely render address regardless of format (string or object)
-const safeAddress = (addr) => {
-  if (!addr) return 'N/A';
+const safeAddress = (addr, t) => {
+  if (!addr) return t('common.notAvailable');
   if (typeof addr === 'string') return addr;
   // It's an object
   const parts = [];
@@ -194,7 +194,7 @@ const safeAddress = (addr) => {
     else if (addr.country?.value) parts.push(addr.country.value);
   }
   if (addr.zipCode) parts.push(addr.zipCode);
-  return parts.length > 0 ? parts.join(', ') : 'N/A';
+  return parts.length > 0 ? parts.join(', ') : t('common.notAvailable');
 };
 
 const ManageShops = () => {
@@ -256,7 +256,7 @@ const ManageShops = () => {
       const { data } = await api.get(`/shops/${shop._id}`, { _skipLoading: true });
       setViewShopData(data);
     } catch (err) {
-      setViewShopError(err.response?.data?.message || 'Failed to load shop details');
+      setViewShopError(err.response?.data?.message || t('manageShopsPage.loadShopDetailsFailed'));
     } finally {
       setViewShopLoading(false);
     }
@@ -288,11 +288,11 @@ const ManageShops = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.shops')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage all registered shops
+            {t('manageShopsPage.subtitle')}
           </p>
         </div>
         <button className="btn-premium btn-premium-primary" onClick={() => setDrawerOpen(true)}>
-          <BiPlus /> Add Shop
+          <BiPlus /> {t('manageShopsPage.addShop')}
         </button>
       </div>
 
@@ -302,7 +302,7 @@ const ManageShops = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder="Search shops..."
+            placeholder={t('manageShopsPage.searchShopsPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -315,25 +315,25 @@ const ManageShops = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
-                <th>Shop</th>
-                <th>Owner</th>
-                <th>Contact</th>
-                <th>Status</th>
-                <th style={{ width: '180px' }}>Actions</th>
+                <th>{t('manageShopsPage.shop')}</th>
+                <th>{t('manageShopsPage.owner')}</th>
+                <th>{t('manageShopsPage.contact')}</th>
+                <th>{t('common.status')}</th>
+                <th style={{ width: '180px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> Loading...
+                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : shops.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🏪</div>
-                    No shops found
+                    {t('manageShopsPage.noShopsFound')}
                   </td>
                 </tr>
               ) : shops.map((shop) => (
@@ -345,7 +345,7 @@ const ManageShops = () => {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <BiUser style={{ color: 'var(--text-muted)' }} />
-                      {shop.ownerName || 'N/A'}
+                      {shop.ownerName || t('common.notAvailable')}
                     </div>
                   </td>
                   <td>
@@ -354,25 +354,25 @@ const ManageShops = () => {
                   </td>
                   <td>
                     <span className={`badge ${shop.isActive ? 'badge-success' : 'badge-danger'}`}>
-                      {shop.isActive ? 'Active' : 'Inactive'}
+                      {shop.isActive ? t('common.active') : t('common.inactive')}
                     </span>
                   </td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip="View Details" onClick={() => handleViewShop(shop)}>
+                      <button className="btn-action btn-action-view" data-tooltip={t('manageShopsPage.viewDetails')} onClick={() => handleViewShop(shop)}>
                         <BiShow />
                       </button>
-                      <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => setEditShop(shop)}>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => setEditShop(shop)}>
                         <BiEdit />
                       </button>
                       <button
                         className={`btn-action ${shop.isActive ? 'btn-action-toggle active' : 'btn-action-toggle'}`}
-                        data-tooltip={shop.isActive ? 'Deactivate' : 'Activate'}
+                        data-tooltip={shop.isActive ? t('manageShopsPage.deactivate') : t('manageShopsPage.activate')}
                         onClick={() => toggleStatus(shop._id)}
                       >
                         <BiLock />
                       </button>
-                      <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(shop._id)}>
+                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(shop._id)}>
                         <BiTrash />
                       </button>
                     </div>
@@ -397,7 +397,7 @@ const ManageShops = () => {
         <div className="drawer-header">
           <h5 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BiStore style={{ color: 'var(--primary)' }} />
-            Shop Details
+            {t('manageShopsPage.shopDetails')}
           </h5>
           <button className="btn-close-premium" onClick={() => { setViewShop(null); setViewShopData(null); }}><BiX /></button>
         </div>
@@ -405,7 +405,7 @@ const ManageShops = () => {
           {viewShopLoading ? (
             <div className="d-flex flex-column align-items-center justify-content-center py-5">
               <div className="spinner-border mb-3" style={{ color: 'var(--primary)', width: '2.5rem', height: '2.5rem' }} role="status" />
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>Loading shop details...</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>{t('manageShopsPage.loadingShopDetails')}</p>
             </div>
           ) : viewShopError ? (
             <div style={{
@@ -450,31 +450,31 @@ const ManageShops = () => {
                 <h5 style={{ fontWeight: 700, margin: '0 0 0.5rem' }}>{viewShopData.name}</h5>
                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <span className={`badge ${viewShopData.isActive ? 'badge-success' : 'badge-danger'}`}>
-                    {viewShopData.isActive ? '● Active' : '● Inactive'}
+                    {viewShopData.isActive ? `● ${t('common.active')}` : `● ${t('common.inactive')}`}
                   </span>
                   <span className={`badge ${viewShopData.subscriptionStatus === 'active' ? 'badge-success' : viewShopData.subscriptionStatus === 'trial' ? 'badge-warning' : 'badge-danger'}`}>
-                    {viewShopData.subscriptionStatus === 'active' ? '◉ Subscribed' : viewShopData.subscriptionStatus === 'trial' ? '◉ Trial' : '◉ Expired'}
+                    {viewShopData.subscriptionStatus === 'active' ? `◉ ${t('manageShopsPage.subscribed')}` : viewShopData.subscriptionStatus === 'trial' ? `◉ ${t('subscription.trial')}` : `◉ ${t('manageShopsPage.expired')}`}
                   </span>
                 </div>
               </div>
 
               {/* ========== INFORMATION SECTIONS (single column, no overflow) ========== */}
               {[
-                { icon: BiStore, color: 'var(--primary)', glow: 'var(--glow-primary)', title: 'Shop Information', rows: [
-                  { icon: BiStore, label: 'Shop Name', value: viewShopData.name },
-                  { icon: BiPhone, label: 'Phone', value: viewShopData.phone || 'N/A' },
-                  { icon: BiEnvelope, label: 'Email', value: viewShopData.email || 'N/A' },
+                { key: 'shop', icon: BiStore, color: 'var(--primary)', glow: 'var(--glow-primary)', title: t('manageShopsPage.shopInformation'), rows: [
+                  { icon: BiStore, label: t('manageShopsPage.shopName'), value: viewShopData.name },
+                  { icon: BiPhone, label: t('auth.phone'), value: viewShopData.phone || t('common.notAvailable') },
+                  { icon: BiEnvelope, label: t('auth.email'), value: viewShopData.email || t('common.notAvailable') },
                 ]},
-                { icon: BiUser, color: 'var(--secondary)', glow: 'var(--glow-secondary)', title: 'Owner Information', rows: [
-                  { icon: BiUser, label: 'Name', value: viewShopData.owner?.name || 'N/A' },
-                  { icon: BiEnvelope, label: 'Email', value: viewShopData.owner?.email || 'N/A' },
+                { key: 'owner', icon: BiUser, color: 'var(--secondary)', glow: 'var(--glow-secondary)', title: t('manageShopsPage.ownerInformation'), rows: [
+                  { icon: BiUser, label: t('common.name'), value: viewShopData.owner?.name || t('common.notAvailable') },
+                  { icon: BiEnvelope, label: t('auth.email'), value: viewShopData.owner?.email || t('common.notAvailable') },
                 ]},
-                { icon: BiMap, color: 'var(--info)', glow: 'var(--glow-info)', title: 'Address Information', rows: [
-                  { icon: BiMap, label: 'Address', value: safeAddress(viewShopData.address) },
+                { key: 'address', icon: BiMap, color: 'var(--info)', glow: 'var(--glow-info)', title: t('manageShopsPage.addressInformation'), rows: [
+                  { icon: BiMap, label: t('manageShopsPage.address'), value: safeAddress(viewShopData.address, t) },
                 ]},
-                { icon: BiCalendar, color: 'var(--text-muted)', glow: 'var(--bg-input)', title: 'System Information', rows: [
-                  { icon: BiCalendar, label: 'Created', value: new Date(viewShopData.createdAt).toLocaleDateString() },
-                  { icon: BiCalendar, label: 'Updated', value: new Date(viewShopData.updatedAt).toLocaleDateString() },
+                { key: 'system', icon: BiCalendar, color: 'var(--text-muted)', glow: 'var(--bg-input)', title: t('manageShopsPage.systemInformation'), rows: [
+                  { icon: BiCalendar, label: t('manageShopsPage.created'), value: new Date(viewShopData.createdAt).toLocaleDateString() },
+                  { icon: BiCalendar, label: t('manageShopsPage.updated'), value: new Date(viewShopData.updatedAt).toLocaleDateString() },
                 ]},
               ].map((section, si) => (
                 <div key={si} className="premium-card" style={{ border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}>
@@ -507,7 +507,7 @@ const ManageShops = () => {
                         </div>
                       </div>
                     ))}
-                    {section.title === 'Address Information' && viewShopData.subscriptionStatus && (
+                    {section.key === 'address' && viewShopData.subscriptionStatus && (
                       <div style={{
                         display: 'flex', alignItems: 'center', gap: '12px',
                         marginTop: '12px', paddingTop: '12px',
@@ -522,14 +522,14 @@ const ManageShops = () => {
                           <BiLock />
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '1px' }}>Subscription</div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '1px' }}>{t('manageShopsPage.subscription')}</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span className={`badge ${viewShopData.subscriptionStatus === 'active' ? 'badge-success' : viewShopData.subscriptionStatus === 'trial' ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: '0.75rem', textTransform: 'capitalize' }}>
-                              {viewShopData.subscriptionStatus || 'trial'}
+                            <span className={`badge ${viewShopData.subscriptionStatus === 'active' ? 'badge-success' : viewShopData.subscriptionStatus === 'trial' ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: '0.75rem' }}>
+                              {viewShopData.subscriptionStatus === 'active' ? t('manageShopsPage.subscribed') : viewShopData.subscriptionStatus === 'trial' ? t('subscription.trial') : t('manageShopsPage.expired')}
                             </span>
                             {viewShopData.trialEndsAt && (
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                Trial ends: {new Date(viewShopData.trialEndsAt).toLocaleDateString()}
+                                {t('manageShopsPage.trialEndsPrefix', { date: new Date(viewShopData.trialEndsAt).toLocaleDateString() })}
                               </span>
                             )}
                           </div>
@@ -557,16 +557,16 @@ const ManageShops = () => {
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-premium-header">
-              <h5>Delete Shop</h5>
+              <h5>{t('manageShopsPage.deleteShopTitle')}</h5>
               <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
             </div>
             <div className="modal-premium-body text-center">
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--glow-danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 1.25rem' }}><BiTrash /></div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>Are you sure you want to delete this shop? This action cannot be undone.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>{t('manageShopsPage.deleteShopMessage')}</p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
-              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
             </div>
           </div>
         </div>
@@ -576,6 +576,7 @@ const ManageShops = () => {
 };
 
 const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [errors, setErrors] = useState({});
@@ -607,8 +608,8 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
     setErrors((prev) => {
       if (!(name in prev)) return prev;
       const msg = name === 'email'
-        ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || '') ? '' : 'Enter a valid email address')
-        : (String(value || '').trim() ? '' : `${name === 'shopName' ? 'Shop name' : name === 'ownerName' ? 'Owner name' : 'This field'} is required`);
+        ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || '') ? '' : t('auth.invalidEmail'))
+        : (String(value || '').trim() ? '' : (name === 'shopName' ? t('manageShopsPage.shopNameRequired') : name === 'ownerName' ? t('manageShopsPage.ownerNameRequired') : t('validation.fieldRequired')));
       const next = { ...prev };
       if (msg) next[name] = msg; else delete next[name];
       return next;
@@ -622,8 +623,8 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
     const newErrors = {};
     fields.forEach((field) => {
       const msg = field === 'email'
-        ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form[field] || '') ? '' : 'Enter a valid email address')
-        : (String(form[field] || '').trim() ? '' : `${field === 'shopName' ? 'Shop name' : field === 'ownerName' ? 'Owner name' : 'This field'} is required`);
+        ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form[field] || '') ? '' : t('auth.invalidEmail'))
+        : (String(form[field] || '').trim() ? '' : (field === 'shopName' ? t('manageShopsPage.shopNameRequired') : field === 'ownerName' ? t('manageShopsPage.ownerNameRequired') : t('validation.fieldRequired')));
       if (msg) newErrors[field] = msg;
     });
     if (Object.keys(newErrors).length > 0) {
@@ -643,7 +644,7 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
       }, { _skipLoading: true });
       onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update shop');
+      setError(err.response?.data?.message || t('manageShopsPage.updateShopFailed'));
     } finally {
       setLoading(false);
     }
@@ -654,7 +655,7 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
     name,
     value: form[name],
     onChange: handleChange,
-    placeholder: name === 'shopName' ? 'Enter shop name' : name === 'ownerName' ? 'Enter owner name' : name === 'phone' ? 'Phone number' : name === 'email' ? 'Email address' : '',
+    placeholder: name === 'shopName' ? t('manageShopsPage.shopNamePlaceholder') : name === 'ownerName' ? t('manageShopsPage.ownerNamePlaceholder') : name === 'phone' ? t('manageShopsPage.phonePlaceholder') : name === 'email' ? t('manageShopsPage.emailPlaceholder') : '',
   });
 
   return (
@@ -662,7 +663,7 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />Edit Shop</h5>
+          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />{t('manageShopsPage.editShopTitle')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
@@ -681,42 +682,42 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
           )}
           <form onSubmit={handleSubmit} id="edit-shop-form" noValidate>
             <div className="form-group">
-              <label className="form-label"><BiStore style={{ marginRight: '6px' }} />Shop Name <span style={{color: 'var(--danger)'}}>*</span></label>
+              <label className="form-label"><BiStore style={{ marginRight: '6px' }} />{t('manageShopsPage.shopName')} <span style={{color: 'var(--danger)'}}>*</span></label>
               <input {...field('shopName')} />
               {errors.shopName && <div className="invalid-feedback-premium">{errors.shopName}</div>}
             </div>
             <div className="form-group">
-              <label className="form-label"><BiUser style={{ marginRight: '6px' }} />Owner Name <span style={{color: 'var(--danger)'}}>*</span></label>
+              <label className="form-label"><BiUser style={{ marginRight: '6px' }} />{t('manageShopsPage.ownerName')} <span style={{color: 'var(--danger)'}}>*</span></label>
               <input {...field('ownerName')} />
               {errors.ownerName && <div className="invalid-feedback-premium">{errors.ownerName}</div>}
             </div>
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="form-group">
-                  <label className="form-label"><BiPhone style={{ marginRight: '6px' }} />Phone <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <label className="form-label"><BiPhone style={{ marginRight: '6px' }} />{t('auth.phone')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input type="tel" {...field('phone')} />
                   {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
                 </div>
               </div>
               <div className="col-md-6">
                 <div className="form-group">
-                  <label className="form-label"><BiEnvelope style={{ marginRight: '6px' }} />Email <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <label className="form-label"><BiEnvelope style={{ marginRight: '6px' }} />{t('auth.email')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input type="email" {...field('email')} />
                   {errors.email && <div className="invalid-feedback-premium">{errors.email}</div>}
                 </div>
               </div>
             </div>
             <div className="form-group">
-              <label className="form-label"><BiMap style={{ marginRight: '6px' }} />Address</label>
-              <textarea className={`form-control ${errors.address ? 'is-invalid' : ''}`} name="address" value={form.address} onChange={handleChange} placeholder="Enter shop address" rows={3} />
+              <label className="form-label"><BiMap style={{ marginRight: '6px' }} />{t('manageShopsPage.address')}</label>
+              <textarea className={`form-control ${errors.address ? 'is-invalid' : ''}`} name="address" value={form.address} onChange={handleChange} placeholder={t('manageShopsPage.addressPlaceholder')} rows={3} />
               {errors.address && <div className="invalid-feedback-premium">{errors.address}</div>}
             </div>
           </form>
         </div>
         <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" form="edit-shop-form" className="btn-premium btn-premium-primary" disabled={loading}>
-            {loading ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> Update Shop</>}
+            {loading ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('manageShopsPage.updateShop')}</>}
           </button>
         </div>
       </div>

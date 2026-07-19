@@ -49,20 +49,20 @@ const Header = ({ onToggleSidebar }) => {
   const handleLogout = () => {
     setProfileOpen(false);
     Swal.fire({
-      title: 'Logout?',
-      text: 'Are you sure you want to logout?',
+      title: t('confirm.logoutTitle'),
+      text: t('confirm.logoutMessage'),
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#FF6B6B',
       cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, logout',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('common.yesLogout'),
+      cancelButtonText: t('common.cancel'),
       background: 'var(--bg-card)',
       color: 'var(--text-primary)',
       reverseButtons: true,
     }).then((result) => {
       if (!result.isConfirmed) return;
-      showToast.success('Logged out successfully.');
+      showToast.success(t('toast.logoutSuccess'));
       localStorage.clear();
       window.location.href = '/login';
     });
@@ -74,7 +74,7 @@ const Header = ({ onToggleSidebar }) => {
         <button
           className="header-btn"
           onClick={onToggleSidebar}
-          aria-label="Toggle sidebar"
+          aria-label={t('common.toggleSidebar')}
         >
           <BiMenu />
         </button>
@@ -88,7 +88,7 @@ const Header = ({ onToggleSidebar }) => {
           <button
             className="header-btn"
             onClick={() => setLangOpen(!langOpen)}
-            aria-label="Switch language"
+            aria-label={t('auth.selectLanguage')}
           >
             <BiGlobe />
           </button>
@@ -98,13 +98,13 @@ const Header = ({ onToggleSidebar }) => {
                 className={`dropdown-item-premium ${i18n.language === 'bn' ? 'active' : ''}`}
                 onClick={() => handleLanguageChange('bn')}
               >
-                <span style={{ fontSize: '1.1rem' }}>🇧🇩</span> বাংলা
+                <span style={{ fontSize: '1.1rem' }}>বাং</span> বাংলা
               </button>
               <button
                 className={`dropdown-item-premium ${i18n.language === 'en' ? 'active' : ''}`}
                 onClick={() => handleLanguageChange('en')}
               >
-                <span style={{ fontSize: '1.1rem' }}>🇬🇧</span> English
+                <span style={{ fontSize: '1.1rem' }}>EN</span> English
               </button>
             </div>
           )}
@@ -114,7 +114,7 @@ const Header = ({ onToggleSidebar }) => {
         <button
           className="header-btn"
           onClick={() => dispatch(toggleTheme())}
-          aria-label="Toggle theme"
+          aria-label={t('common.toggleTheme')}
         >
           {mode === 'light' ? <BiMoon /> : <BiSun />}
         </button>
@@ -124,13 +124,13 @@ const Header = ({ onToggleSidebar }) => {
           <button
             className="user-profile-btn"
             onClick={() => setProfileOpen(!profileOpen)}
-            aria-label="User menu"
+            aria-label={t('common.userMenu')}
           >
             <div className="user-avatar">
               {user?.name?.charAt(0)?.toUpperCase() || <BiUser />}
             </div>
             <div className="d-none d-md-block text-start">
-              <div className="user-name">{user?.name || 'User'}</div>
+              <div className="user-name">{user?.name || t('common.user')}</div>
               <div className="user-email">{user?.email || ''}</div>
             </div>
           </button>

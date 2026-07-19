@@ -13,17 +13,17 @@ import {
   BiNote, BiChevronRight
 } from 'react-icons/bi';
 
-const PRINTER_SIZES = [
-  { key: 'a4', label: 'A4 Invoice', icon: <BiFile size={18} />, width: '210mm' },
-  { key: '80mm', label: '80mm Thermal', icon: <BiGridSmall size={18} />, width: '80mm' },
-  { key: '58mm', label: '58mm Thermal', icon: <BiGridSmall size={18} />, width: '58mm' },
+const getPrinterSizes = (t) => [
+  { key: 'a4', label: t('posPage.printer.sizeA4'), icon: <BiFile size={18} />, width: '210mm' },
+  { key: '80mm', label: t('posPage.printer.size80mm'), icon: <BiGridSmall size={18} />, width: '80mm' },
+  { key: '58mm', label: t('posPage.printer.size58mm'), icon: <BiGridSmall size={18} />, width: '58mm' },
 ];
 
-const INVOICE_TEMPLATES = [
-  { key: 'classic', label: 'Classic', icon: <BiLayout size={18} /> },
-  { key: 'modern', label: 'Modern', icon: <BiFile size={18} /> },
-  { key: 'minimal', label: 'Minimal', icon: <BiGridSmall size={18} /> },
-  { key: 'grocery', label: 'Grocery Store', icon: <BiStore size={18} /> },
+const getInvoiceTemplates = (t) => [
+  { key: 'classic', label: t('posPage.printer.templateClassic'), icon: <BiLayout size={18} /> },
+  { key: 'modern', label: t('posPage.printer.templateModern'), icon: <BiFile size={18} /> },
+  { key: 'minimal', label: t('posPage.printer.templateMinimal'), icon: <BiGridSmall size={18} /> },
+  { key: 'grocery', label: t('posPage.printer.templateGrocery'), icon: <BiStore size={18} /> },
 ];
 
 const formatAddress = (addr) => {
@@ -78,8 +78,11 @@ const InvoiceQR = ({ invoiceNo, size = 60 }) => {
 };
 
 const PrinterSettingsModal = ({ currentSettings, onSelect, onClose }) => {
+  const { t } = useTranslation();
   const [size, setSize] = useState(currentSettings.size);
   const [template, setTemplate] = useState(currentSettings.template);
+  const printerSizes = getPrinterSizes(t);
+  const invoiceTemplates = getInvoiceTemplates(t);
   const handleApply = () => { savePrinterSettings({ size, template }); onSelect({ size, template }); onClose(); };
   return (
     <div className="printer-settings-overlay" onClick={onClose}>
@@ -87,34 +90,34 @@ const PrinterSettingsModal = ({ currentSettings, onSelect, onClose }) => {
         <div className="printer-settings-header">
           <div className="printer-settings-header-left">
             <div className="printer-settings-icon"><BiPrinter size={22} /></div>
-            <h3>Printer Settings</h3>
+            <h3>{t('posPage.printer.settings')}</h3>
           </div>
           <button className="printer-settings-close" onClick={onClose}><BiX size={20} /></button>
         </div>
         <div className="printer-settings-body">
           <div className="printer-settings-mobile-row">
             <div className="printer-settings-group printer-settings-group--half">
-              <label className="printer-settings-label">Paper Size</label>
+              <label className="printer-settings-label">{t('posPage.printer.paperSize')}</label>
               <div className="printer-settings-options">
-                {PRINTER_SIZES.map(s => (
+                {printerSizes.map(s => (
                   <button key={s.key} className={`printer-settings-option ${size === s.key ? 'active' : ''}`} onClick={() => setSize(s.key)}>{s.icon}<span>{s.label}</span></button>
                 ))}
               </div>
             </div>
             <div className="printer-settings-group printer-settings-group--half">
-              <label className="printer-settings-label">Invoice Design</label>
+              <label className="printer-settings-label">{t('posPage.printer.invoiceDesign')}</label>
               <div className="printer-settings-options">
-                {INVOICE_TEMPLATES.map(t => (
-                  <button key={t.key} className={`printer-settings-option ${template === t.key ? 'active' : ''}`} onClick={() => setTemplate(t.key)}>{t.icon}<span>{t.label}</span></button>
+                {invoiceTemplates.map(tpl => (
+                  <button key={tpl.key} className={`printer-settings-option ${template === tpl.key ? 'active' : ''}`} onClick={() => setTemplate(tpl.key)}>{tpl.icon}<span>{tpl.label}</span></button>
                 ))}
               </div>
             </div>
           </div>
-          <div className="printer-settings-preview-hint"><BiPrinter size={16} /> Preview: {size.toUpperCase()} | {template.charAt(0).toUpperCase() + template.slice(1)}</div>
+          <div className="printer-settings-preview-hint"><BiPrinter size={16} /> {t('posPage.printer.preview')}: {size.toUpperCase()} | {template.charAt(0).toUpperCase() + template.slice(1)}</div>
         </div>
         <div className="printer-settings-footer">
-          <button className="printer-settings-btn printer-settings-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleApply}>Apply Settings</button>
+          <button className="printer-settings-btn printer-settings-btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleApply}>{t('posPage.printer.apply')}</button>
         </div>
       </div>
     </div>
@@ -126,32 +129,32 @@ const Invoice = React.forwardRef(({ sale, shopInfo, template, size, onClose, onP
   const combinedRef = useRef(null);
   const isThermal = size === '58mm' || size === '80mm';
   const isA4 = size === 'a4';
-  const cashierName = 'Cashier';
-  const footerMsg = shopInfo?.settings?.receiptFooter || 'Thank you for your purchase!';
-  const taxName = shopInfo?.settings?.taxName || 'VAT';
+  const cashierName = t('posPage.receipt.cashier');
+  const footerMsg = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
+  const taxName = shopInfo?.settings?.taxName || t('posPage.receipt.defaultTaxName');
 
   const renderClassic = () => (
     <div className={`receipt ${isA4 ? 'receipt-a4' : ''}`} style={isThermal ? { maxWidth: size === '58mm' ? '48mm' : '72mm' } : {}}>
       <div className="receipt-header">
         <div className="receipt-logo">{shopInfo?.logo ? <img src={shopInfo.logo} alt="Logo" className="receipt-logo-img" /> : <div className="receipt-logo-placeholder"><BiStore size={isThermal ? 20 : 28} /></div>}</div>
-        <h2 className="receipt-shop-name">{shopInfo?.shopName || 'Shop Name'}</h2>
+        <h2 className="receipt-shop-name">{shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2>
         <p className="receipt-shop-address">{formatAddress(shopInfo?.address)}</p>
         {shopInfo?.phone && <p className="receipt-shop-address">📞 {shopInfo.phone}</p>}
         {shopInfo?.gst && <p className="receipt-shop-address">GST: {shopInfo.gst}</p>}
       </div>
       <div className="receipt-divider" />
       <div className="receipt-info">
-        <div className="receipt-info-row"><span className="receipt-label">Invoice</span><span className="receipt-value">{sale?.invoiceNo || 'N/A'}</span></div>
-        <div className="receipt-info-row"><span className="receipt-label">Date</span><span className="receipt-value">{formatDate(sale?.createdAt)}</span></div>
-        <div className="receipt-info-row"><span className="receipt-label">Customer</span><span className="receipt-value">{sale?.customer?.name || 'Walk-in'}</span></div>
-        <div className="receipt-info-row"><span className="receipt-label">Cashier</span><span className="receipt-value">{cashierName}</span></div>
+        <div className="receipt-info-row"><span className="receipt-label">{t('sale.invoice')}</span><span className="receipt-value">{sale?.invoiceNo || t('common.notAvailable')}</span></div>
+        <div className="receipt-info-row"><span className="receipt-label">{t('common.date')}</span><span className="receipt-value">{formatDate(sale?.createdAt)}</span></div>
+        <div className="receipt-info-row"><span className="receipt-label">{t('sale.customer')}</span><span className="receipt-value">{sale?.customer?.name || t('posPage.customer.walkIn')}</span></div>
+        <div className="receipt-info-row"><span className="receipt-label">{t('posPage.receipt.cashier')}</span><span className="receipt-value">{cashierName}</span></div>
       </div>
       <div className="receipt-divider" />
       <div className="receipt-items">
-        <div className="receipt-items-header"><span className="receipt-col-item">Item</span><span className="receipt-col-qty">Qty</span><span className="receipt-col-price">Price</span><span className="receipt-col-total">Total</span></div>
+        <div className="receipt-items-header"><span className="receipt-col-item">{t('posPage.receipt.item')}</span><span className="receipt-col-qty">{t('posPage.receipt.qty')}</span><span className="receipt-col-price">{t('common.price')}</span><span className="receipt-col-total">{t('common.total')}</span></div>
         {sale?.items?.map((item, idx) => (
           <div key={idx} className="receipt-item-row">
-            <div className="receipt-col-item"><span className="receipt-item-name">{item.product?.name || item.name || 'Item'}</span>{item.discount > 0 && <span className="receipt-item-discount">-{item.discount}% off</span>}</div>
+            <div className="receipt-col-item"><span className="receipt-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span>{item.discount > 0 && <span className="receipt-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</span>}</div>
             <div className="receipt-col-qty">{item.quantity} {item.unit || ''}</div>
             <div className="receipt-col-price">₹{Number(item.price).toFixed(2)}</div>
             <div className="receipt-col-total">₹{Number(item.total).toFixed(2)}</div>
@@ -160,13 +163,13 @@ const Invoice = React.forwardRef(({ sale, shopInfo, template, size, onClose, onP
       </div>
       <div className="receipt-divider" />
       <div className="receipt-totals">
-        <div className="receipt-total-row"><span>Subtotal</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>Discount</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
+        <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
         {Number(sale?.tax || 0) > 0 && <div className="receipt-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span className="receipt-grand-total">Grand Total</span><span className="receipt-grand-total">₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-total-row"><span>Paid</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>Due</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span>Payment</span><span className="receipt-payment-method">{sale?.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+        <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.grandTotal')}</span><span className="receipt-grand-total">₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
+        <div className="receipt-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        <div className="receipt-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-payment-method">{sale?.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
       </div>
       <div className="receipt-footer"><p>{footerMsg}</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}</div>
     </div>
@@ -177,35 +180,35 @@ const Invoice = React.forwardRef(({ sale, shopInfo, template, size, onClose, onP
       <div className="receipt-modern-header">
         <div className="receipt-modern-brand">
           {shopInfo?.logo ? <img src={shopInfo.logo} alt="Logo" className="receipt-modern-logo" /> : <div className="receipt-modern-logo-placeholder"><BiStore size={isThermal ? 18 : 24} /></div>}
-          <div><h2 className="receipt-modern-shop-name">{shopInfo?.shopName || 'Shop Name'}</h2><p className="receipt-modern-address">{formatAddress(shopInfo?.address)}</p></div>
+          <div><h2 className="receipt-modern-shop-name">{shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2><p className="receipt-modern-address">{formatAddress(shopInfo?.address)}</p></div>
         </div>
-        <div className="receipt-modern-invoice-badge">#{sale?.invoiceNo || 'N/A'}</div>
+        <div className="receipt-modern-invoice-badge">#{sale?.invoiceNo || t('common.notAvailable')}</div>
       </div>
       <div className="receipt-modern-meta">
         <span className="receipt-modern-meta-item"><BiCalendar size={12} /> {formatDate(sale?.createdAt)}</span>
-        <span className="receipt-modern-meta-item"><BiUser size={12} /> {sale?.customer?.name || 'Walk-in'}</span>
+        <span className="receipt-modern-meta-item"><BiUser size={12} /> {sale?.customer?.name || t('posPage.customer.walkIn')}</span>
         <span className="receipt-modern-meta-item"><BiIdCard size={12} /> {cashierName}</span>
       </div>
       <div className="receipt-modern-divider" />
       <div className="receipt-modern-items">
-        <div className="receipt-modern-items-header"><span>Item</span><span>Qty</span><span>Price</span><span>Total</span></div>
+        <div className="receipt-modern-items-header"><span>{t('posPage.receipt.item')}</span><span>{t('posPage.receipt.qty')}</span><span>{t('common.price')}</span><span>{t('common.total')}</span></div>
         {sale?.items?.map((item, idx) => (
           <div key={idx} className="receipt-modern-item">
-            <div className="receipt-modern-item-name">{item.product?.name || item.name || 'Item'}</div>
+            <div className="receipt-modern-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div>
             <div className="receipt-modern-item-details"><span>{item.quantity} {item.unit || ''}</span><span>₹{Number(item.price).toFixed(2)}</span><span className="receipt-modern-item-total">₹{Number(item.total).toFixed(2)}</span></div>
-            {item.discount > 0 && <div className="receipt-modern-item-discount">-{item.discount}% off</div>}
+            {item.discount > 0 && <div className="receipt-modern-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</div>}
           </div>
         ))}
       </div>
       <div className="receipt-modern-divider" />
       <div className="receipt-modern-totals">
-        <div className="receipt-modern-total-row"><span>Subtotal</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-modern-total-row receipt-modern-discount"><span>Discount</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
+        <div className="receipt-modern-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-modern-total-row receipt-modern-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
         {Number(sale?.tax || 0) > 0 && <div className="receipt-modern-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        <div className="receipt-modern-grand-total"><span>Grand Total</span><span className="receipt-modern-grand-amount">₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-modern-total-row"><span>Paid</span><span className="receipt-modern-paid">₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-modern-total-row"><span>Due</span><span className="receipt-modern-due">₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
-        <div className="receipt-modern-total-row"><span>Payment</span><span className="receipt-modern-payment-badge">{sale?.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+        <div className="receipt-modern-grand-total"><span>{t('posPage.totals.grandTotal')}</span><span className="receipt-modern-grand-amount">₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
+        <div className="receipt-modern-total-row"><span>{t('common.paid')}</span><span className="receipt-modern-paid">₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-modern-total-row"><span>{t('common.due')}</span><span className="receipt-modern-due">₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        <div className="receipt-modern-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-modern-payment-badge">{sale?.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
       </div>
       <div className="receipt-modern-footer"><p>{footerMsg}</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}</div>
     </div>
@@ -213,24 +216,24 @@ const Invoice = React.forwardRef(({ sale, shopInfo, template, size, onClose, onP
 
   const renderMinimal = () => (
     <div className={`receipt receipt-minimal ${isA4 ? 'receipt-a4' : ''}`} style={isThermal ? { maxWidth: size === '58mm' ? '48mm' : '72mm' } : {}}>
-      <div className="receipt-minimal-header"><h2 className="receipt-minimal-shop-name">{shopInfo?.shopName || 'Shop Name'}</h2><p className="receipt-minimal-address">{formatAddress(shopInfo?.address)}</p>{shopInfo?.phone && <p className="receipt-minimal-address">{shopInfo.phone}</p>}</div>
+      <div className="receipt-minimal-header"><h2 className="receipt-minimal-shop-name">{shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2><p className="receipt-minimal-address">{formatAddress(shopInfo?.address)}</p>{shopInfo?.phone && <p className="receipt-minimal-address">{shopInfo.phone}</p>}</div>
       <div className="receipt-minimal-divider" />
       <div className="receipt-minimal-info">
-        <div className="receipt-minimal-info-row"><span>Invoice</span><span>{sale?.invoiceNo || 'N/A'}</span></div>
-        <div className="receipt-minimal-info-row"><span>Date</span><span>{formatDate(sale?.createdAt)}</span></div>
-        <div className="receipt-minimal-info-row"><span>Customer</span><span>{sale?.customer?.name || 'Walk-in'}</span></div>
+        <div className="receipt-minimal-info-row"><span>{t('sale.invoice')}</span><span>{sale?.invoiceNo || t('common.notAvailable')}</span></div>
+        <div className="receipt-minimal-info-row"><span>{t('common.date')}</span><span>{formatDate(sale?.createdAt)}</span></div>
+        <div className="receipt-minimal-info-row"><span>{t('sale.customer')}</span><span>{sale?.customer?.name || t('posPage.customer.walkIn')}</span></div>
       </div>
       <div className="receipt-minimal-divider" />
       <div className="receipt-minimal-items">{sale?.items?.map((item, idx) => (
-        <div key={idx} className="receipt-minimal-item"><div className="receipt-minimal-item-name">{item.product?.name || item.name || 'Item'}</div><div className="receipt-minimal-item-line"><span>{item.quantity} x ₹{Number(item.price).toFixed(2)}</span><span className="receipt-minimal-item-total">₹{Number(item.total).toFixed(2)}</span></div></div>
+        <div key={idx} className="receipt-minimal-item"><div className="receipt-minimal-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div><div className="receipt-minimal-item-line"><span>{item.quantity} x ₹{Number(item.price).toFixed(2)}</span><span className="receipt-minimal-item-total">₹{Number(item.total).toFixed(2)}</span></div></div>
       ))}</div>
       <div className="receipt-minimal-divider" />
       <div className="receipt-minimal-totals">
-        <div className="receipt-minimal-total-row"><span>Subtotal</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-discount"><span>Discount</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-minimal-total-row receipt-minimal-grand"><span>Total</span><span>₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-minimal-total-row"><span>Paid</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-due"><span>Due</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        <div className="receipt-minimal-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
+        <div className="receipt-minimal-total-row receipt-minimal-grand"><span>{t('common.total')}</span><span>₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
+        <div className="receipt-minimal-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
       </div>
       <div className="receipt-minimal-footer"><p>{footerMsg}</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 70 : 40} /></div>}</div>
     </div>
@@ -240,34 +243,34 @@ const Invoice = React.forwardRef(({ sale, shopInfo, template, size, onClose, onP
     <div className={`receipt receipt-grocery ${isA4 ? 'receipt-a4' : ''}`} style={isThermal ? { maxWidth: size === '58mm' ? '48mm' : '72mm' } : {}}>
       <div className="receipt-grocery-header">
         <div className="receipt-grocery-logo">{shopInfo?.logo ? <img src={shopInfo.logo} alt="Logo" className="receipt-grocery-logo-img" /> : <div className="receipt-grocery-logo-placeholder"><BiStore size={isThermal ? 20 : 28} /></div>}</div>
-        <h2 className="receipt-grocery-shop-name">{shopInfo?.shopName || 'Grocery Store'}</h2>
+        <h2 className="receipt-grocery-shop-name">{shopInfo?.shopName || t('posPage.printer.templateGrocery')}</h2>
         <p className="receipt-grocery-address">{formatAddress(shopInfo?.address)}</p>
         {shopInfo?.phone && <p className="receipt-grocery-phone">📞 {shopInfo.phone}</p>}
         {shopInfo?.gst && <p className="receipt-grocery-gst">GST: {shopInfo.gst}</p>}
       </div>
       <div className="receipt-grocery-divider" />
       <div className="receipt-grocery-info">
-        <div className="receipt-grocery-info-row"><span>🧾 {sale?.invoiceNo || 'N/A'}</span><span>📅 {formatDate(sale?.createdAt)}</span></div>
-        <div className="receipt-grocery-info-row"><span>👤 {sale?.customer?.name || 'Walk-in Customer'}</span><span>👨‍💼 {cashierName}</span></div>
+        <div className="receipt-grocery-info-row"><span>🧾 {sale?.invoiceNo || t('common.notAvailable')}</span><span>📅 {formatDate(sale?.createdAt)}</span></div>
+        <div className="receipt-grocery-info-row"><span>👤 {sale?.customer?.name || t('posPage.customer.walkInCustomer')}</span><span>👨‍💼 {cashierName}</span></div>
       </div>
       <div className="receipt-grocery-divider" />
       <div className="receipt-grocery-items">
-        <div className="receipt-grocery-items-header"><span>Item</span><span>Qty</span><span>₹</span><span>Total</span></div>
+        <div className="receipt-grocery-items-header"><span>{t('posPage.receipt.item')}</span><span>{t('posPage.receipt.qty')}</span><span>₹</span><span>{t('common.total')}</span></div>
         {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-grocery-item"><span className="receipt-grocery-item-name">{item.product?.name || item.name || 'Item'}</span><span className="receipt-grocery-item-qty">{item.quantity}{item.unit || ''}</span><span className="receipt-grocery-item-price">₹{Number(item.price).toFixed(2)}</span><span className="receipt-grocery-item-total">₹{Number(item.total).toFixed(2)}</span></div>
+          <div key={idx} className="receipt-grocery-item"><span className="receipt-grocery-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span><span className="receipt-grocery-item-qty">{item.quantity}{item.unit || ''}</span><span className="receipt-grocery-item-price">₹{Number(item.price).toFixed(2)}</span><span className="receipt-grocery-item-total">₹{Number(item.total).toFixed(2)}</span></div>
         ))}
       </div>
       <div className="receipt-grocery-divider" />
       <div className="receipt-grocery-totals">
-        <div className="receipt-grocery-total-row"><span>Subtotal</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-discount"><span>Discount</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row receipt-grocery-grand"><span>Total</span><span>₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-grocery-total-row"><span>Paid</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-due"><span>Due</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row"><span>Payment</span><span className="receipt-grocery-payment">{sale?.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+        <div className="receipt-grocery-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
+        <div className="receipt-grocery-total-row receipt-grocery-grand"><span>{t('common.total')}</span><span>₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
+        <div className="receipt-grocery-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        <div className="receipt-grocery-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-grocery-payment">{sale?.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
       </div>
       <div className="receipt-grocery-divider" />
-      <div className="receipt-grocery-footer"><p>🛒 {footerMsg}</p><p className="receipt-grocery-footer-small">Visit again for fresh groceries 🥦🍎</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}</div>
+      <div className="receipt-grocery-footer"><p>🛒 {footerMsg}</p><p className="receipt-grocery-footer-small">{t('posPage.receipt.visitAgain')} 🥦🍎</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}</div>
     </div>
   );
 
@@ -277,10 +280,10 @@ const Invoice = React.forwardRef(({ sale, shopInfo, template, size, onClose, onP
     <div className="invoice-modal-overlay" onClick={onClose}>
       <div className="invoice-modal invoice-theme" onClick={(e) => e.stopPropagation()}>
         <div className="invoice-actions no-print">
-          <button className="invoice-action-btn" onClick={onSettingsChange} title="Printer Settings"><BiPrinter size={16} /> {size.toUpperCase()} | {template.charAt(0).toUpperCase() + template.slice(1)}</button>
+          <button className="invoice-action-btn" onClick={onSettingsChange} title={t('posPage.printer.settings')}><BiPrinter size={16} /> {size.toUpperCase()} | {template.charAt(0).toUpperCase() + template.slice(1)}</button>
           <div className="invoice-actions-right">
-            <button className="btn btn-premium btn-premium-primary btn-premium-sm" onClick={onPrint}><BiPrinter /> Print</button>
-            <button className="btn btn-premium btn-premium-secondary btn-premium-sm" onClick={onDownload}><BiDownload /> PDF</button>
+            <button className="btn btn-premium btn-premium-primary btn-premium-sm" onClick={onPrint}><BiPrinter /> {t('common.print')}</button>
+            <button className="btn btn-premium btn-premium-secondary btn-premium-sm" onClick={onDownload}><BiDownload /> {t('common.pdf')}</button>
             <button className="btn-close-premium" onClick={onClose}><BiX /></button>
           </div>
         </div>
@@ -296,37 +299,37 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
   const [selectedPayment, setSelectedPayment] = useState(data.paymentMethod || 'cash');
   const formatDateTime = () => { const now = new Date(); return now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }); };
   const paymentMethods = [
-    { key: 'cash', icon: <BiMoney size={18} />, label: 'Cash', color: '#2ecc71' },
-    { key: 'card', icon: <BiCreditCard size={18} />, label: 'Card', color: '#6C63FF' },
-    { key: 'upi', icon: <BiMobile size={18} />, label: 'UPI', color: '#00D9A6' },
-    { key: 'mobile_banking', icon: <BiBookmark size={18} />, label: 'Mobile Banking', color: '#FF6B9D' },
+    { key: 'cash', icon: <BiMoney size={18} />, label: t('sale.cash'), color: '#2ecc71' },
+    { key: 'card', icon: <BiCreditCard size={18} />, label: t('sale.card'), color: '#6C63FF' },
+    { key: 'upi', icon: <BiMobile size={18} />, label: t('sale.upi'), color: '#00D9A6' },
+    { key: 'mobile_banking', icon: <BiBookmark size={18} />, label: t('sale.mobileBanking'), color: '#FF6B9D' },
   ];
   const summaryCards = [
-    { icon: <BiShoppingBag size={16} />, label: 'Total Items', value: `${data.totalItems} items`, color: '#6C63FF' },
-    { icon: <BiDollar size={16} />, label: 'Subtotal', value: `₹${data.subtotal.toFixed(2)}`, color: '#17A2B8' },
-    { icon: <BiTag size={16} />, label: 'Discount', value: `-₹${data.discount.toFixed(2)}`, color: data.discount > 0 ? '#FF6B6B' : '#9a9ab0' },
-    { icon: <BiCrown size={16} />, label: 'Grand Total', value: `₹${data.grandTotal.toFixed(2)}`, color: '#6C63FF', highlight: true },
-    { icon: <BiCheckCircle size={16} />, label: 'Paid Amount', value: `₹${data.paidAmount.toFixed(2)}`, color: '#2ecc71' },
-    { icon: <BiErrorCircle size={16} />, label: 'Due Amount', value: `₹${data.dueAmount.toFixed(2)}`, color: data.dueAmount > 0 ? '#FF6B6B' : '#2ecc71' },
-    { icon: <BiWallet size={16} />, label: 'Payment Method', value: selectedPayment.toUpperCase(), badge: true, color: '#6C63FF' },
+    { key: 'totalItems', icon: <BiShoppingBag size={16} />, label: t('posPage.confirmSale.totalItems'), value: t('posPage.confirmSale.itemsCount', { count: data.totalItems }), color: '#6C63FF' },
+    { key: 'subtotal', icon: <BiDollar size={16} />, label: t('sale.subtotal'), value: `₹${data.subtotal.toFixed(2)}`, color: '#17A2B8' },
+    { key: 'discount', icon: <BiTag size={16} />, label: t('sale.discount'), value: `-₹${data.discount.toFixed(2)}`, color: data.discount > 0 ? '#FF6B6B' : '#9a9ab0' },
+    { key: 'grandTotal', icon: <BiCrown size={16} />, label: t('posPage.totals.grandTotal'), value: `₹${data.grandTotal.toFixed(2)}`, color: '#6C63FF', highlight: true },
+    { key: 'paidAmount', icon: <BiCheckCircle size={16} />, label: t('sale.paidAmount'), value: `₹${data.paidAmount.toFixed(2)}`, color: '#2ecc71' },
+    { key: 'dueAmount', icon: <BiErrorCircle size={16} />, label: t('sale.dueAmount'), value: `₹${data.dueAmount.toFixed(2)}`, color: data.dueAmount > 0 ? '#FF6B6B' : '#2ecc71' },
+    { key: 'paymentMethod', icon: <BiWallet size={16} />, label: t('sale.paymentMethod'), value: selectedPayment.toUpperCase(), badge: true, color: '#6C63FF' },
   ];
   return (
     <div className="confirm-sale-overlay" onClick={onCancel}>
       <div className="confirm-sale-modal" onClick={(e) => e.stopPropagation()}>
         <div className="confirm-sale-header">
-          <div className="confirm-sale-header-left"><div className="confirm-sale-header-icon"><BiReceipt size={24} /></div><div><h3 className="confirm-sale-title">Confirm Sale</h3><span className="confirm-sale-datetime">{formatDateTime()}</span></div></div>
+          <div className="confirm-sale-header-left"><div className="confirm-sale-header-icon"><BiReceipt size={24} /></div><div><h3 className="confirm-sale-title">{t('posPage.confirmSale.title')}</h3><span className="confirm-sale-datetime">{formatDateTime()}</span></div></div>
           <button className="confirm-sale-close" onClick={onCancel}><BiX size={22} /></button>
         </div>
         <div className="confirm-sale-body">
           <div className="confirm-sale-cards">{summaryCards.map((card, idx) => (
             <div key={idx} className={`confirm-sale-card ${card.highlight ? 'confirm-sale-card-highlight' : ''}`} style={{ '--card-accent': card.color }}>
               <div className="confirm-sale-card-icon" style={{ color: card.color }}>{card.icon}</div>
-              <div className="confirm-sale-card-info"><span className="confirm-sale-card-label">{card.label}</span>{card.badge ? <span className="confirm-sale-card-badge" style={{ background: card.color }}>{card.value}</span> : <span className={`confirm-sale-card-value ${card.label === 'Paid Amount' && data.paidAmount > 0 ? 'confirm-sale-value-green' : ''} ${card.label === 'Due Amount' ? (data.dueAmount > 0 ? 'confirm-sale-value-red' : 'confirm-sale-value-green') : ''} ${card.highlight ? 'confirm-sale-value-grand' : ''}`}>{card.value}</span>}</div>
+              <div className="confirm-sale-card-info"><span className="confirm-sale-card-label">{card.label}</span>{card.badge ? <span className="confirm-sale-card-badge" style={{ background: card.color }}>{card.value}</span> : <span className={`confirm-sale-card-value ${card.key === 'paidAmount' && data.paidAmount > 0 ? 'confirm-sale-value-green' : ''} ${card.key === 'dueAmount' ? (data.dueAmount > 0 ? 'confirm-sale-value-red' : 'confirm-sale-value-green') : ''} ${card.highlight ? 'confirm-sale-value-grand' : ''}`}>{card.value}</span>}</div>
             </div>
           ))}</div>
- 
+
           <div className="confirm-sale-actions">
-            <button className="confirm-sale-btn confirm-sale-btn-primary" onClick={() => onConfirm(selectedPayment)} disabled={loading}>{loading ? <span className="confirm-sale-btn-loading"><span className="spinner-border spinner-border-sm" /> Processing...</span> : <><BiPrinter size={18} /><span>Generate & Print Bill</span></>}</button>
+            <button className="confirm-sale-btn confirm-sale-btn-primary" onClick={() => onConfirm(selectedPayment)} disabled={loading}>{loading ? <span className="confirm-sale-btn-loading"><span className="spinner-border spinner-border-sm" /> {t('posPage.confirmSale.processing')}</span> : <><BiPrinter size={18} /><span>{t('posPage.confirmSale.generateAndPrint')}</span></>}</button>
           </div>
         </div>
       </div>
@@ -381,7 +384,7 @@ const POS = () => {
 
   const handleAddCustomer = async () => {
     if (!addCustomerForm.name || !addCustomerForm.phone) {
-      showToast.error('Name and phone are required');
+      showToast.error(t('posPage.customer.nameRequired'));
       return;
     }
     try {
@@ -391,9 +394,9 @@ const POS = () => {
       setSelectedCustomerData(data);
       setShowAddCustomer(false);
       setAddCustomerForm({ name: '', phone: '', address: '' });
-      showToast.success('Customer added successfully');
+      showToast.success(t('posPage.customer.addSuccess'));
     } catch (err) {
-      showToast.error(err.response?.data?.message || 'Failed to add customer');
+      showToast.error(err.response?.data?.message || t('posPage.customer.addFailed'));
     }
   };
 
@@ -429,27 +432,27 @@ const POS = () => {
   };
 
   const addToCart = useCallback((product) => {
-    if (product.stock <= 0) { showToast.warning(`${product.name} is out of stock`); return; }
+    if (product.stock <= 0) { showToast.warning(t('posPage.stockWarnings.outOfStock', { name: product.name })); return; }
     setCart(prev => {
       const existing = prev.find(item => item.product._id === product._id);
       if (existing) {
-        if (existing.quantity >= product.stock) { showToast.warning(`Only ${product.stock} ${product.unit || 'pcs'} available`); return prev; }
+        if (existing.quantity >= product.stock) { showToast.warning(t('posPage.stockWarnings.onlyAvailable', { count: product.stock, unit: product.unit || t('product.piece') })); return prev; }
         return prev.map(item => item.product._id === product._id ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.price } : item);
       }
       return [...prev, { product, quantity: 1, price: product.sellingPrice, discount: product.discount || 0, total: product.sellingPrice }];
     });
-  }, []);
+  }, [t]);
 
   const updateQty = useCallback((id, delta) => {
     setCart(prev => prev.map(item => {
       if (item.product._id === id) {
         const newQty = Math.max(1, item.quantity + delta);
-        if (newQty > item.product.stock) { showToast.warning(`Only ${item.product.stock} ${item.product.unit || 'pcs'} available`); return item; }
+        if (newQty > item.product.stock) { showToast.warning(t('posPage.stockWarnings.onlyAvailable', { count: item.product.stock, unit: item.product.unit || t('product.piece') })); return item; }
         return { ...item, quantity: newQty, total: newQty * item.price };
       }
       return item;
     }));
-  }, []);
+  }, [t]);
 
   const removeItem = useCallback((id) => { setCart(prev => prev.filter(item => item.product._id !== id)); }, []);
 
@@ -464,8 +467,8 @@ const POS = () => {
   };
 
   const taxRate = shopInfo?.settings?.taxRate ?? 0;
-  const taxName = shopInfo?.settings?.taxName || 'VAT';
-  const receiptFooter = shopInfo?.settings?.receiptFooter || 'Thank you for your purchase!';
+  const taxName = shopInfo?.settings?.taxName || t('posPage.receipt.defaultTaxName');
+  const receiptFooter = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const itemDiscount = cart.reduce((sum, item) => sum + ((item.price * item.discount / 100) * item.quantity), 0);
   const extraDiscount = discountMode === 'percent' ? (subtotal - itemDiscount) * (discountValue / 100) : discountValue;
@@ -504,8 +507,8 @@ const POS = () => {
       clearCart();
       loadTopSelling();
       loadRecentSales();
-      showToast.success(`Invoice ${data.invoiceNo || ''} generated successfully`);
-    } catch (err) { showToast.error(err.response?.data?.message || 'Checkout failed'); }
+      showToast.success(t('posPage.toast.invoiceGenerated', { invoiceNo: data.invoiceNo || '' }));
+    } catch (err) { showToast.error(err.response?.data?.message || t('posPage.toast.checkoutFailed')); }
     finally { setLoading(false); }
   };
 
@@ -534,10 +537,10 @@ const POS = () => {
       const pdf = new jsPDF('p', 'mm', isA4 ? 'a4' : [imgWidth, Math.max(imgHeight + 10, 50)]);
       pdf.addImage(imgData, 'PNG', isA4 ? 10 : 0, isA4 ? 10 : 5, imgWidth, imgHeight);
       pdf.save(`Invoice-${lastSale?.invoiceNo || 'sale'}.pdf`);
-    } catch (err) { showToast.error('Failed to generate PDF'); }
+    } catch (err) { showToast.error(t('posPage.toast.pdfFailed')); }
   };
 
-  const handleReprint = () => { if (lastSale) setShowInvoice(true); else showToast.warning('No previous invoice to reprint'); };
+  const handleReprint = () => { if (lastSale) setShowInvoice(true); else showToast.warning(t('posPage.totals.noPreviousInvoice')); };
   const quickAmounts = [100, 200, 500, 1000];
   const quickDiscounts = [
     { label: '5%', value: 5, mode: 'percent' },
@@ -570,15 +573,15 @@ const POS = () => {
         <div className="pos-search-section">
           <div className="pos-search-wrapper">
             <BiSearch className="pos-search-icon" />
-            <input ref={searchRef} className="pos-search-input" placeholder={`${t('common.search', 'Search')} by name, barcode or SKU...`} value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input ref={searchRef} className="pos-search-input" placeholder={t('product.searchByNameBarcodeSku')} value={search} onChange={(e) => setSearch(e.target.value)} />
             {search && <button className="pos-search-clear" onClick={() => { setSearch(''); setShowTopSelling(true); }}><BiX /></button>}
           </div>
           <div className="pos-search-hints">
-            <small><BiBarcode /> Scan barcode or type to search</small>
-            <small className="pos-kbd-hint"><kbd>F1</kbd> Search <kbd>F8</kbd> Bill</small>
+            <small><BiBarcode /> {t('posPage.search.hint')}</small>
+            <small className="pos-kbd-hint"><kbd>F1</kbd> {t('posPage.search.shortcutSearch')} <kbd>F8</kbd> {t('posPage.search.shortcutBill')}</small>
           </div>
         </div>
-        {showTopSelling && topSelling.length > 0 && <div className="pos-section-header"><BiTrendingUp /> Top Selling Products</div>}
+        {showTopSelling && topSelling.length > 0 && <div className="pos-section-header"><BiTrendingUp /> {t('dashboard.topSellingProducts')}</div>}
         {/* Mobile compact card list — used for both Top Selling and search results (rendered before grid so CSS sibling selector works) */}
         {showMobileList && (
           <div className="pos-top-selling-mobile">
@@ -592,16 +595,16 @@ const POS = () => {
                       <div className="pos-top-selling-mobile-name">{product.name}</div>
                       <div className="pos-top-selling-mobile-stats">
                         <div className="pos-top-selling-mobile-stat">
-                          <span className="pos-top-selling-mobile-stat-label">Price</span>
+                          <span className="pos-top-selling-mobile-stat-label">{t('common.price')}</span>
                           <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--price">₹{product.sellingPrice || 0}</span>
                         </div>
                         <div className="pos-top-selling-mobile-stat">
-                          <span className="pos-top-selling-mobile-stat-label">Sold</span>
+                          <span className="pos-top-selling-mobile-stat-label">{t('posPage.product.sold')}</span>
                           <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--sold">{product.totalSold || 0}</span>
                         </div>
                         <div className="pos-top-selling-mobile-stat">
-                          <span className="pos-top-selling-mobile-stat-label">Stock</span>
-                          <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--stock">{isOutOfStock ? 'Out of stock' : `${product.stock ?? 0} ${product.unit || ''}`}</span>
+                          <span className="pos-top-selling-mobile-stat-label">{t('product.stock')}</span>
+                          <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--stock">{isOutOfStock ? t('product.outOfStock') : `${product.stock ?? 0} ${product.unit || ''}`}</span>
                         </div>
                       </div>
                     </div>
@@ -612,14 +615,14 @@ const POS = () => {
             </div>
             {showTopSelling && hasMoreTopSelling && (
               <button className="pos-top-selling-mobile-view-all">
-                View All ({topSelling.length - 5} more) <BiChevronRight />
+                {t('posPage.product.viewAllMore', { count: topSelling.length - 5 })} <BiChevronRight />
               </button>
             )}
           </div>
         )}
         {/* Desktop grid - unchanged */}
         <div className="pos-product-grid">
-          {!showTopSelling && products.length === 0 && search && <div className="pos-empty-state"><BiPackage size={48} /><p>No products found for "{search}"</p></div>}
+          {!showTopSelling && products.length === 0 && search && <div className="pos-empty-state"><BiPackage size={48} /><p>{t('product.noProductsFoundFor', { query: search })}</p></div>}
           {displayProducts.slice(0, desktopDisplayLimit).map(product => {
             const isOutOfStock = product.stock <= 0;
             const isLowStock = product.stock > 0 && product.stock <= 10;
@@ -630,9 +633,9 @@ const POS = () => {
                   <div className="pos-product-name">{product.name}</div>
                   <div className="pos-product-price">₹{product.sellingPrice}</div>
                   <div className="pos-product-stock">
-                    {isOutOfStock ? <span className="stock-badge out-of-stock">Out of Stock</span> : isLowStock ? <span className="stock-badge low-stock">{product.stock} {product.unit || 'pcs'}</span> : <span className="stock-badge in-stock">{product.stock} {product.unit || 'pcs'}</span>}
+                    {isOutOfStock ? <span className="stock-badge out-of-stock">{t('product.outOfStock')}</span> : isLowStock ? <span className="stock-badge low-stock">{product.stock} {product.unit || t('product.piece')}</span> : <span className="stock-badge in-stock">{product.stock} {product.unit || t('product.piece')}</span>}
                   </div>
-                  {product.totalSold > 0 && <div className="pos-product-sold"><BiStar /> {product.totalSold} sold</div>}
+                  {product.totalSold > 0 && <div className="pos-product-sold"><BiStar /> {t('posPage.product.soldCount', { count: product.totalSold })}</div>}
                 </div>
                 <button className="pos-add-btn" disabled={isOutOfStock} onClick={(e) => { e.stopPropagation(); addToCart(product); }}><BiPlus /></button>
               </div>
@@ -650,7 +653,7 @@ const POS = () => {
               <input
                 ref={customerSearchRef}
                 className="pos-customer-search-input"
-                placeholder="Search customer..."
+                placeholder={t('posPage.customer.searchPlaceholder')}
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
                 onFocus={() => setCustomerDropdownOpen(true)}
@@ -661,12 +664,12 @@ const POS = () => {
                 </button>
               )}
               {customer ? (
-                <button className="pos-customer-search-clear" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); }} title="Clear customer">
+                <button className="pos-customer-search-clear" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); }} title={t('posPage.customer.clear')}>
                   <BiTrash />
                 </button>
               ) : (
-                <button className="pos-customer-btn-walkin" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setCustomerDropdownOpen(false); }} title="Walk-in Customer">
-                  Walk-in
+                <button className="pos-customer-btn-walkin" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setCustomerDropdownOpen(false); }} title={t('posPage.customer.walkInCustomer')}>
+                  {t('posPage.customer.walkIn')}
                 </button>
               )}
             </div>
@@ -675,9 +678,9 @@ const POS = () => {
             {customerDropdownOpen && (
               <div className="pos-customer-dropdown-modern">
                 <div className="pos-customer-dropdown-header">
-                  <span>Customers ({customers.length})</span>
-                  <button className="pos-customer-add-btn" onClick={() => setShowAddCustomer(true)} title="Add Customer">
-                    <BiPlus /> Add Customer
+                  <span>{t('posPage.customer.customersCount', { count: customers.length })}</span>
+                  <button className="pos-customer-add-btn" onClick={() => setShowAddCustomer(true)} title={t('posPage.customer.add')}>
+                    <BiPlus /> {t('posPage.customer.add')}
                   </button>
                 </div>
                 <div className="pos-customer-dropdown-list">
@@ -690,8 +693,8 @@ const POS = () => {
                       <BiUser size={16} />
                     </div>
                     <div className="pos-customer-option-info">
-                      <span className="pos-customer-option-name">Walk-in Customer</span>
-                      <span className="pos-customer-option-phone">No account needed</span>
+                      <span className="pos-customer-option-name">{t('posPage.customer.walkInCustomer')}</span>
+                      <span className="pos-customer-option-phone">{t('posPage.customer.noAccountNeeded')}</span>
                     </div>
                   </div>
                   {customers
@@ -715,7 +718,7 @@ const POS = () => {
                           </div>
                           <div className="pos-customer-option-info">
                             <span className="pos-customer-option-name">{c.name}</span>
-                            <span className="pos-customer-option-phone">{c.phone || 'No phone'}</span>
+                            <span className="pos-customer-option-phone">{c.phone || t('posPage.customer.noPhone')}</span>
                           </div>
                           {due > 0 && (
                             <span className="pos-customer-option-due">₹{Number(due).toFixed(2)}</span>
@@ -728,7 +731,7 @@ const POS = () => {
             )}
           </div>
           <div className="pos-customer-header-right">
-            <button className="pos-customer-add-btn-icon" onClick={() => setShowAddCustomer(true)} title="Add Customer">
+            <button className="pos-customer-add-btn-icon" onClick={() => setShowAddCustomer(true)} title={t('posPage.customer.add')}>
               <BiPlus size={18} />
             </button>
           </div>
@@ -742,10 +745,10 @@ const POS = () => {
             </div>
             <div className="pos-customer-selected-info">
               <span className="pos-customer-selected-name">{selectedCustomerData.name}</span>
-              <span className="pos-customer-selected-phone">{selectedCustomerData.phone || 'No phone'}</span>
+              <span className="pos-customer-selected-phone">{selectedCustomerData.phone || t('posPage.customer.noPhone')}</span>
               {selectedCustomerData.totalDue > 0 && (
                 <div className="pos-customer-selected-due-row">
-                  <span className="pos-customer-selected-due-label">Due:</span>
+                  <span className="pos-customer-selected-due-label">{t('posPage.totals.dueAmount')}</span>
                   <span className="pos-customer-selected-due-value" style={{ color: 'var(--danger)' }}>₹{Number(selectedCustomerData.totalDue).toFixed(2)}</span>
                 </div>
               )}
@@ -761,15 +764,15 @@ const POS = () => {
           {cart.length === 0 ? (
             <div className="pos-cart-empty">
               <BiCart size={48} />
-              <h5>Cart is empty</h5>
-              <p>Search or scan products to add</p>
+              <h5>{t('posPage.cart.empty')}</h5>
+              <p>{t('posPage.cart.emptyHint')}</p>
             </div>
           ) : (
             cart.map(item => (
               <div key={item.product._id} className="pos-cart-item">
                 <div className="pos-cart-item-info">
                   <div className="pos-cart-item-name">{item.product.name}</div>
-                  <div className="pos-cart-item-price">₹{item.price} / {item.product.unit || 'pcs'}</div>
+                  <div className="pos-cart-item-price">₹{item.price} / {item.product.unit || t('product.piece')}</div>
                 </div>
                 <div className="pos-cart-item-controls">
                   <div className="pos-qty-control">
@@ -790,11 +793,11 @@ const POS = () => {
           {/* Summary Cards */}
           <div className="pos-summary-cards">
             <div className="pos-summary-card pos-summary-subtotal">
-              <span className="pos-summary-label">Subtotal</span>
+              <span className="pos-summary-label">{t('sale.subtotal')}</span>
               <span className="pos-summary-value">₹{subtotal.toFixed(2)}</span>
             </div>
             <div className="pos-summary-card pos-summary-discount">
-              <span className="pos-summary-label">Discount</span>
+              <span className="pos-summary-label">{t('sale.discount')}</span>
               <span className="pos-summary-value">-₹{totalDiscount.toFixed(2)}</span>
             </div>
             <div className="pos-summary-card pos-summary-tax">
@@ -805,7 +808,7 @@ const POS = () => {
 
           {/* Grand Total */}
           <div className="pos-grand-total">
-            <span>Grand Total</span>
+            <span>{t('posPage.totals.grandTotal')}</span>
             <span className="pos-grand-total-amount">₹{grandTotal.toFixed(2)}</span>
           </div>
 
@@ -813,7 +816,7 @@ const POS = () => {
           {dueAmount > 0 && (
             <div className="pos-due-alert">
               <BiErrorCircle size={16} />
-              <span>Due Amount: ₹{dueAmount.toFixed(2)}</span>
+              <span>{t('posPage.totals.dueAmount')} ₹{dueAmount.toFixed(2)}</span>
             </div>
           )}
 
@@ -821,19 +824,19 @@ const POS = () => {
           {change > 0 && (
             <div className="pos-change-display">
               <BiCheckCircle size={16} />
-              <span>Change: <strong>₹{change.toFixed(2)}</strong></span>
+              <span>{t('posPage.totals.change')} <strong>₹{change.toFixed(2)}</strong></span>
             </div>
           )}
 
           {/* Payment Options */}
           <div className="pos-payment-section">
-            <label className="pos-payment-label">Payment Method</label>
+            <label className="pos-payment-label">{t('sale.paymentMethod')}</label>
             <div className="pos-payment-options">
               {[
-                { key: 'cash', icon: <BiMoney size={16} />, label: 'Cash' },
-                { key: 'card', icon: <BiCreditCard size={16} />, label: 'Card' },
-                { key: 'upi', icon: <BiMobile size={16} />, label: 'UPI' },
-                { key: 'mobile_banking', icon: <BiBookmark size={16} />, label: 'M. Banking' },
+                { key: 'cash', icon: <BiMoney size={16} />, label: t('sale.cash') },
+                { key: 'card', icon: <BiCreditCard size={16} />, label: t('sale.card') },
+                { key: 'upi', icon: <BiMobile size={16} />, label: t('sale.upi') },
+                { key: 'mobile_banking', icon: <BiBookmark size={16} />, label: t('posPage.payment.mobileBankingShort') },
               ].map(m => (
                 <button key={m.key} className={`pos-payment-option ${paymentMethod === m.key ? 'active' : ''}`} onClick={() => setPaymentMethod(m.key)}>
                   {m.icon} {m.label}
@@ -844,7 +847,7 @@ const POS = () => {
 
           {/* Paid Amount */}
           <div className="pos-paid-section">
-            <label className="pos-payment-label">Paid Amount</label>
+            <label className="pos-payment-label">{t('sale.paidAmount')}</label>
             <div className="pos-paid-input-group">
               <span className="pos-paid-currency">₹</span>
               <input type="number" className="pos-paid-input" value={paidAmount} onChange={(e) => setPaidAmount(Number(e.target.value) || 0)} min={0} step="any" />
@@ -853,19 +856,19 @@ const POS = () => {
               {quickAmounts.map(amt => (
                 <button key={amt} className={`pos-quick-amt-btn ${paidAmount === amt ? 'active' : ''}`} onClick={() => setPaidAmount(amt)}>₹{amt}</button>
               ))}
-              <button className={`pos-quick-amt-btn pos-quick-amt-exact ${paidAmount === grandTotal ? 'active' : ''}`} onClick={() => setPaidAmount(grandTotal)}>Exact</button>
+              <button className={`pos-quick-amt-btn pos-quick-amt-exact ${paidAmount === grandTotal ? 'active' : ''}`} onClick={() => setPaidAmount(grandTotal)}>{t('posPage.payment.exact')}</button>
             </div>
           </div>
 
           {/* Discount Section */}
           <div className="pos-discount-section">
-            <label className="pos-payment-label">Extra Discount</label>
+            <label className="pos-payment-label">{t('posPage.discount.extraLabel')}</label>
             <div className="pos-discount-input-row">
               <div className="pos-discount-mode-toggle">
                 <button className={`pos-discount-mode-btn ${discountMode === 'percent' ? 'active' : ''}`} onClick={() => setDiscountMode('percent')}>%</button>
                 <button className={`pos-discount-mode-btn ${discountMode === 'fixed' ? 'active' : ''}`} onClick={() => setDiscountMode('fixed')}>₹</button>
               </div>
-              <input type="number" className="pos-discount-input" value={discountValue} onChange={(e) => setDiscountValue(Number(e.target.value) || 0)} min={0} placeholder={discountMode === 'percent' ? 'Discount %' : 'Discount amount'} />
+              <input type="number" className="pos-discount-input" value={discountValue} onChange={(e) => setDiscountValue(Number(e.target.value) || 0)} min={0} placeholder={discountMode === 'percent' ? t('posPage.discount.percentPlaceholder') : t('posPage.discount.amountPlaceholder')} />
             </div>
             <div className="pos-quick-amounts">
               {quickDiscounts.map((d, idx) => (
@@ -876,22 +879,22 @@ const POS = () => {
 
           {/* Customer Note */}
           <div className="pos-note-section">
-            <label className="pos-payment-label">Note (optional)</label>
-            <input type="text" className="pos-note-input" value={customerNote} onChange={(e) => setCustomerNote(e.target.value)} placeholder="Add a note to this sale..." maxLength={200} />
+            <label className="pos-payment-label">{t('posPage.note.label')}</label>
+            <input type="text" className="pos-note-input" value={customerNote} onChange={(e) => setCustomerNote(e.target.value)} placeholder={t('posPage.note.placeholder')} maxLength={200} />
           </div>
 
           {/* Action Buttons */}
           <div className="pos-action-buttons">
             <div className="pos-action-row">
-              <button className="pos-action-btn" onClick={handleReprint} disabled={!lastSale}><BiPrinter size={16} /> Reprint</button>
-              <button className="pos-action-btn" onClick={() => { setShowPrinterSettings(true); }}><BiGridSmall size={16} /> Settings</button>
+              <button className="pos-action-btn" onClick={handleReprint} disabled={!lastSale}><BiPrinter size={16} /> {t('posPage.actions.reprint')}</button>
+              <button className="pos-action-btn" onClick={() => { setShowPrinterSettings(true); }}><BiGridSmall size={16} /> {t('posPage.actions.printerSettingsShort')}</button>
             </div>
             <button className="pos-checkout-btn" onClick={handleOpenConfirm} disabled={cart.length === 0}>
               <BiReceipt size={18} />
-              Generate Bill
+              {t('posPage.search.shortcutBill')}
             </button>
             <button className="pos-clear-btn" onClick={clearCart} disabled={cart.length === 0}>
-              <BiTrash size={14} /> Clear Cart
+              <BiTrash size={14} /> {t('posPage.actions.clearCart')}
             </button>
           </div>
         </div>
@@ -927,27 +930,27 @@ const POS = () => {
             <div className="pos-add-customer-header">
               <div className="pos-add-customer-header-left">
                 <div className="pos-add-customer-header-icon"><BiUserCircle size={20} /></div>
-                <h3>Add Customer</h3>
+                <h3>{t('posPage.addCustomerModal.title')}</h3>
               </div>
               <button className="pos-add-customer-close" onClick={() => setShowAddCustomer(false)}><BiX size={20} /></button>
             </div>
             <div className="pos-add-customer-body">
               <div className="pos-add-customer-field">
-                <label>Name *</label>
-                <input type="text" value={addCustomerForm.name} onChange={(e) => setAddCustomerForm({ ...addCustomerForm, name: e.target.value })} placeholder="Customer name" />
+                <label>{t('posPage.addCustomerModal.nameLabel')}</label>
+                <input type="text" value={addCustomerForm.name} onChange={(e) => setAddCustomerForm({ ...addCustomerForm, name: e.target.value })} placeholder={t('posPage.addCustomerModal.namePlaceholder')} />
               </div>
               <div className="pos-add-customer-field">
-                <label>Phone *</label>
-                <input type="text" value={addCustomerForm.phone} onChange={(e) => setAddCustomerForm({ ...addCustomerForm, phone: e.target.value })} placeholder="Phone number" />
+                <label>{t('posPage.addCustomerModal.phoneLabel')}</label>
+                <input type="text" value={addCustomerForm.phone} onChange={(e) => setAddCustomerForm({ ...addCustomerForm, phone: e.target.value })} placeholder={t('posPage.addCustomerModal.phonePlaceholder')} />
               </div>
               <div className="pos-add-customer-field">
-                <label>Address</label>
-                <input type="text" value={addCustomerForm.address} onChange={(e) => setAddCustomerForm({ ...addCustomerForm, address: e.target.value })} placeholder="Address (optional)" />
+                <label>{t('posPage.addCustomerModal.addressLabel')}</label>
+                <input type="text" value={addCustomerForm.address} onChange={(e) => setAddCustomerForm({ ...addCustomerForm, address: e.target.value })} placeholder={t('posPage.addCustomerModal.addressPlaceholder')} />
               </div>
             </div>
             <div className="pos-add-customer-footer">
-              <button className="pos-add-customer-btn-cancel" onClick={() => setShowAddCustomer(false)}>Cancel</button>
-              <button className="pos-add-customer-btn-save" onClick={handleAddCustomer}><BiCheck size={18} /> Save</button>
+              <button className="pos-add-customer-btn-cancel" onClick={() => setShowAddCustomer(false)}>{t('common.cancel')}</button>
+              <button className="pos-add-customer-btn-save" onClick={handleAddCustomer}><BiCheck size={18} /> {t('common.save')}</button>
             </div>
           </div>
         </div>

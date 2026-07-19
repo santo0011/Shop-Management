@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { BiSearch, BiPlus, BiPackage } from 'react-icons/bi';
 import api from '../../services/api';
 
@@ -27,9 +28,10 @@ const ProductSearchField = forwardRef(({
   onSelect,
   onCreateNew,
   onEnter,
-  placeholder = 'Search by name, barcode or SKU...',
+  placeholder,
   disabled = false,
 }, ref) => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState(value?.name || '');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -159,7 +161,7 @@ const ProductSearchField = forwardRef(({
           className="psf-input"
           value={query}
           disabled={disabled}
-          placeholder={placeholder}
+          placeholder={placeholder || t('product.searchByNameBarcodeSku')}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onBlur={handleBlur}
@@ -189,18 +191,18 @@ const ProductSearchField = forwardRef(({
                 <span className="psf-option-details">
                   {p.barcode && (
                     <span className="psf-option-detail-item">
-                      <strong>Barcode:</strong> <HighlightMatch text={p.barcode} query={query} />
+                      <strong>{t('product.barcode')}:</strong> <HighlightMatch text={p.barcode} query={query} />
                     </span>
                   )}
                   {p.sku && !p.barcode && (
                     <span className="psf-option-detail-item">
-                      <strong>SKU:</strong> <HighlightMatch text={p.sku} query={query} />
+                      <strong>{t('product.sku')}:</strong> <HighlightMatch text={p.sku} query={query} />
                     </span>
                   )}
                 </span>
                 <div className="psf-option-meta">
                   <span className="psf-option-stock">
-                    Stock: <strong>{p.stock}</strong> {p.unit || 'pc'}
+                    {t('product.stock')}: <strong>{p.stock}</strong> {p.unit || t('product.piece')}
                   </span>
                   <span className="psf-option-price">
                     ₹{Number(p.purchasePrice || 0).toLocaleString('en-IN')}
@@ -213,7 +215,7 @@ const ProductSearchField = forwardRef(({
           {!loading && results.length === 0 && (
             <div className="psf-empty">
               <BiPackage size={20} />
-              <span>No products found for "<strong>{query.trim()}</strong>"</span>
+              <span>{t('product.noProductsFoundFor', { query: query.trim() })}</span>
             </div>
           )}
 
@@ -227,7 +229,7 @@ const ProductSearchField = forwardRef(({
             </div>
             <div className="psf-option-content">
               <span className="psf-option-name" style={{ color: 'var(--primary)' }}>
-                + Create New Product
+                {t('product.createNewProduct')}
               </span>
               <span className="psf-option-details" style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
                 "{query.trim()}"

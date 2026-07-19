@@ -12,13 +12,24 @@ import {
 import Swal from 'sweetalert2';
 
 // ─── Constants ────────────────────────────────────────────────────────────
-const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'card', label: 'Card' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'mobile_banking', label: 'Mobile Banking' },
-  { value: 'due', label: 'Due' },
+const getPaymentMethods = (t) => [
+  { value: 'cash', label: t('sale.cash') },
+  { value: 'card', label: t('sale.card') },
+  { value: 'bank_transfer', label: t('purchasesPage.bankTransfer') },
+  { value: 'mobile_banking', label: t('sale.mobileBanking') },
+  { value: 'due', label: t('common.due') },
 ];
+
+const paymentMethodLabel = (method, t) => {
+  const map = {
+    cash: t('sale.cash'),
+    card: t('sale.card'),
+    bank_transfer: t('purchasesPage.bankTransfer'),
+    mobile_banking: t('sale.mobileBanking'),
+    due: t('common.due'),
+  };
+  return map[method] || '-';
+};
 
 const ROW_FIELDS = ['batchNumber', 'expiryDate', 'quantity', 'purchasePrice', 'sellingPrice', 'discount', 'tax'];
 
@@ -53,14 +64,14 @@ const rowTotal = (row) => rowBase(row) - rowDiscountAmt(row) + rowTaxAmt(row);
 const money = (val) => `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // ─── Mobile Product Card for drawer ──────────────────────────────────────
-const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, updateRow, removeRow, handleSelectProduct, handleCreateNewProduct, handleRowFieldEnter, rowTotal, money, rows }) => {
+const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, updateRow, removeRow, handleSelectProduct, handleCreateNewProduct, handleRowFieldEnter, rowTotal, money, rows, t }) => {
   return (
     <div className={`purchase-mobile-product-card ${isOpen ? 'purchase-mobile-product-card--open' : ''}`}>
       <div className="purchase-mobile-product-card__header" onClick={onToggle}>
         <div className="purchase-mobile-product-card__header-left">
           <span className="purchase-mobile-product-card__header-index">#{index + 1}</span>
           <span className="purchase-mobile-product-card__header-name">
-            {row.product?.name || (isViewMode ? 'Unknown product' : 'Select product')}
+            {row.product?.name || (isViewMode ? t('purchasesPage.unknownProduct') : t('purchasesPage.selectProduct'))}
           </span>
         </div>
         <div className="purchase-mobile-product-card__header-right">
@@ -78,7 +89,7 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
         <div className="purchase-mobile-product-card__body">
           {!isViewMode && (
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Product</label>
+              <label className="purchase-mobile-product-card__label">{t('purchasesPage.product')}</label>
               <ProductSearchField
                 ref={setFieldRef(row.key, 'product')}
                 value={row.product}
@@ -88,32 +99,32 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
               />
               {row.product && (
                 <div className="purchase-mobile-product-card__hint">
-                  Unit: {row.product.unit} · Stock: {row.product.stock ?? 0}
+                  {t('purchasesPage.unitStockHint', { unit: row.product.unit, stock: row.product.stock ?? 0 })}
                 </div>
               )}
             </div>
           )}
           {isViewMode && row.product && (
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Product</label>
-              <span className="purchase-mobile-product-card__value">{row.product?.name || 'Unknown product'}</span>
+              <label className="purchase-mobile-product-card__label">{t('purchasesPage.product')}</label>
+              <span className="purchase-mobile-product-card__value">{row.product?.name || t('purchasesPage.unknownProduct')}</span>
             </div>
           )}
 
           <div className="purchase-mobile-product-card__row-fields">
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Batch No.</label>
+              <label className="purchase-mobile-product-card__label">{t('purchasesPage.batchNo')}</label>
               <input
                 ref={setFieldRef(row.key, 'batchNumber')}
                 className="purchase-mobile-product-card__input"
                 value={row.batchNumber}
                 onChange={(e) => updateRow(row.key, { batchNumber: e.target.value })}
                 disabled={isViewMode}
-                placeholder="Batch"
+                placeholder={t('purchasesPage.batchPlaceholder')}
               />
             </div>
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Expiry Date</label>
+              <label className="purchase-mobile-product-card__label">{t('product.expiryDate')}</label>
               <input
                 ref={setFieldRef(row.key, 'expiryDate')}
                 type="date"
@@ -127,39 +138,39 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
 
           <div className="purchase-mobile-product-card__row-fields purchase-mobile-product-card__row-fields--3col">
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Qty</label>
+              <label className="purchase-mobile-product-card__label">{t('purchasesPage.qty')}</label>
               <input
                 ref={setFieldRef(row.key, 'quantity')}
                 type="number"
                 min="1"
                 className="purchase-mobile-product-card__input"
-                placeholder="Qty"
+                placeholder={t('purchasesPage.qty')}
                 value={row.quantity}
                 onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
                 disabled={isViewMode}
               />
             </div>
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Purchase Price</label>
+              <label className="purchase-mobile-product-card__label">{t('product.purchasePrice')}</label>
               <input
                 ref={setFieldRef(row.key, 'purchasePrice')}
                 type="number"
                 min="0"
                 className="purchase-mobile-product-card__input"
-                placeholder="Price"
+                placeholder={t('common.price')}
                 value={row.purchasePrice}
                 onChange={(e) => updateRow(row.key, { purchasePrice: e.target.value })}
                 disabled={isViewMode}
               />
             </div>
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Selling Price</label>
+              <label className="purchase-mobile-product-card__label">{t('product.sellingPrice')}</label>
               <input
                 ref={setFieldRef(row.key, 'sellingPrice')}
                 type="number"
                 min="0"
                 className="purchase-mobile-product-card__input"
-                placeholder="S.Price"
+                placeholder={t('product.sellingPrice')}
                 value={row.sellingPrice}
                 onChange={(e) => updateRow(row.key, { sellingPrice: e.target.value })}
                 disabled={isViewMode}
@@ -169,26 +180,26 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
 
           <div className="purchase-mobile-product-card__row-fields">
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Discount %</label>
+              <label className="purchase-mobile-product-card__label">{t('purchasesPage.discountPercent')}</label>
               <input
                 ref={setFieldRef(row.key, 'discount')}
                 type="number"
                 min="0"
                 className="purchase-mobile-product-card__input"
-                placeholder="Disc %"
+                placeholder={t('purchasesPage.discountPercent')}
                 value={row.discount}
                 onChange={(e) => updateRow(row.key, { discount: e.target.value })}
                 disabled={isViewMode}
               />
             </div>
             <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">Tax %</label>
+              <label className="purchase-mobile-product-card__label">{t('purchasesPage.taxPercent')}</label>
               <input
                 ref={setFieldRef(row.key, 'tax')}
                 type="number"
                 min="0"
                 className="purchase-mobile-product-card__input"
-                placeholder="Tax %"
+                placeholder={t('purchasesPage.taxPercent')}
                 value={row.tax}
                 onChange={(e) => updateRow(row.key, { tax: e.target.value })}
                 disabled={isViewMode}
@@ -197,7 +208,7 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
           </div>
 
           <div className="purchase-mobile-product-card__total">
-            <span>Line Total</span>
+            <span>{t('purchasesPage.lineTotal')}</span>
             <strong>{money(rowTotal(row))}</strong>
           </div>
 
@@ -208,7 +219,7 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
               onClick={() => removeRow(row.key)}
               disabled={rows.length <= 1}
             >
-              <BiTrash /> Remove Item
+              <BiTrash /> {t('purchasesPage.removeItem')}
             </button>
           )}
         </div>
@@ -266,7 +277,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
       });
       setRows((viewing.items || []).map((i) => ({
         key: makeRowKey(),
-        product: i.product && typeof i.product === 'object' ? i.product : { _id: i.product, name: 'Unknown product' },
+        product: i.product && typeof i.product === 'object' ? i.product : { _id: i.product, name: t('purchasesPage.unknownProduct') },
         batchNumber: i.batchNumber || '',
         expiryDate: i.expiryDate ? String(i.expiryDate).slice(0, 10) : '',
         quantity: i.quantity,
@@ -375,8 +386,8 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
-    if (!header.supplier) newErrors.supplier = 'Supplier is required';
-    if (validRows.length === 0) newErrors.items = 'Add at least one product';
+    if (!header.supplier) newErrors.supplier = t('purchasesPage.supplierRequired');
+    if (validRows.length === 0) newErrors.items = t('purchasesPage.itemsRequired');
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -410,11 +421,11 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         paidAmount: Number(paidAmount) || 0,
       };
       const { data } = await api.post('/purchases', payload);
-      showToast.success(`Purchase ${data.purchaseNo} created`);
+      showToast.success(t('purchasesPage.purchaseCreated', { no: data.purchaseNo }));
       onSuccess();
       onClose();
     } catch (err) {
-      setSubmitError(err.response?.data?.message || 'Failed to save purchase');
+      setSubmitError(err.response?.data?.message || t('purchasesPage.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -425,7 +436,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer purchase-drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5>{isViewMode ? `Purchase ${viewing?.purchaseNo || ''}` : 'New Purchase'}</h5>
+          <h5>{isViewMode ? t('purchasesPage.purchaseTitle', { no: viewing?.purchaseNo || '' }) : t('purchase.newPurchase')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
 
@@ -444,17 +455,17 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                 onChange={(e) => handleHeaderChange('supplier', e.target.value)}
                 disabled={isViewMode}
               >
-                <option value="">Select Supplier</option>
+                <option value="">{t('purchasesPage.selectSupplier')}</option>
                 {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>
               {errors.supplier && <div className="invalid-feedback-premium">{errors.supplier}</div>}
             </div>
 
             <div className="form-group mb-0">
-              <label className="form-label"><BiHash style={{ marginRight: 4 }} />Purchase No</label>
+              <label className="form-label"><BiHash style={{ marginRight: 4 }} />{t('purchasesPage.purchaseNo')}</label>
               <input
                 className="form-control"
-                value={isViewMode ? viewing?.purchaseNo || '' : 'Auto-generated on save'}
+                value={isViewMode ? viewing?.purchaseNo || '' : t('purchasesPage.autoGenerated')}
                 readOnly
                 disabled
                 style={{ color: 'var(--text-muted)', background: 'var(--bg-primary)' }}
@@ -462,10 +473,10 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
             </div>
 
             <div className="form-group mb-0">
-              <label className="form-label">Supplier Invoice No</label>
+              <label className="form-label">{t('purchasesPage.supplierInvoiceNo')}</label>
               <input
                 className="form-control"
-                placeholder="Optional"
+                placeholder={t('common.optional')}
                 value={header.supplierInvoiceNo}
                 onChange={(e) => handleHeaderChange('supplierInvoiceNo', e.target.value)}
                 disabled={isViewMode}
@@ -473,7 +484,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
             </div>
 
             <div className="form-group mb-0">
-              <label className="form-label"><BiCalendar style={{ marginRight: 4 }} />Purchase Date</label>
+              <label className="form-label"><BiCalendar style={{ marginRight: 4 }} />{t('purchasesPage.purchaseDate')}</label>
               <input
                 type="date"
                 className="form-control"
@@ -484,22 +495,22 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
             </div>
 
             <div className="form-group mb-0">
-              <label className="form-label"><BiCreditCard style={{ marginRight: 4 }} />Payment Method</label>
+              <label className="form-label"><BiCreditCard style={{ marginRight: 4 }} />{t('sale.paymentMethod')}</label>
               <select
                 className="form-select"
                 value={header.paymentMethod}
                 onChange={(e) => handleHeaderChange('paymentMethod', e.target.value)}
                 disabled={isViewMode}
               >
-                {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                {getPaymentMethods(t).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
 
             <div className="form-group mb-0 purchase-header-notes">
-              <label className="form-label"><BiNote style={{ marginRight: 4 }} />Notes</label>
+              <label className="form-label"><BiNote style={{ marginRight: 4 }} />{t('common.notes')}</label>
               <input
                 className="form-control"
-                placeholder="Optional notes"
+                placeholder={t('purchasesPage.optionalNotes')}
                 value={header.notes}
                 onChange={(e) => handleHeaderChange('notes', e.target.value)}
                 disabled={isViewMode}
@@ -510,10 +521,10 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
           {/* ─── Desktop Product Table ─────────────────────────────── */}
           <div className="purchase-desktop-section">
             <div className="purchase-items-header">
-              <label className="form-label mb-0" style={{ fontWeight: 600 }}>Products</label>
+              <label className="form-label mb-0" style={{ fontWeight: 600 }}>{t('purchasesPage.products')}</label>
               {!isViewMode && (
                 <button type="button" className="purchase-add-row-btn" onClick={addRow}>
-                  <BiPlus /> Add Row
+                  <BiPlus /> {t('purchasesPage.addRow')}
                 </button>
               )}
             </div>
@@ -523,15 +534,15 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
               <table className="purchase-items-table">
                 <thead>
                   <tr>
-                    <th style={{ minWidth: 180, width: '22%' }}>Product</th>
-                    <th style={{ width: 85 }}>Batch No.</th>
-                    <th style={{ width: 105 }}>Expiry Date</th>
-                    <th style={{ width: 55 }}>Qty</th>
-                    <th style={{ width: 80 }}>Purchase Price</th>
-                    <th style={{ width: 80 }}>Selling Price</th>
-                    <th style={{ width: 65 }}>Discount %</th>
-                    <th style={{ width: 55 }}>Tax %</th>
-                    <th style={{ width: 75 }}>Total</th>
+                    <th style={{ minWidth: 180, width: '22%' }}>{t('purchasesPage.product')}</th>
+                    <th style={{ width: 85 }}>{t('purchasesPage.batchNo')}</th>
+                    <th style={{ width: 105 }}>{t('product.expiryDate')}</th>
+                    <th style={{ width: 55 }}>{t('purchasesPage.qty')}</th>
+                    <th style={{ width: 80 }}>{t('product.purchasePrice')}</th>
+                    <th style={{ width: 80 }}>{t('product.sellingPrice')}</th>
+                    <th style={{ width: 65 }}>{t('purchasesPage.discountPercent')}</th>
+                    <th style={{ width: 55 }}>{t('purchasesPage.taxPercent')}</th>
+                    <th style={{ width: 75 }}>{t('common.total')}</th>
                     {!isViewMode && <th style={{ width: 32 }} />}
                   </tr>
                 </thead>
@@ -540,7 +551,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                     <tr key={row.key}>
                       <td>
                         {isViewMode ? (
-                          <span style={{ fontWeight: 600 }}>{row.product?.name || 'Unknown product'}</span>
+                          <span style={{ fontWeight: 600 }}>{row.product?.name || t('purchasesPage.unknownProduct')}</span>
                         ) : (
                           <>
                             <ProductSearchField
@@ -552,7 +563,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                             />
                             {row.product && (
                               <div className="purchase-row-hint">
-                                Unit: {row.product.unit} · Stock: {row.product.stock ?? 0}
+                                {t('purchasesPage.unitStockHint', { unit: row.product.unit, stock: row.product.stock ?? 0 })}
                               </div>
                             )}
                           </>
@@ -647,7 +658,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                             className="purchase-remove-row-btn"
                             onClick={() => removeRow(row.key)}
                             disabled={rows.length <= 1}
-                            title="Remove row"
+                            title={t('purchasesPage.removeRow')}
                           >
                             <BiTrash size={14} />
                           </button>
@@ -663,10 +674,10 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
           {/* ─── Mobile Product Cards ──────────────────────────────── */}
           <div className="purchase-mobile-section">
             <div className="purchase-items-header">
-              <label className="form-label mb-0" style={{ fontWeight: 600 }}>Products ({rows.length})</label>
+              <label className="form-label mb-0" style={{ fontWeight: 600 }}>{t('purchasesPage.productsCount', { count: rows.length })}</label>
               {!isViewMode && (
                 <button type="button" className="purchase-add-row-btn" onClick={addRow}>
-                  <BiPlus /> Add Item
+                  <BiPlus /> {t('purchasesPage.addItem')}
                 </button>
               )}
             </div>
@@ -690,6 +701,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                   rowTotal={rowTotal}
                   money={money}
                   rows={rows}
+                  t={t}
                 />
               ))}
             </div>
@@ -700,29 +712,29 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         <div className="purchase-summary-card">
           <div className="purchase-summary-card__body">
             <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">Total Items</span>
+              <span className="purchase-summary-row__label">{t('purchasesPage.totalItems')}</span>
               <span className="purchase-summary-row__value">{totalItems}</span>
             </div>
             <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">Discount</span>
+              <span className="purchase-summary-row__label">{t('sale.discount')}</span>
               <span className="purchase-summary-row__value purchase-summary-row__value--danger">-{money(discountTotal)}</span>
             </div>
             <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">Tax</span>
+              <span className="purchase-summary-row__label">{t('sale.tax')}</span>
               <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(taxTotal)}</span>
             </div>
             <div className="purchase-summary-divider" />
             <div className="purchase-summary-row purchase-summary-row--grand">
-              <span className="purchase-summary-row__label purchase-summary-row__label--grand">Grand Total</span>
+              <span className="purchase-summary-row__label purchase-summary-row__label--grand">{t('purchasesPage.grandTotal')}</span>
               <span className="purchase-summary-row__value purchase-summary-row__value--grand">{money(grandTotal)}</span>
             </div>
             <div className="purchase-summary-divider" />
             <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">Previous Due</span>
+              <span className="purchase-summary-row__label">{t('purchasesPage.previousDue')}</span>
               <span className="purchase-summary-row__value">{money(previousDue)}</span>
             </div>
             <div className="purchase-summary-row purchase-summary-row--paid">
-              <span className="purchase-summary-row__label">Paid Amount</span>
+              <span className="purchase-summary-row__label">{t('sale.paidAmount')}</span>
               {isViewMode ? (
                 <span className="purchase-summary-row__value purchase-summary-row__value--success">{money(paidAmount)}</span>
               ) : (
@@ -736,7 +748,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
             </div>
             <div className="purchase-summary-divider" />
             <div className={`purchase-summary-row purchase-summary-row--due ${currentDue > 0 ? 'purchase-summary-row--due-warning' : ''}`}>
-              <span className="purchase-summary-row__label purchase-summary-row__label--due">Current Due</span>
+              <span className="purchase-summary-row__label purchase-summary-row__label--due">{t('purchasesPage.currentDue')}</span>
               <span className={`purchase-summary-row__value purchase-summary-row__value--due ${currentDue > 0 ? 'purchase-summary-row__value--danger' : 'purchase-summary-row__value--success'}`}>
                 {money(currentDue)}
               </span>
@@ -749,16 +761,16 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
           {!isViewMode && (
             <>
               <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="button" className="btn-premium btn-premium-primary" onClick={handleSubmit} disabled={saving}>
-                {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> Save Purchase</>}
+                {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('purchasesPage.savePurchase')}</>}
               </button>
             </>
           )}
           {isViewMode && (
             <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
-              Close
+              {t('common.close')}
             </button>
           )}
         </div>
@@ -822,7 +834,7 @@ const Purchases = () => {
       setViewing(data);
       setDrawerOpen(true);
     } catch (err) {
-      showToast.error('Failed to load purchase details');
+      showToast.error(t('purchasesPage.loadDetailFailed'));
     }
   };
 
@@ -838,14 +850,14 @@ const Purchases = () => {
 
   const confirmDelete = (purchase) => {
     Swal.fire({
-      title: 'Delete Purchase?',
-      text: `Are you sure you want to delete purchase "${purchase.purchaseNo}"? This action cannot be undone.`,
+      title: t('purchasesPage.deletePurchaseTitle'),
+      text: t('purchasesPage.deletePurchaseConfirm', { no: purchase.purchaseNo }),
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#FF6B6B',
       cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('purchasesPage.yesDeleteIt'),
+      cancelButtonText: t('common.cancel'),
       background: 'var(--bg-card)',
       color: 'var(--text-primary)',
       reverseButtons: true,
@@ -853,8 +865,8 @@ const Purchases = () => {
       if (result.isConfirmed) {
         handleDelete(purchase._id);
         Swal.fire({
-          title: 'Deleted!',
-          text: 'Purchase has been deleted.',
+          title: t('purchasesPage.deletedTitle'),
+          text: t('purchasesPage.purchaseDeletedText'),
           icon: 'success',
           timer: 1500,
           showConfirmButton: false,
@@ -867,9 +879,9 @@ const Purchases = () => {
 
   const getStatusBadge = (status) => {
     const map = {
-      paid: { cls: 'badge-success', label: 'Paid' },
-      partial: { cls: 'badge-warning', label: 'Partial' },
-      unpaid: { cls: 'badge-danger', label: 'Unpaid' },
+      paid: { cls: 'badge-success', label: t('common.paid') },
+      partial: { cls: 'badge-warning', label: t('common.partial') },
+      unpaid: { cls: 'badge-danger', label: t('purchasesPage.unpaid') },
     };
     const s = map[status] || map.unpaid;
     return <span className={`badge ${s.cls}`}>{s.label}</span>;
@@ -882,11 +894,11 @@ const Purchases = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.purchases')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage your purchase orders
+            {t('purchasesPage.subtitle')}
           </p>
         </div>
         <button className="btn-premium btn-premium-primary" onClick={() => { setViewing(null); setDrawerOpen(true); }}>
-          <BiPlus /> Add <span className="purchase-btn-full-label">Purchase</span>
+          <BiPlus /> {t('common.add')} <span className="purchase-btn-full-label">{t('purchasesPage.purchase')}</span>
         </button>
       </div>
 
@@ -896,7 +908,7 @@ const Purchases = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder="Search by purchase no, supplier invoice or supplier..."
+            placeholder={t('purchasesPage.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -909,8 +921,8 @@ const Purchases = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
-                <th>Purchase No</th>
-                <th>Supplier Invoice</th>
+                <th>{t('purchasesPage.purchaseNo')}</th>
+                <th>{t('purchasesPage.supplierInvoiceNo')}</th>
                 <th>{t('purchase.supplier')}</th>
                 <th>{t('sale.total')}</th>
                 <th>{t('common.paid')}</th>
@@ -923,14 +935,14 @@ const Purchases = () => {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> Loading...
+                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : purchases.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
-                    No purchases found
+                    {t('purchasesPage.noPurchasesFound')}
                   </td>
                 </tr>
               ) : purchases.map((purchase) => (
@@ -950,10 +962,10 @@ const Purchases = () => {
                   <td>{getStatusBadge(purchase.paymentStatus)}</td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(purchase)}>
+                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(purchase)}>
                         <BiShow />
                       </button>
-                      <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => confirmDelete(purchase)}>
+                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(purchase)}>
                         <BiTrash />
                       </button>
                     </div>
@@ -969,12 +981,12 @@ const Purchases = () => {
       <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
         {loading ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : purchases.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
-            No purchases found
+            {t('purchasesPage.noPurchasesFound')}
           </div>
         ) : purchases.map((purchase) => (
           <ExpandableCard
@@ -982,7 +994,7 @@ const Purchases = () => {
             compact={
               <>
                 <div className="expandable-card__compact-row">
-                  <span className="expandable-card__name">{purchase.supplier?.name || 'Unknown'}</span>
+                  <span className="expandable-card__name">{purchase.supplier?.name || t('common.unknown')}</span>
                   <span className="expandable-card__price">{money(purchase.totalAmount)}</span>
                 </div>
                 <div className="expandable-card__meta">
@@ -996,7 +1008,7 @@ const Purchases = () => {
                   </span>
                 </div>
                 <div className="expandable-card__compact-row" style={{ marginTop: '0.15rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Payment Status</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('purchasesPage.paymentStatus')}</span>
                   <span>{getStatusBadge(purchase.paymentStatus)}</span>
                 </div>
               </>
@@ -1004,42 +1016,42 @@ const Purchases = () => {
             expanded={
               <div className="expandable-card__rows">
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Supplier Invoice No.</span>
+                  <span className="expandable-card__row-label">{t('purchasesPage.supplierInvoiceNo')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{purchase.supplierInvoiceNo || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Total Items</span>
+                  <span className="expandable-card__row-label">{t('purchasesPage.totalItems')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{purchase.totalItems || purchase.items?.length || 0}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Paid Amount</span>
+                  <span className="expandable-card__row-label">{t('sale.paidAmount')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{money(purchase.paidAmount)}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Due Amount</span>
+                  <span className="expandable-card__row-label">{t('purchasesPage.dueAmount')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value" style={purchase.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>{money(purchase.dueAmount)}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Payment Method</span>
+                  <span className="expandable-card__row-label">{t('sale.paymentMethod')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value" style={{ textTransform: 'capitalize' }}>{(purchase.paymentMethod || '-').replace(/_/g, ' ')}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Notes</span>
+                  <span className="expandable-card__row-label">{t('common.notes')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{purchase.notes || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Created By</span>
+                  <span className="expandable-card__row-label">{t('purchasesPage.createdBy')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{purchase.createdBy?.name || purchase.createdBy || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Created Date</span>
+                  <span className="expandable-card__row-label">{t('purchasesPage.createdDate')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{new Date(purchase.createdAt).toLocaleDateString()}</span>
                 </div>
@@ -1047,13 +1059,13 @@ const Purchases = () => {
             }
             actions={
               <>
-                <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(purchase)}>
+                <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(purchase)}>
                   <BiShow />
                 </button>
-                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => { setViewing(purchase); setDrawerOpen(true); }}>
+                <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => { setViewing(purchase); setDrawerOpen(true); }}>
                   <BiCheck />
                 </button>
-                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => confirmDelete(purchase)}>
+                <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(purchase)}>
                   <BiTrash />
                 </button>
               </>
@@ -1076,16 +1088,16 @@ const Purchases = () => {
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-premium-header">
-              <h5>Delete Purchase</h5>
+              <h5>{t('purchasesPage.deletePurchaseTitle')}</h5>
               <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
             </div>
             <div className="modal-premium-body text-center">
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--glow-danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 1.25rem' }}><BiTrash /></div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>Are you sure you want to delete this purchase? This action cannot be undone.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>{t('purchasesPage.deletePurchaseConfirmGeneric')}</p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
-              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
             </div>
           </div>
         </div>

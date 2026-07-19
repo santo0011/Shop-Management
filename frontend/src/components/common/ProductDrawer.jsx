@@ -10,13 +10,13 @@ const emptyForm = {
 
 const REQUIRED_FIELDS = ['name', 'category', 'purchasePrice', 'sellingPrice', 'stock'];
 
-const validateField = (name, value) => {
+const validateField = (name, value, t) => {
   switch (name) {
-    case 'name': return String(value || '').trim() ? '' : 'Product name is required';
-    case 'category': return value ? '' : 'Category is required';
-    case 'purchasePrice': return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid purchase price';
-    case 'sellingPrice': return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid selling price';
-    case 'stock': return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid stock quantity';
+    case 'name': return String(value || '').trim() ? '' : t('validation.nameRequired');
+    case 'category': return value ? '' : t('validation.categoryRequired');
+    case 'purchasePrice': return value !== '' && value !== null && Number(value) >= 0 ? '' : t('validation.invalidPurchasePrice');
+    case 'sellingPrice': return value !== '' && value !== null && Number(value) >= 0 ? '' : t('validation.invalidSellingPrice');
+    case 'stock': return value !== '' && value !== null && Number(value) >= 0 ? '' : t('validation.invalidStockQuantity');
     default: return '';
   }
 };
@@ -53,7 +53,7 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, units, t
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => {
       if (!(name in prev)) return prev;
-      const msg = validateField(name, value);
+      const msg = validateField(name, value, t);
       const next = { ...prev };
       if (msg) next[name] = msg; else delete next[name];
       return next;
@@ -65,7 +65,7 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, units, t
     e.preventDefault();
     const newErrors = {};
     REQUIRED_FIELDS.forEach((field) => {
-      const msg = validateField(field, form[field]);
+      const msg = validateField(field, form[field], t);
       if (msg) newErrors[field] = msg;
     });
     if (Object.keys(newErrors).length > 0) {
@@ -84,7 +84,7 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, units, t
       onSuccess(product);
       onClose();
     } catch (err) {
-      setSubmitError(err.response?.data?.message || 'Failed to save product');
+      setSubmitError(err.response?.data?.message || t('product.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -145,7 +145,7 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, units, t
                     onChange={(e) => handleChange('category', e.target.value)}
                     style={inputStyle}
                   >
-                    <option value="">Select</option>
+                    <option value="">{t('common.select')}</option>
                     {categories.map((cat) => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
                   </select>
                   {errors.category && <div className="invalid-feedback-premium" style={errorStyle}>{errors.category}</div>}
@@ -207,7 +207,7 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, units, t
                   <input type="number" {...field('tax')} />
                 </div>
                 <div>
-                  <label className="form-label" style={labelStyle}>SKU</label>
+                  <label className="form-label" style={labelStyle}>{t('product.sku')}</label>
                   <input {...field('sku')} />
                 </div>
               </div>
@@ -217,7 +217,7 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, units, t
         <div className="drawer-footer product-drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
           <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>{t('common.cancel')}</button>
           <button type="submit" form="product-form" className="btn-premium btn-premium-primary" disabled={saving} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
-            {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
+            {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('common.save')}</>}
           </button>
         </div>
       </div>

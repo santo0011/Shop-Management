@@ -23,19 +23,20 @@ const PAYMENT_METHOD_ICONS = {
   mobile_banking: '🏦',
 };
 
-const PAYMENT_METHOD_LABELS = {
-  cash: 'Cash',
-  card: 'Card',
-  upi: 'UPI',
-  mobile_banking: 'Mobile Banking',
-};
+const getPaymentMethodLabels = (t) => ({
+  cash: t('sale.cash'),
+  card: t('sale.card'),
+  upi: t('sale.upi'),
+  mobile_banking: t('sale.mobileBanking'),
+  due: t('common.other'),
+});
 
 // ─── Status Styles ───────────────────────────────────────────
-const STATUS_STYLES = {
-  paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: 'Paid', icon: '✅' },
-  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: 'Partial', icon: '🟠' },
-  unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: 'Due', icon: '🔴' },
-};
+const getStatusStyles = (t) => ({
+  paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: t('common.paid'), icon: '✅' },
+  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: t('common.partial'), icon: '🟠' },
+  unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: t('common.due'), icon: '🔴' },
+});
 
 // ─── Chart Colors ────────────────────────────────────────────
 const CHART_COLORS = {
@@ -96,10 +97,10 @@ const CustomLineTooltip = ({ active, payload, label }) => {
   );
 };
 
-const CustomAreaTooltip = ({ active, payload, label }) => {
+const CustomAreaTooltip = ({ active, payload, label, t }) => {
   if (!active || !payload || !payload.length) return null;
-  const profitItem = payload.find(p => p.name === 'Profit');
-  const expenseItem = payload.find(p => p.name === 'Expenses');
+  const profitItem = payload.find(p => p.dataKey === 'Profit');
+  const expenseItem = payload.find(p => p.dataKey === 'Expenses');
   const profit = profitItem?.value || 0;
   const expenses = expenseItem?.value || 0;
   const netProfit = profit - expenses;
@@ -115,7 +116,7 @@ const CustomAreaTooltip = ({ active, payload, label }) => {
       ))}
       <div className="dashboard-tooltip-divider" />
       <div className="dashboard-tooltip-row" style={{ color: netProfit >= 0 ? '#00D9A6' : '#FF6B6B' }}>
-        <span>Net Profit: </span>
+        <span>{t('dashboard.netProfit')}: </span>
         <strong>{formatCurrency(netProfit)}</strong>
       </div>
     </div>
@@ -143,7 +144,7 @@ const CustomBarTooltip = ({ active, payload, label }) => {
         <div key={idx} className="dashboard-tooltip-row" style={{ color: entry.color }}>
           <span className="dashboard-tooltip-dot" style={{ background: entry.color }} />
           <span>{entry.name}: </span>
-          <strong>{entry.name === 'Revenue' ? formatCurrency(entry.value) : entry.value}</strong>
+          <strong>{entry.dataKey === 'Revenue' ? formatCurrency(entry.value) : entry.value}</strong>
         </div>
       ))}
     </div>
@@ -169,18 +170,18 @@ const CustomTopProductsTooltip = ({ active, payload, label }) => {
   );
 };
 
-const CustomPieTooltip = ({ active, payload }) => {
+const CustomPieTooltip = ({ active, payload, t, paymentMethodLabels }) => {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   return (
     <div className="dashboard-tooltip">
       <div className="dashboard-tooltip-row" style={{ color: payload[0].color }}>
         <span className="dashboard-tooltip-dot" style={{ background: payload[0].color }} />
-        <span>{data.name}: </span>
+        <span>{paymentMethodLabels[data.method] || data.name}: </span>
         <strong>{formatCurrency(data.value)}</strong>
       </div>
       <div className="dashboard-tooltip-row">
-        <span>Transactions: </span>
+        <span>{t('dashboard.transactions')}: </span>
         <strong>{data.count || 0}</strong>
       </div>
     </div>
@@ -189,6 +190,8 @@ const CustomPieTooltip = ({ active, payload }) => {
 
 const Dashboard = () => {
   const { t } = useTranslation();
+  const PAYMENT_METHOD_LABELS = getPaymentMethodLabels(t);
+  const STATUS_STYLES = getStatusStyles(t);
   const { user } = useSelector((state) => state.auth);
   const [stats, setStats] = useState(null);
   const [salesChart, setSalesChart] = useState([]);
@@ -239,7 +242,7 @@ const Dashboard = () => {
       setRecentPayments(Array.isArray(recentRes.data) ? recentRes.data : []);
     } catch (err) {
       console.error('Failed to fetch dashboard data', err);
-      setError(err.response?.data?.message || err.message || 'Failed to load dashboard data');
+      setError(err.response?.data?.message || err.message || t('dashboard.failedToLoadData'));
     } finally {
       setLoading(false);
     }
@@ -253,10 +256,10 @@ const Dashboard = () => {
 
   // Sales Period options
   const PERIOD_OPTIONS = [
-    { key: 1, label: 'Today' },
-    { key: 7, label: 'Last 7 Days' },
-    { key: 30, label: 'Last 30 Days' },
-    { key: 0, label: 'This Month' },
+    { key: 1, label: t('common.today') },
+    { key: 7, label: t('common.last7Days') },
+    { key: 30, label: t('common.last30Days') },
+    { key: 0, label: t('common.thisMonth') },
   ];
 
   const handlePeriodChange = (days) => {
@@ -277,10 +280,10 @@ const Dashboard = () => {
   }, [recentPayments, paymentFilter]);
 
   const FILTER_OPTIONS = [
-    { key: 'all', label: 'All' },
-    { key: 'paid', label: 'Paid' },
-    { key: 'partial', label: 'Partial' },
-    { key: 'unpaid', label: 'Due' },
+    { key: 'all', label: t('common.all') },
+    { key: 'paid', label: t('common.paid') },
+    { key: 'partial', label: t('common.partial') },
+    { key: 'unpaid', label: t('common.due') },
   ];
 
   // ─── Sales Chart Data ──────────────────────────────────────
@@ -296,12 +299,12 @@ const Dashboard = () => {
   // ─── Top Products Data ─────────────────────────────────────
   const topProductsData = useMemo(() => {
     return topProducts.slice(0, 5).map((p, index) => ({
-      name: p.name?.length > 20 ? p.name.substring(0, 20) + '...' : p.name || 'Unknown',
+      name: p.name?.length > 20 ? p.name.substring(0, 20) + '...' : p.name || t('common.unknown'),
       'Quantity Sold': p.totalQuantity || 0,
       Revenue: p.totalRevenue || 0,
       _index: index,
     }));
-  }, [topProducts]);
+  }, [topProducts, t]);
 
   // ─── Payment Distribution Data ─────────────────────────────
   const paymentData = useMemo(() => {
@@ -314,31 +317,31 @@ const Dashboard = () => {
   // ─── Category Data ─────────────────────────────────────────
   const categoryData = useMemo(() => {
     return salesByCategory.map(c => ({
-      name: c.name || 'Unknown',
+      name: c.name || t('common.unknown'),
       Revenue: c.revenue || 0,
     }));
-  }, [salesByCategory]);
+  }, [salesByCategory, t]);
 
   if (error) {
     return (
       <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
         <div className="premium-card p-5 text-center" style={{ maxWidth: '500px' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--danger)' }}><BiError /></div>
-          <h5 className="mb-2" style={{ fontWeight: 700 }}>Failed to Load Dashboard</h5>
+          <h5 className="mb-2" style={{ fontWeight: 700 }}>{t('dashboard.failedToLoad')}</h5>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{error}</p>
-          <button className="btn-premium btn-premium-primary" onClick={() => { setSalesPeriod(7); fetchDashboardData(); }}><BiRefresh /> Retry</button>
+          <button className="btn-premium btn-premium-primary" onClick={() => { setSalesPeriod(7); fetchDashboardData(); }}><BiRefresh /> {t('common.retry')}</button>
         </div>
       </div>
     );
   }
 
   const statCards = [
-    { icon: BiPackage, label: 'Total Products', value: stats?.totalProducts || 0, color: 'primary' },
-    { icon: BiCart, label: 'Total Sales', value: stats?.monthlySalesCount || 0, color: 'success' },
-    { icon: BiCreditCard, label: 'Total Due Amount', subtitle: 'Outstanding Receivables', value: stats?.customerDue || 0, color: 'warning', prefix: '₹' },
-    { icon: BiCar, label: 'Total Suppliers', value: stats?.totalSuppliers || 0, color: 'warning' },
-    { icon: BiDollar, label: "Today's Revenue", value: stats?.todaySales || 0, color: 'primary', prefix: '₹' },
-    { icon: BiError, label: 'Low Stock Products', value: stats?.lowStockProducts || 0, color: 'danger' },
+    { icon: BiPackage, label: t('dashboard.totalProducts'), value: stats?.totalProducts || 0, color: 'primary' },
+    { icon: BiCart, label: t('dashboard.totalSales'), value: stats?.monthlySalesCount || 0, color: 'success' },
+    { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), subtitle: t('dashboard.outstandingReceivables'), value: stats?.customerDue || 0, color: 'warning', prefix: '₹' },
+    { icon: BiCar, label: t('dashboard.totalSuppliers'), value: stats?.totalSuppliers || 0, color: 'warning' },
+    { icon: BiDollar, label: t('dashboard.todaysRevenue'), value: stats?.todaySales || 0, color: 'primary', prefix: '₹' },
+    { icon: BiError, label: t('dashboard.lowStockProducts'), value: stats?.lowStockProducts || 0, color: 'danger' },
   ];
 
   const formatValue = (card) => {
@@ -355,11 +358,11 @@ const Dashboard = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.dashboard')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Welcome back, {user?.name || 'User'}! Here's your overview.
+            {t('dashboard.welcomeMessage', { name: user?.name || t('common.user') })}
           </p>
         </div>
         <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => { setSalesPeriod(7); fetchDashboardData(); }}>
-          <BiRefresh /> Refresh
+          <BiRefresh /> {t('common.refresh')}
         </button>
       </div>
 
@@ -380,7 +383,7 @@ const Dashboard = () => {
             <div className="premium-card-header">
               <h6 className="mb-0" style={{ fontWeight: 600 }}>
                 <BiLineChart size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Sales Overview
+                {t('dashboard.salesOverview')}
               </h6>
               <div className="dashboard-period-filter">
                 {PERIOD_OPTIONS.map(opt => (
@@ -416,6 +419,7 @@ const Dashboard = () => {
                     <Line
                       type="monotone"
                       dataKey="Sales"
+                      name={t('nav.sales')}
                       stroke={CHART_COLORS.primary}
                       strokeWidth={3}
                       dot={false}
@@ -424,6 +428,7 @@ const Dashboard = () => {
                     <Line
                       type="monotone"
                       dataKey="Orders"
+                      name={t('dashboard.ordersLabel')}
                       stroke={CHART_COLORS.secondary}
                       strokeWidth={2}
                       dot={false}
@@ -432,6 +437,7 @@ const Dashboard = () => {
                     <Line
                       type="monotone"
                       dataKey="Profit"
+                      name={t('product.profit')}
                       stroke={CHART_COLORS.warning}
                       strokeWidth={2}
                       dot={false}
@@ -455,7 +461,7 @@ const Dashboard = () => {
             <div className="premium-card-header">
               <h6 className="mb-0" style={{ fontWeight: 600 }}>
                 <BiArea size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Profit vs Expense
+                {t('dashboard.profitVsExpense')}
               </h6>
             </div>
             <div className="premium-card-body">
@@ -485,10 +491,11 @@ const Dashboard = () => {
                       axisLine={false}
                       tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
                     />
-                    <Tooltip content={<CustomAreaTooltip />} />
+                    <Tooltip content={<CustomAreaTooltip t={t} />} />
                     <Area
                       type="monotone"
                       dataKey="Profit"
+                      name={t('product.profit')}
                       stroke={CHART_COLORS.secondary}
                       strokeWidth={2}
                       fill="url(#profitGradient)"
@@ -497,6 +504,7 @@ const Dashboard = () => {
                     <Area
                       type="monotone"
                       dataKey="Expenses"
+                      name={t('dashboard.expensesLabel')}
                       stroke={CHART_COLORS.danger}
                       strokeWidth={2}
                       fill="url(#expenseGradient)"
@@ -528,9 +536,9 @@ const Dashboard = () => {
             <div className="premium-card-header">
               <h6 className="mb-0" style={{ fontWeight: 600 }}>
                 <BiStar size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Top Selling Products
+                {t('dashboard.topSellingProducts')}
               </h6>
-              <span className="badge badge-success">This Month</span>
+              <span className="badge badge-success">{t('common.thisMonth')}</span>
             </div>
             <div className="premium-card-body">
               {topProductsData.length > 0 ? (
@@ -568,6 +576,7 @@ const Dashboard = () => {
                     <Tooltip content={<CustomTopProductsTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
                     <Bar
                       dataKey="Quantity Sold"
+                      name={t('dashboard.quantitySold')}
                       radius={[0, 8, 8, 0]}
                       animationDuration={900}
                       animationEasing="ease-out"
@@ -624,7 +633,7 @@ const Dashboard = () => {
                             <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip content={<CustomPieTooltip />} />
+                        <Tooltip content={<CustomPieTooltip t={t} paymentMethodLabels={PAYMENT_METHOD_LABELS} />} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -635,7 +644,7 @@ const Dashboard = () => {
                           className="dashboard-donut-legend-dot"
                           style={{ background: PIE_COLORS[index % PIE_COLORS.length] }}
                         />
-                        <span className="dashboard-donut-legend-name">{entry.name}</span>
+                        <span className="dashboard-donut-legend-name">{PAYMENT_METHOD_LABELS[entry.method] || entry.name}</span>
                         <span className="dashboard-donut-legend-value">{formatCurrency(entry.value)}</span>
                         <span className="dashboard-donut-legend-pct">{entry.percentage}%</span>
                       </div>
@@ -660,9 +669,9 @@ const Dashboard = () => {
             <div className="premium-card-header">
               <h6 className="mb-0" style={{ fontWeight: 600 }}>
                 <BiBarChartAlt size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Sales by Category
+                {t('dashboard.salesByCategory')}
               </h6>
-              <span className="badge badge-primary">This Month</span>
+              <span className="badge badge-primary">{t('common.thisMonth')}</span>
             </div>
             <div className="premium-card-body">
               {categoryData.length > 0 ? (
@@ -684,6 +693,7 @@ const Dashboard = () => {
                     <Tooltip content={<CustomBarTooltip />} />
                     <Bar
                       dataKey="Revenue"
+                      name={t('dashboard.revenue')}
                       radius={[6, 6, 0, 0]}
                       animationDuration={800}
                     >
@@ -711,13 +721,13 @@ const Dashboard = () => {
             <div className="rp-header-icon">
               <BiReceipt />
             </div>
-            <h6 className="mb-0" style={{ fontWeight: 600 }}>Recent Payments</h6>
+            <h6 className="mb-0" style={{ fontWeight: 600 }}>{t('dashboard.recentPayments')}</h6>
           </div>
           <button
             className="btn-premium btn-premium-secondary btn-premium-sm rp-view-all-btn"
             onClick={() => window.location.href = '/sales'}
           >
-            View All <BiRightArrowAlt size={14} style={{ marginLeft: 4 }} />
+            {t('common.viewAll')} <BiRightArrowAlt size={14} style={{ marginLeft: 4 }} />
           </button>
         </div>
 
@@ -738,7 +748,7 @@ const Dashboard = () => {
           {filteredPayments.length === 0 ? (
             <div className="rp-empty">
               <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
-              <p style={{ fontSize: '0.85rem', margin: 0 }}>No payments found</p>
+              <p style={{ fontSize: '0.85rem', margin: 0 }}>{t('dashboard.noPaymentsFound')}</p>
             </div>
           ) : (
             <>
@@ -747,9 +757,9 @@ const Dashboard = () => {
                 {filteredPayments.map((payment) => {
                   const st = STATUS_STYLES[payment.paymentStatus] || STATUS_STYLES.paid;
                   const pmtIcon = PAYMENT_METHOD_ICONS[payment.paymentMethod] || '💵';
-                  const pmtLabel = PAYMENT_METHOD_LABELS[payment.paymentMethod] || payment.paymentMethod?.toUpperCase() || 'CASH';
+                  const pmtLabel = PAYMENT_METHOD_LABELS[payment.paymentMethod] || payment.paymentMethod?.toUpperCase() || t('sale.cash');
                   const isNew = isToday(payment.createdAt);
-                  const customerName = payment.customer?.name || 'Walk-in Customer';
+                  const customerName = payment.customer?.name || t('dashboard.walkInCustomer');
                   const initial = customerName.charAt(0).toUpperCase();
 
                   return (
@@ -764,11 +774,11 @@ const Dashboard = () => {
                       <div className="rp-row__info">
                         <div className="rp-row__name-row">
                           <span className="rp-row__name">{customerName}</span>
-                          {isNew && <span className="rp-row__new-badge">New</span>}
+                          {isNew && <span className="rp-row__new-badge">{t('dashboard.new')}</span>}
                         </div>
                         <div className="rp-row__meta">
                           <span className="rp-row__meta-item">
-                            <BiHash size={10} /> {payment.invoiceNo || 'N/A'}
+                            <BiHash size={10} /> {payment.invoiceNo || t('common.notAvailable')}
                           </span>
                           <span className="rp-row__meta-dot">•</span>
                           <span className="rp-row__meta-item">
@@ -800,9 +810,9 @@ const Dashboard = () => {
                 {filteredPayments.map((payment) => {
                   const st = STATUS_STYLES[payment.paymentStatus] || STATUS_STYLES.paid;
                   const pmtIcon = PAYMENT_METHOD_ICONS[payment.paymentMethod] || '💵';
-                  const pmtLabel = PAYMENT_METHOD_LABELS[payment.paymentMethod] || payment.paymentMethod?.toUpperCase() || 'CASH';
+                  const pmtLabel = PAYMENT_METHOD_LABELS[payment.paymentMethod] || payment.paymentMethod?.toUpperCase() || t('sale.cash');
                   const isNew = isToday(payment.createdAt);
-                  const customerName = payment.customer?.name || 'Walk-in Customer';
+                  const customerName = payment.customer?.name || t('dashboard.walkInCustomer');
                   const initial = customerName.charAt(0).toUpperCase();
 
                   return (
@@ -818,7 +828,7 @@ const Dashboard = () => {
                           </div>
                           <div className="rp-mobile-card__name-row">
                             <span className="rp-mobile-card__name">{customerName}</span>
-                            {isNew && <span className="rp-mobile-card__new-badge">New</span>}
+                            {isNew && <span className="rp-mobile-card__new-badge">{t('dashboard.new')}</span>}
                           </div>
                         </div>
                         <div className="rp-mobile-card__amount">

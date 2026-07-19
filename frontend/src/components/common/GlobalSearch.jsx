@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { BiSearch, BiX, BiPackage, BiUser, BiBarcode, BiPhone } from 'react-icons/bi';
 
@@ -7,6 +8,7 @@ const DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 1;
 
 const GlobalSearch = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const containerRef = useRef(null);
   const inputRef = useRef(null);
@@ -135,7 +137,7 @@ const GlobalSearch = () => {
       <button
         type="button"
         className="global-search-mobile-toggle"
-        aria-label="Search"
+        aria-label={t('common.search')}
         onClick={() => {
           setMobileOpen(true);
           setTimeout(() => inputRef.current?.focus(), 0);
@@ -150,23 +152,23 @@ const GlobalSearch = () => {
           ref={inputRef}
           className="global-search-input"
           type="text"
-          placeholder="Search products, customers..."
+          placeholder={t('common.searchProductsCustomers')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { if (hasResults) setOpen(true); }}
           onKeyDown={handleKeyDown}
-          aria-label="Global search"
+          aria-label={t('common.globalSearch')}
           autoComplete="off"
         />
         {query && (
-          <button type="button" className="global-search-clear" onClick={clearSearch} aria-label="Clear search">
+          <button type="button" className="global-search-clear" onClick={clearSearch} aria-label={t('common.clearSearch')}>
             <BiX />
           </button>
         )}
         <button
           type="button"
           className="global-search-mobile-close"
-          aria-label="Close search"
+          aria-label={t('common.closeSearch')}
           onClick={() => { setMobileOpen(false); clearSearch(); }}
         >
           <BiX />
@@ -177,13 +179,13 @@ const GlobalSearch = () => {
         <div className="global-search-dropdown" role="listbox">
           {showEmpty && (
             <div className="global-search-empty">
-              No results found for "<strong>{term}</strong>"
+              {t('common.noResultsFor', { term })}
             </div>
           )}
 
           {results?.products.length > 0 && (
             <div className="global-search-group">
-              <div className="global-search-group-title">Products</div>
+              <div className="global-search-group-title">{t('nav.products')}</div>
               {results.products.map((p) => {
                 flatCursor += 1;
                 const idx = flatCursor;
@@ -218,7 +220,7 @@ const GlobalSearch = () => {
 
           {results?.customers.length > 0 && (
             <div className="global-search-group">
-              <div className="global-search-group-title">Customers</div>
+              <div className="global-search-group-title">{t('nav.customers')}</div>
               {results.customers.map((c) => {
                 flatCursor += 1;
                 const idx = flatCursor;
@@ -238,7 +240,7 @@ const GlobalSearch = () => {
                       <span className="global-search-item-sub"><BiPhone size={12} /> {c.phone}</span>
                     </span>
                     <span className="global-search-item-meta">
-                      {c.dueAmount > 0 && <span className="global-search-item-due">Due ₹{c.dueAmount}</span>}
+                      {c.dueAmount > 0 && <span className="global-search-item-due">{t('common.dueValue', { amount: c.dueAmount })}</span>}
                     </span>
                   </button>
                 );

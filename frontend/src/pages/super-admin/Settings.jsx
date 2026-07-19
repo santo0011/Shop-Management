@@ -35,9 +35,9 @@ const SuperAdminSettings = () => {
       {/* Page Header */}
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
-          <h4 className="mb-1" style={{ fontWeight: 800 }}>Settings</h4>
+          <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('superAdminSettingsPage.title')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage your account and preferences
+            {t('superAdminSettingsPage.subtitle')}
           </p>
         </div>
       </div>
@@ -56,10 +56,10 @@ const SuperAdminSettings = () => {
               }}>
                 {user?.name?.charAt(0)?.toUpperCase() || <BiUser />}
               </div>
-              <h5 className="mb-1" style={{ fontWeight: 700 }}>{user?.name || 'Super Admin'}</h5>
+              <h5 className="mb-1" style={{ fontWeight: 700 }}>{user?.name || t('superAdminSettingsPage.superAdmin')}</h5>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>{user?.email}</p>
               <span className="badge badge-primary mt-2" style={{ textTransform: 'capitalize' }}>
-                <BiShield style={{ marginRight: '4px' }} />Super Admin
+                <BiShield style={{ marginRight: '4px' }} />{t('superAdminSettingsPage.superAdmin')}
               </span>
             </div>
           </div>
@@ -79,12 +79,12 @@ const SuperAdminSettings = () => {
                   {mode === 'light' ? <BiSun /> : <BiMoon />}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Theme</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'capitalize' }}>{mode} Mode</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{t('superAdminSettingsPage.theme')}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{mode === 'light' ? t('superAdminSettingsPage.lightMode') : t('superAdminSettingsPage.darkMode')}</div>
                 </div>
               </div>
               <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={handleThemeToggle}>
-                {mode === 'light' ? <BiMoon /> : <BiSun />} Switch to {mode === 'light' ? 'Dark' : 'Light'}
+                {mode === 'light' ? <BiMoon /> : <BiSun />} {mode === 'light' ? t('superAdminSettingsPage.switchToDark') : t('superAdminSettingsPage.switchToLight')}
               </button>
             </div>
           </div>
@@ -101,7 +101,7 @@ const SuperAdminSettings = () => {
                   <BiGlobe />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Language</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{t('superAdminSettingsPage.language')}</div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                     {i18n.language === 'bn' ? 'বাংলা' : 'English'}
                   </div>

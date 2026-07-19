@@ -242,6 +242,7 @@ const getPaymentDistribution = async (req, res) => {
     };
 
     const result = distribution.map(d => ({
+      method: d._id,
       name: paymentLabels[d._id] || d._id,
       value: d.total,
       count: d.count,

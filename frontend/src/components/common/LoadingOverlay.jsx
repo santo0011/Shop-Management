@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Global loading overlay with a modern circular spinner.
@@ -15,7 +16,8 @@ import { useSelector } from 'react-redux';
 const SHOW_DELAY = 100; // ms — only show if loading takes longer than this
 
 const LoadingOverlay = () => {
-  const { globalLoading, text } = useSelector((state) => state.loading);
+  const { t } = useTranslation();
+  const { globalLoading } = useSelector((state) => state.loading);
   const [visible, setVisible] = useState(false);
   const timerRef = useRef(null);
 
@@ -92,7 +94,7 @@ const LoadingOverlay = () => {
             fontWeight: 500,
           }}
         >
-          {text}
+          {t('common.pleaseWait')}
         </p>
       </div>
     </div>

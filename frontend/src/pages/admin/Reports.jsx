@@ -14,34 +14,34 @@ import {
 } from 'react-icons/bi';
 
 // ─── Filter presets ───────────────────────────────────────────
-const PRESETS = [
-  { key: 'today', label: 'Today' },
-  { key: '7d', label: 'Last 7 Days' },
-  { key: '30d', label: 'Last 30 Days' },
-  { key: 'month', label: 'This Month' },
-  { key: 'custom', label: 'Custom Range' },
+const getPresets = (t) => [
+  { key: 'today', label: t('common.today') },
+  { key: '7d', label: t('common.last7Days') },
+  { key: '30d', label: t('common.last30Days') },
+  { key: 'month', label: t('common.thisMonth') },
+  { key: 'custom', label: t('common.customRange') },
 ];
 
-const PAYMENT_METHODS = [
-  { key: 'all', label: 'All Payment Methods' },
-  { key: 'cash', label: 'Cash' },
-  { key: 'card', label: 'Card' },
-  { key: 'upi', label: 'UPI' },
-  { key: 'mobile_banking', label: 'Mobile Banking' },
-  { key: 'due', label: 'Due' },
+const getPaymentMethods = (t) => [
+  { key: 'all', label: t('reportsPage.allPaymentMethods') },
+  { key: 'cash', label: t('sale.cash') },
+  { key: 'card', label: t('sale.card') },
+  { key: 'upi', label: t('sale.upi') },
+  { key: 'mobile_banking', label: t('sale.mobileBanking') },
+  { key: 'due', label: t('common.due') },
 ];
 
 const PAYMENT_METHOD_ICONS = { cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦', due: '🧾' };
-const PAYMENT_METHOD_LABELS = { cash: 'Cash', card: 'Card', upi: 'UPI', mobile_banking: 'Mobile Banking', due: 'Due' };
+const getPaymentMethodLabels = (t) => ({ cash: t('sale.cash'), card: t('sale.card'), upi: t('sale.upi'), mobile_banking: t('sale.mobileBanking'), due: t('common.due') });
 
 // ─── Top Products Chart Palette (one color per product bar) ──
 const TOP_PRODUCTS_COLORS = ['#2a78d6', '#1baf7a', '#eb6834', '#7c5cd6', '#e34948'];
 
-const STATUS_STYLES = {
-  paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: 'Paid' },
-  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: 'Partial' },
-  unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: 'Due' },
-};
+const getStatusStyles = (t) => ({
+  paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: t('common.paid') },
+  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: t('common.partial') },
+  unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: t('common.due') },
+});
 
 const EMPTY_ANALYTICS = {
   summary: { totalOrders: 0, totalSales: 0, totalRevenue: 0, totalProfit: 0, totalCustomers: 0, lowStockProducts: 0 },
@@ -119,6 +119,10 @@ const drawPdfTable = (doc, startY, headers, rows, colWidths) => {
 
 const Reports = () => {
   const { t } = useTranslation();
+  const PRESETS = getPresets(t);
+  const PAYMENT_METHODS = getPaymentMethods(t);
+  const PAYMENT_METHOD_LABELS = getPaymentMethodLabels(t);
+  const STATUS_STYLES = getStatusStyles(t);
 
   const [filters, setFilters] = useState({ preset: '30d', customStart: '', customEnd: '', paymentMethod: 'all' });
   const [analytics, setAnalytics] = useState(EMPTY_ANALYTICS);
@@ -142,7 +146,7 @@ const Reports = () => {
       const { data } = await api.get(`/reports/analytics?${params.toString()}`, { _skipLoading: true });
       setAnalytics(data);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to load report data');
+      setError(err.response?.data?.message || err.message || t('reportsPage.failedToLoadData'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -187,9 +191,9 @@ const Reports = () => {
   }), [analytics, theme]);
 
   const trendSeries = useMemo(() => [
-    { name: 'Sales', data: analytics.daily.map(d => Number((d.sales || 0).toFixed(2))) },
-    { name: 'Profit', data: analytics.daily.map(d => Number((d.profit || 0).toFixed(2))) },
-  ], [analytics]);
+    { name: t('nav.sales'), data: analytics.daily.map(d => Number((d.sales || 0).toFixed(2))) },
+    { name: t('product.profit'), data: analytics.daily.map(d => Number((d.profit || 0).toFixed(2))) },
+  ], [analytics, t]);
 
   const topProductsChartOptions = useMemo(() => ({
     chart: { type: 'bar', height: 320, toolbar: { show: false }, foreColor: chartColors.textSecondary },
@@ -198,24 +202,24 @@ const Reports = () => {
     legend: { show: false },
     xaxis: { categories: analytics.topProducts.map(p => p.name), labels: { style: { fontSize: '11px' } } },
     yaxis: { labels: { style: { fontSize: '11px' } } },
-    tooltip: { y: { formatter: (val) => `${val} sold` } },
+    tooltip: { y: { formatter: (val) => t('reportsPage.soldCount', { count: val }) } },
     grid: { borderColor: chartColors.gridColor },
     theme: { mode: theme },
     colors: TOP_PRODUCTS_COLORS,
-  }), [analytics, theme]);
+  }), [analytics, theme, t]);
 
   const topProductsChartSeries = useMemo(() => [
-    { name: 'Quantity Sold', data: analytics.topProducts.map(p => p.quantity) },
-  ], [analytics]);
+    { name: t('dashboard.quantitySold'), data: analytics.topProducts.map(p => p.quantity) },
+  ], [analytics, t]);
 
   // ─── Summary cards (reuses the shared StatCard component) ─────────────
   const summaryCards = [
-    { icon: BiCart, label: 'Total Sales', value: money(analytics.summary.totalSales), color: 'primary', rawValue: analytics.summary.totalSales, isCurrency: true },
-    { icon: BiDollar, label: 'Total Revenue', value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
-    { icon: BiTrendingUp, label: 'Total Profit', value: money(analytics.summary.totalProfit), color: 'info', rawValue: analytics.summary.totalProfit, isCurrency: true },
-    { icon: BiReceipt, label: 'Total Orders', value: count(analytics.summary.totalOrders), color: 'warning', rawValue: analytics.summary.totalOrders, isCurrency: false },
-    { icon: BiCreditCard, label: 'Total Due Amount', value: money(analytics.summary.totalDue), color: 'warning', rawValue: analytics.summary.totalDue, isCurrency: true },
-    { icon: BiError, label: 'Low Stock Products', value: count(analytics.summary.lowStockProducts), color: 'danger', rawValue: analytics.summary.lowStockProducts, isCurrency: false },
+    { icon: BiCart, label: t('dashboard.totalSales'), value: money(analytics.summary.totalSales), color: 'primary', rawValue: analytics.summary.totalSales, isCurrency: true },
+    { icon: BiDollar, label: t('reportsPage.totalRevenue'), value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
+    { icon: BiTrendingUp, label: t('dashboard.totalProfit'), value: money(analytics.summary.totalProfit), color: 'info', rawValue: analytics.summary.totalProfit, isCurrency: true },
+    { icon: BiReceipt, label: t('dashboard.totalOrders'), value: count(analytics.summary.totalOrders), color: 'warning', rawValue: analytics.summary.totalOrders, isCurrency: false },
+    { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), value: money(analytics.summary.totalDue), color: 'warning', rawValue: analytics.summary.totalDue, isCurrency: true },
+    { icon: BiError, label: t('dashboard.lowStockProducts'), value: count(analytics.summary.lowStockProducts), color: 'danger', rawValue: analytics.summary.lowStockProducts, isCurrency: false },
   ];
 
   // ─── Export ─────────────────────────────────────────────────────────
@@ -236,12 +240,12 @@ const Reports = () => {
   const exportCSV = () => {
     if (!range) return;
     const rows = [
-      ['Date', 'Orders', 'Sales', 'Profit'],
+      [t('common.date'), t('dashboard.ordersLabel'), t('nav.sales'), t('product.profit')],
       ...analytics.daily.map(d => [d.date, d.orders, d.sales.toFixed(2), d.profit.toFixed(2)]),
     ];
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     downloadBlob(csv, 'text/csv;charset=utf-8;', `sales-report-${fileTag()}.csv`);
-    showToast.success('CSV exported');
+    showToast.success(t('toast.csvExported'));
   };
 
   const exportExcel = () => {
@@ -249,15 +253,15 @@ const Reports = () => {
     const wb = XLSX.utils.book_new();
     const s = analytics.summary;
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{
-      'Total Sales': s.totalSales, 'Total Revenue': s.totalRevenue, 'Total Profit': s.totalProfit,
-      'Total Orders': s.totalOrders, 'Total Customers': s.totalCustomers, 'Low Stock Products': s.lowStockProducts,
-    }]), 'Summary');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.daily), 'Daily Sales');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.topProducts), 'Top Products');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.paymentMethods), 'Payment Methods');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.lowStockProducts), 'Low Stock Products');
+      [t('dashboard.totalSales')]: s.totalSales, [t('reportsPage.totalRevenue')]: s.totalRevenue, [t('dashboard.totalProfit')]: s.totalProfit,
+      [t('dashboard.totalOrders')]: s.totalOrders, [t('dashboard.totalCustomers')]: s.totalCustomers, [t('dashboard.lowStockProducts')]: s.lowStockProducts,
+    }]), t('report.periodSummary'));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.daily), t('report.dailySales'));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.topProducts), t('dashboard.topProducts'));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.paymentMethods), t('reportsPage.paymentMethods'));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analytics.lowStockProducts), t('dashboard.lowStockProducts'));
     XLSX.writeFile(wb, `sales-report-${fileTag()}.xlsx`);
-    showToast.success('Excel file exported');
+    showToast.success(t('toast.excelExported'));
   };
 
   const exportPDF = async () => {
@@ -269,7 +273,7 @@ const Reports = () => {
       const s = analytics.summary;
 
       doc.setFontSize(16);
-      doc.text('Sales Report', 14, 15);
+      doc.text(t('reportsPage.salesReportTitle'), 14, 15);
       doc.setFontSize(10);
       doc.setTextColor(100);
       doc.text(`${formatDate(range.startDate)} - ${formatDate(range.endDate)}`, 14, 22);
@@ -278,33 +282,33 @@ const Reports = () => {
       let y = 32;
       doc.setFontSize(11);
       const summaryLines = [
-        `Total Sales: ${money(s.totalSales)}`,
-        `Total Revenue: ${money(s.totalRevenue)}`,
-        `Total Profit: ${money(s.totalProfit)}`,
-        `Total Orders: ${count(s.totalOrders)}`,
-        `Total Due Amount: ${money(s.totalDue)}`,
-        `Low Stock Products: ${count(s.lowStockProducts)}`,
+        `${t('dashboard.totalSales')}: ${money(s.totalSales)}`,
+        `${t('reportsPage.totalRevenue')}: ${money(s.totalRevenue)}`,
+        `${t('dashboard.totalProfit')}: ${money(s.totalProfit)}`,
+        `${t('dashboard.totalOrders')}: ${count(s.totalOrders)}`,
+        `${t('dashboard.totalDueAmount')}: ${money(s.totalDue)}`,
+        `${t('dashboard.lowStockProducts')}: ${count(s.lowStockProducts)}`,
       ];
       summaryLines.forEach((line) => { doc.text(line, 14, y); y += 6; });
       y += 4;
 
       doc.setFontSize(12);
-      doc.text('Daily Sales Summary', 14, y);
+      doc.text(`${t('report.dailySales')} ${t('report.periodSummary')}`, 14, y);
       y += 6;
-      y = drawPdfTable(doc, y, ['Date', 'Orders', 'Sales', 'Profit'],
+      y = drawPdfTable(doc, y, [t('common.date'), t('dashboard.ordersLabel'), t('nav.sales'), t('product.profit')],
         analytics.daily.map(d => [d.date, d.orders, money(d.sales), money(d.profit)]));
 
       if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 15; }
       doc.setFontSize(12);
-      doc.text('Top Selling Products', 14, y);
+      doc.text(t('dashboard.topSellingProducts'), 14, y);
       y += 6;
-      drawPdfTable(doc, y, ['Product', 'Category', 'Qty Sold', 'Revenue'],
+      drawPdfTable(doc, y, [t('reportsPage.product'), t('product.category'), t('dashboard.quantitySold'), t('dashboard.revenue')],
         analytics.topProducts.map(p => [p.name, p.category, p.quantity, money(p.revenue)]));
 
       doc.save(`sales-report-${fileTag()}.pdf`);
-      showToast.success('PDF exported');
+      showToast.success(t('toast.pdfExported'));
     } catch (err) {
-      showToast.error('Failed to export PDF');
+      showToast.error(t('toast.pdfExportFailed'));
     } finally {
       setExportingPdf(false);
     }
@@ -317,9 +321,9 @@ const Reports = () => {
       <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
         <div className="premium-card p-5 text-center" style={{ maxWidth: '500px' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--danger)' }}><BiError /></div>
-          <h5 className="mb-2" style={{ fontWeight: 700 }}>Failed to Load Reports</h5>
+          <h5 className="mb-2" style={{ fontWeight: 700 }}>{t('reportsPage.failedToLoad')}</h5>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{error}</p>
-          <button className="btn-premium btn-premium-primary" onClick={() => fetchAnalytics(true)}><BiRefresh /> Retry</button>
+          <button className="btn-premium btn-premium-primary" onClick={() => fetchAnalytics(true)}><BiRefresh /> {t('common.retry')}</button>
         </div>
       </div>
     );
@@ -332,11 +336,11 @@ const Reports = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.reports')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Sales, profit, and performance analytics for your shop.
+            {t('reportsPage.subtitle')}
           </p>
         </div>
         <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false)} disabled={refreshing}>
-          {refreshing ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} Refresh
+          {refreshing ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('common.refresh')}
         </button>
       </div>
 
@@ -354,7 +358,7 @@ const Reports = () => {
         <div className="premium-card-body reports-filter-card-body">
           <div className="reports-filter-bar">
             <div className="sales-date-filters-scroll">
-              <div className="sales-date-segmented" role="tablist" aria-label="Report period">
+              <div className="sales-date-segmented" role="tablist" aria-label={t('reportsPage.reportPeriod')}>
                 {PRESETS.map((p, idx) => (
                   <React.Fragment key={p.key}>
                     <button
@@ -395,14 +399,14 @@ const Reports = () => {
             </select>
 
             <div className="reports-export-group">
-              <button type="button" className="btn-premium btn-premium-secondary btn-premium-sm" onClick={exportCSV} title="Export CSV">
-                <BiFile /> CSV
+              <button type="button" className="btn-premium btn-premium-secondary btn-premium-sm" onClick={exportCSV} title={`${t('common.export')} ${t('common.csv')}`}>
+                <BiFile /> {t('common.csv')}
               </button>
-              <button type="button" className="btn-premium btn-premium-secondary btn-premium-sm" onClick={exportExcel} title="Export Excel">
-                <BiSpreadsheet /> Excel
+              <button type="button" className="btn-premium btn-premium-secondary btn-premium-sm" onClick={exportExcel} title={`${t('common.export')} ${t('common.excel')}`}>
+                <BiSpreadsheet /> {t('common.excel')}
               </button>
-              <button type="button" className="btn-premium btn-premium-secondary btn-premium-sm" onClick={exportPDF} disabled={exportingPdf} title="Export PDF">
-                {exportingPdf ? <span className="spinner-border spinner-border-sm" /> : <BiFileBlank />} PDF
+              <button type="button" className="btn-premium btn-premium-secondary btn-premium-sm" onClick={exportPDF} disabled={exportingPdf} title={`${t('common.export')} ${t('common.pdf')}`}>
+                {exportingPdf ? <span className="spinner-border spinner-border-sm" /> : <BiFileBlank />} {t('common.pdf')}
               </button>
             </div>
           </div>
@@ -416,9 +420,9 @@ const Reports = () => {
             <div className="premium-card-header">
               <h6 className="mb-0" style={{ fontWeight: 600 }}>
                 <BiTrendingUp size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Sales vs Profit Trend
+                {t('report.salesVsProfitTrend')}
               </h6>
-              <span className="badge badge-primary">{PRESETS.find(p => p.key === filters.preset)?.label || 'Custom'}</span>
+              <span className="badge badge-primary">{PRESETS.find(p => p.key === filters.preset)?.label || t('common.custom')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
               {analytics.daily.length > 0 ? (
@@ -437,9 +441,9 @@ const Reports = () => {
             <div className="premium-card-header">
               <h6 className="mb-0" style={{ fontWeight: 600 }}>
                 <BiStar size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Top Selling Products
+                {t('dashboard.topSellingProducts')}
               </h6>
-              <span className="badge badge-success">By Quantity</span>
+              <span className="badge badge-success">{t('report.byQuantity')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
               {analytics.topProducts.length > 0 ? (
@@ -458,19 +462,19 @@ const Reports = () => {
       {/* Top 10 Best Selling Products */}
       <div className="desktop-table mb-3">
         <DataTable
-          title="Top 10 Best Selling Products"
+          title={t('reportsPage.top10Products')}
           icon={BiStar}
           data={analytics.topProducts}
           rowKey={(row) => row.productId}
           searchKeys={['name', 'category']}
-          searchPlaceholder="Search products..."
-          emptyMessage="No sales in this period"
+          searchPlaceholder={t('product.searchProductsPlaceholder')}
+          emptyMessage={t('reportsPage.noSalesPeriod')}
           pageSize={10}
           columns={[
-            { key: 'name', label: 'Product', sortable: true },
-            { key: 'category', label: 'Category', sortable: true },
-            { key: 'quantity', label: 'Qty Sold', sortable: true, align: 'right' },
-            { key: 'revenue', label: 'Revenue', sortable: true, align: 'right', render: (row) => money(row.revenue) },
+            { key: 'name', label: t('reportsPage.product'), sortable: true },
+            { key: 'category', label: t('product.category'), sortable: true },
+            { key: 'quantity', label: t('dashboard.quantitySold'), sortable: true, align: 'right' },
+            { key: 'revenue', label: t('dashboard.revenue'), sortable: true, align: 'right', render: (row) => money(row.revenue) },
           ]}
         />
       </div>
@@ -479,12 +483,12 @@ const Reports = () => {
       <div className="mobile-cards mb-3">
         <h5 className="mb-2" style={{ fontWeight: 700, fontSize: '0.95rem' }}>
           <BiStar size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-          Top 10 Best Selling Products
+          {t('reportsPage.top10Products')}
         </h5>
         {analytics.topProducts.length === 0 ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
-            No sales in this period
+            {t('reportsPage.noSalesPeriod')}
           </div>
         ) : analytics.topProducts.map((product) => (
           <ExpandableCard
@@ -493,7 +497,7 @@ const Reports = () => {
               <>
                 <div className="expandable-card__compact-row">
                   <span className="expandable-card__name">{product.name}</span>
-                  <span className="expandable-card__price">{product.quantity} sold</span>
+                  <span className="expandable-card__price">{t('reportsPage.soldCount', { count: product.quantity })}</span>
                 </div>
                 <div className="expandable-card__meta">
                   <span className="expandable-card__meta-item">
@@ -506,22 +510,22 @@ const Reports = () => {
             expanded={
               <div className="expandable-card__rows">
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Product</span>
+                  <span className="expandable-card__row-label">{t('reportsPage.product')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{product.name}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Category</span>
+                  <span className="expandable-card__row-label">{t('product.category')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{product.category || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Qty Sold</span>
+                  <span className="expandable-card__row-label">{t('dashboard.quantitySold')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{product.quantity}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Revenue</span>
+                  <span className="expandable-card__row-label">{t('dashboard.revenue')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{money(product.revenue)}</span>
                 </div>
@@ -535,38 +539,38 @@ const Reports = () => {
       <div className="reports-summary-line mb-3">
         <BiTrendingUp />
         <span>
-          {PRESETS.find(p => p.key === filters.preset)?.label || 'Custom'} Summary:{' '}
-          <strong>{count(analytics.summary.totalOrders)}</strong> Orders{' · '}
-          <strong>{money(analytics.summary.totalSales)}</strong> Sales{' · '}
-          <strong>{money(analytics.summary.totalProfit)}</strong> Profit
+          {PRESETS.find(p => p.key === filters.preset)?.label || t('common.custom')} {t('report.periodSummary')}:{' '}
+          <strong>{count(analytics.summary.totalOrders)}</strong> {t('dashboard.ordersLabel')}{' · '}
+          <strong>{money(analytics.summary.totalSales)}</strong> {t('nav.sales')}{' · '}
+          <strong>{money(analytics.summary.totalProfit)}</strong> {t('product.profit')}
         </span>
       </div>
 
       {/* Recent Sales */}
       <div className="desktop-table">
         <DataTable
-          title="Recent Sales"
+          title={t('sale.recentSales')}
           icon={BiReceipt}
           data={analytics.recentTransactions}
           rowKey={(row) => row._id}
           searchKeys={['invoiceNo']}
-          searchPlaceholder="Search invoice..."
-          emptyMessage="No transactions in this period"
+          searchPlaceholder={t('sale.searchInvoicePlaceholder')}
+          emptyMessage={t('empty.noTransactions')}
           pageSize={10}
           columns={[
-            { key: 'invoiceNo', label: 'Invoice', sortable: true },
-            { key: 'createdAt', label: 'Date', sortable: true, render: (row) => formatDateTime(row.createdAt) },
+            { key: 'invoiceNo', label: t('sale.invoice'), sortable: true },
+            { key: 'createdAt', label: t('common.date'), sortable: true, render: (row) => formatDateTime(row.createdAt) },
             {
-              key: 'customer', label: 'Customer', sortable: false,
-              render: (row) => row.customer?.name || 'Walk-in Customer',
+              key: 'customer', label: t('sale.customer'), sortable: false,
+              render: (row) => row.customer?.name || t('dashboard.walkInCustomer'),
             },
-            { key: 'totalAmount', label: 'Amount', sortable: true, align: 'right', render: (row) => money(row.totalAmount) },
+            { key: 'totalAmount', label: t('common.amount'), sortable: true, align: 'right', render: (row) => money(row.totalAmount) },
             {
-              key: 'paymentMethod', label: 'Payment', sortable: true,
+              key: 'paymentMethod', label: t('sale.paymentMethod'), sortable: true,
               render: (row) => `${PAYMENT_METHOD_ICONS[row.paymentMethod] || '💵'} ${PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod}`,
             },
             {
-              key: 'paymentStatus', label: 'Status', sortable: true,
+              key: 'paymentStatus', label: t('common.status'), sortable: true,
               render: (row) => {
                 const st = STATUS_STYLES[row.paymentStatus] || STATUS_STYLES.paid;
                 return <span className="reports-status-pill" style={{ background: st.bg, color: st.color }}>{st.label}</span>;
@@ -580,12 +584,12 @@ const Reports = () => {
       <div className="mobile-cards">
         <h5 className="mb-2" style={{ fontWeight: 700, fontSize: '0.95rem' }}>
           <BiReceipt size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-          Recent Sales
+          {t('sale.recentSales')}
         </h5>
         {analytics.recentTransactions.length === 0 ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🧾</div>
-            No transactions in this period
+            {t('empty.noTransactions')}
           </div>
         ) : analytics.recentTransactions.map((tx) => {
           const st = STATUS_STYLES[tx.paymentStatus] || STATUS_STYLES.paid;
@@ -595,13 +599,13 @@ const Reports = () => {
               compact={
                 <>
                   <div className="expandable-card__compact-row">
-                    <span className="expandable-card__name">{tx.invoiceNo || 'N/A'}</span>
+                    <span className="expandable-card__name">{tx.invoiceNo || t('common.notAvailable')}</span>
                     <span className="expandable-card__price">{money(tx.totalAmount)}</span>
                   </div>
                   <div className="expandable-card__meta">
                     <span className="expandable-card__meta-item">
                       <BiUser />
-                      <span>{tx.customer?.name || 'Walk-in'}</span>
+                      <span>{tx.customer?.name || t('dashboard.walkInCustomer')}</span>
                     </span>
                     <span className="reports-status-pill" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
                   </div>
@@ -610,32 +614,32 @@ const Reports = () => {
               expanded={
                 <div className="expandable-card__rows">
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Invoice</span>
+                    <span className="expandable-card__row-label">{t('sale.invoice')}</span>
                     <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{tx.invoiceNo || 'N/A'}</span>
+                    <span className="expandable-card__row-value">{tx.invoiceNo || t('common.notAvailable')}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Date</span>
+                    <span className="expandable-card__row-label">{t('common.date')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value">{formatDateTime(tx.createdAt)}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Customer</span>
+                    <span className="expandable-card__row-label">{t('sale.customer')}</span>
                     <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{tx.customer?.name || 'Walk-in Customer'}</span>
+                    <span className="expandable-card__row-value">{tx.customer?.name || t('dashboard.walkInCustomer')}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Amount</span>
+                    <span className="expandable-card__row-label">{t('common.amount')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value">{money(tx.totalAmount)}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Payment</span>
+                    <span className="expandable-card__row-label">{t('sale.paymentMethod')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value">{PAYMENT_METHOD_ICONS[tx.paymentMethod] || '💵'} {PAYMENT_METHOD_LABELS[tx.paymentMethod] || tx.paymentMethod}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Status</span>
+                    <span className="expandable-card__row-label">{t('common.status')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value"><span className="reports-status-pill" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span>
                   </div>

@@ -17,17 +17,17 @@ import {
 } from 'react-icons/bi';
 
 // ─── Printer helpers ─────────────────────────────────────────
-const PRINTER_SIZES = [
-  { key: 'a4', label: 'A4 Invoice', icon: <BiFile size={18} />, width: '210mm' },
-  { key: '80mm', label: '80mm Thermal', icon: <BiGridSmall size={18} />, width: '80mm' },
-  { key: '58mm', label: '58mm Thermal', icon: <BiGridSmall size={18} />, width: '58mm' },
+const getPrinterSizes = (t) => [
+  { key: 'a4', label: t('salesPage.printModal.printerSizes.a4'), icon: <BiFile size={18} />, width: '210mm' },
+  { key: '80mm', label: t('salesPage.printModal.printerSizes.thermal80'), icon: <BiGridSmall size={18} />, width: '80mm' },
+  { key: '58mm', label: t('salesPage.printModal.printerSizes.thermal58'), icon: <BiGridSmall size={18} />, width: '58mm' },
 ];
 
-const INVOICE_TEMPLATES = [
-  { key: 'classic', label: 'Classic', icon: <BiLayout size={18} /> },
-  { key: 'modern', label: 'Modern', icon: <BiFile size={18} /> },
-  { key: 'minimal', label: 'Minimal', icon: <BiGridSmall size={18} /> },
-  { key: 'grocery', label: 'Grocery Store', icon: <BiStore size={18} /> },
+const getInvoiceTemplates = (t) => [
+  { key: 'classic', label: t('salesPage.printModal.templates.classic'), icon: <BiLayout size={18} /> },
+  { key: 'modern', label: t('salesPage.printModal.templates.modern'), icon: <BiFile size={18} /> },
+  { key: 'minimal', label: t('salesPage.printModal.templates.minimal'), icon: <BiGridSmall size={18} /> },
+  { key: 'grocery', label: t('salesPage.printModal.templates.grocery'), icon: <BiStore size={18} /> },
 ];
 
 const getSalesPrinterSettings = () => {
@@ -67,36 +67,36 @@ const formatAddress = (addr) => {
   return String(addr);
 };
 
-const STATUS_STYLES = {
-  paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: 'Paid' },
-  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: 'Partial' },
-  unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: 'Due' },
-};
+const getStatusStyles = (t) => ({
+  paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: t('common.paid') },
+  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: t('common.partial') },
+  unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: t('common.due') },
+});
 
-const RETURN_STYLES = {
-  none: { bg: 'rgba(158, 158, 158, 0.1)', color: '#9e9e9e', label: 'No Return' },
-  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: 'Partial Return' },
-  full: { bg: 'rgba(108, 99, 255, 0.12)', color: '#6C63FF', label: 'Fully Returned' },
-};
+const getReturnStyles = (t) => ({
+  none: { bg: 'rgba(158, 158, 158, 0.1)', color: '#9e9e9e', label: t('salesPage.returnStatusLabels.none') },
+  partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: t('salesPage.returnStatusLabels.partial') },
+  full: { bg: 'rgba(108, 99, 255, 0.12)', color: '#6C63FF', label: t('salesPage.returnStatusLabels.full') },
+});
 
 const PAYMENT_ICONS = {
   cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦',
 };
 
-const STATUS_OPTIONS = [
-  { key: '', label: 'All Status' },
-  { key: 'paid', label: 'Paid' },
-  { key: 'partial', label: 'Partial' },
-  { key: 'unpaid', label: 'Due' },
+const getStatusOptions = (t) => [
+  { key: '', label: t('salesPage.status.all') },
+  { key: 'paid', label: t('common.paid') },
+  { key: 'partial', label: t('common.partial') },
+  { key: 'unpaid', label: t('common.due') },
 ];
 
 // ─── Date Quick Filters ───────────────────────────────────────
-const DATE_PRESETS = [
-  { key: 'today', label: 'Today' },
-  { key: '7d', label: 'Last 7 Days' },
-  { key: '30d', label: 'Last 30 Days' },
-  { key: 'month', label: 'This Month' },
-  { key: 'custom', label: 'Custom Range' },
+const getDatePresets = (t) => [
+  { key: 'today', label: t('common.today') },
+  { key: '7d', label: t('common.last7Days') },
+  { key: '30d', label: t('common.last30Days') },
+  { key: 'month', label: t('common.thisMonth') },
+  { key: 'custom', label: t('common.customRange') },
 ];
 
 // Local calendar date (no timezone shift) — matches what <input type="date"> produces
@@ -128,6 +128,9 @@ const SalesInvoiceQR = ({ invoiceNo, size = 60 }) => {
 
 // ─── Print Settings Modal ────────────────────────────────────
 const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownload, onClose }) => {
+  const { t } = useTranslation();
+  const printerSizesList = getPrinterSizes(t);
+  const invoiceTemplatesList = getInvoiceTemplates(t);
   const [size, setSize] = useState(currentSettings.size);
   const [template, setTemplate] = useState(currentSettings.template);
   const [quickPrint, setQuickPrint] = useState(currentSettings.quickPrint || false);
@@ -154,33 +157,54 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
       const pdf = new jsPDF('p', 'mm', isA4 ? 'a4' : [imgWidth, Math.max(imgHeight + 10, 50)]);
       pdf.addImage(imgData, 'PNG', isA4 ? 10 : 0, isA4 ? 10 : 5, imgWidth, imgHeight);
       pdf.save(`Invoice-${sale?.invoiceNo || 'sale'}.pdf`);
-      showToast.success('PDF downloaded successfully');
+      showToast.success(t('salesPage.printModal.pdfDownloaded'));
     } catch (err) {
-      showToast.error('Failed to generate PDF');
+      showToast.error(t('salesPage.printModal.pdfFailed'));
     }
   };
 
   const isThermal = size === '58mm' || size === '80mm';
   const isA4 = size === 'a4';
-  const cashierName = shopInfo?.cashierName || 'Cashier';
-  const footerMsg = shopInfo?.settings?.receiptFooter || 'Thank you for your purchase!';
-  const taxName = shopInfo?.settings?.taxName || 'VAT';
+  const cashierName = shopInfo?.cashierName || t('salesPage.invoice.cashier');
+  const footerMsg = shopInfo?.settings?.receiptFooter || t('salesPage.invoice.thankYou');
+  const taxName = shopInfo?.settings?.taxName || t('salesPage.invoice.vat');
 
   const renderPreview = () => {
     if (!sale) return null;
+    const itemLabel = t('salesPage.invoice.item');
+    const qtyLabel = t('salesPage.invoice.qty');
+    const priceLabel = t('common.price');
+    const totalLabel = t('common.total');
+    const subtotalLabel = t('sale.subtotal');
+    const discountLabel = t('sale.discount');
+    const grandTotalLabel = t('salesPage.invoice.grandTotal');
+    const paidLabel = t('common.paid');
+    const dueLabel = t('common.due');
+    const paymentLabel = t('salesPage.invoice.payment');
+    const invoiceColonLabel = t('salesPage.invoice.invoiceLabel');
+    const dateColonLabel = t('salesPage.invoice.dateLabel');
+    const customerColonLabel = t('salesPage.invoice.customerLabel');
+    const walkInCustomerLabel = t('dashboard.walkInCustomer');
+    const shopNamePlaceholder = t('salesPage.invoice.shopNamePlaceholder');
+    const groceryStorePlaceholder = t('salesPage.invoice.groceryStorePlaceholder');
+    const telLabel = t('salesPage.invoice.tel');
+    const visitAgainLabel = t('salesPage.invoice.visitAgain');
+    const visitAgainGroceryLabel = t('salesPage.invoice.visitAgainGrocery');
+    const paymentText = sale.paymentMethod ? sale.paymentMethod.toUpperCase() : t('sale.cash').toUpperCase();
+
     const itemsHtml = sale.items?.map((item, idx) => {
       if (template === 'grocery') {
-        return `<div class="receipt-grocery-item"><span class="receipt-grocery-item-name">${item.product?.name || item.name || 'Item'}</span><span class="receipt-grocery-item-qty">${item.quantity}${item.unit || ''}</span><span class="receipt-grocery-item-price">₹${Number(item.price).toFixed(2)}</span><span class="receipt-grocery-item-total">₹${Number(item.total).toFixed(2)}</span></div>`;
+        return `<div class="receipt-grocery-item"><span class="receipt-grocery-item-name">${item.product?.name || item.name || itemLabel}</span><span class="receipt-grocery-item-qty">${item.quantity}${item.unit || ''}</span><span class="receipt-grocery-item-price">₹${Number(item.price).toFixed(2)}</span><span class="receipt-grocery-item-total">₹${Number(item.total).toFixed(2)}</span></div>`;
       }
       if (template === 'minimal') {
-        return `<div class="receipt-minimal-item"><div class="receipt-minimal-item-name">${item.product?.name || item.name || 'Item'}</div><div class="receipt-minimal-item-line"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span class="receipt-minimal-item-total">₹${Number(item.total).toFixed(2)}</span></div></div>`;
+        return `<div class="receipt-minimal-item"><div class="receipt-minimal-item-name">${item.product?.name || item.name || itemLabel}</div><div class="receipt-minimal-item-line"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span class="receipt-minimal-item-total">₹${Number(item.total).toFixed(2)}</span></div></div>`;
       }
-      return `<tr><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px">${item.product?.name || item.name || 'Item'}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:center">${item.quantity} ${item.unit || ''}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.price).toFixed(2)}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.total).toFixed(2)}</td></tr>`;
+      return `<tr><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px">${item.product?.name || item.name || itemLabel}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:center">${item.quantity} ${item.unit || ''}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.price).toFixed(2)}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.total).toFixed(2)}</td></tr>`;
     }).join('') || '';
 
-    const discountHtml = Number(sale.discount || 0) > 0 ? `<div class="${template === 'modern' ? 'receipt-modern-discount' : template === 'minimal' ? 'receipt-minimal-discount' : template === 'grocery' ? 'receipt-grocery-discount' : ''} total-row"><span>Discount</span><span>-₹${Number(sale.discount).toFixed(2)}</span></div>` : '';
+    const discountHtml = Number(sale.discount || 0) > 0 ? `<div class="${template === 'modern' ? 'receipt-modern-discount' : template === 'minimal' ? 'receipt-minimal-discount' : template === 'grocery' ? 'receipt-grocery-discount' : ''} total-row"><span>${discountLabel}</span><span>-₹${Number(sale.discount).toFixed(2)}</span></div>` : '';
     const taxHtml = Number(sale.tax || 0) > 0 ? `<div class="total-row"><span>${taxName}</span><span>₹${Number(sale.tax).toFixed(2)}</span></div>` : '';
-    const dueHtml = Number(sale.dueAmount || 0) > 0 ? `<div class="total-row"><span>Due</span><span style="color:#e74c3c;font-weight:700">₹${Number(sale.dueAmount).toFixed(2)}</span></div>` : '';
+    const dueHtml = Number(sale.dueAmount || 0) > 0 ? `<div class="total-row"><span>${dueLabel}</span><span style="color:#e74c3c;font-weight:700">₹${Number(sale.dueAmount).toFixed(2)}</span></div>` : '';
 
     if (template === 'classic') {
       return `
@@ -189,34 +213,34 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
             <div class="receipt-logo" style="margin-bottom:4px">
               ${shopInfo?.logo ? `<img src="${shopInfo.logo}" style="max-width:60px;max-height:60px;border-radius:50%" />` : `<div style="width:50px;height:50px;margin:0 auto;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D9A6);display:flex;align-items:center;justify-content:center;color:#fff">🛒</div>`}
             </div>
-            <h2 style="font-size:${isThermal?'13px':'18px'};font-weight:800;margin-bottom:2px">${shopInfo?.shopName || 'Shop Name'}</h2>
+            <h2 style="font-size:${isThermal?'13px':'18px'};font-weight:800;margin-bottom:2px">${shopInfo?.shopName || shopNamePlaceholder}</h2>
             <p style="font-size:${isThermal?'9px':'11px'};color:#666">${formatAddress(shopInfo?.address)}</p>
-            ${shopInfo?.phone ? `<p style="font-size:9px;color:#555">Tel: ${shopInfo.phone}</p>` : ''}
+            ${shopInfo?.phone ? `<p style="font-size:9px;color:#555">${telLabel} ${shopInfo.phone}</p>` : ''}
             <div style="border-top:1px dashed #999;margin:6px 0"></div>
           </div>
           <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">Invoice:</span><span style="font-weight:700">${sale.invoiceNo || 'N/A'}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">Date:</span><span style="font-weight:700">${formatDate(sale.createdAt)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">Customer:</span><span style="font-weight:700">${sale.customer?.name || 'Walk-in Customer'}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">${invoiceColonLabel}</span><span style="font-weight:700">${sale.invoiceNo || t('common.notAvailable')}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">${dateColonLabel}</span><span style="font-weight:700">${formatDate(sale.createdAt)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">${customerColonLabel}</span><span style="font-weight:700">${sale.customer?.name || walkInCustomerLabel}</span></div>
             <div style="border-top:1px dashed #999;margin:6px 0"></div>
           </div>
           <table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:${isThermal?'10px':'12px'}">
-            <tr><th style="text-align:left;border-bottom:1px solid #333;padding:4px 6px">Item</th><th style="text-align:center;border-bottom:1px solid #333;padding:4px 6px">Qty</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">Price</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">Total</th></tr>
+            <tr><th style="text-align:left;border-bottom:1px solid #333;padding:4px 6px">${itemLabel}</th><th style="text-align:center;border-bottom:1px solid #333;padding:4px 6px">${qtyLabel}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${priceLabel}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${totalLabel}</th></tr>
             ${itemsHtml}
           </table>
           <div style="border-top:1px dashed #999;margin:6px 0"></div>
           <div style="font-size:${isThermal?'11px':'13px'}">
-            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Subtotal</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
+            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
             ${discountHtml}${taxHtml}
-            <div class="total-row grand-total" style="display:flex;justify-content:space-between;font-size:${isThermal?'12px':'16px'};font-weight:800;border-top:1px dashed #999;padding-top:4px;margin-top:4px"><span>Grand Total</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Paid</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+            <div class="total-row grand-total" style="display:flex;justify-content:space-between;font-size:${isThermal?'12px':'16px'};font-weight:800;border-top:1px dashed #999;padding-top:4px;margin-top:4px"><span>${grandTotalLabel}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>${paidLabel}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
             ${dueHtml}
-            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Payment</span><span style="color:#2ecc71;font-weight:800">${sale.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>${paymentLabel}</span><span style="color:#2ecc71;font-weight:800">${paymentText}</span></div>
           </div>
           <div style="border-top:1px dashed #999;margin:6px 0"></div>
           <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#888;margin-top:6px">
             <p>${footerMsg}</p>
-            <p style="font-size:${isThermal?'8px':'9px'}">Visit us again!</p>
+            <p style="font-size:${isThermal?'8px':'9px'}">${visitAgainLabel}</p>
             ${!isThermal ? `<div style="display:flex;justify-content:center;margin-top:8px"><SalesInvoiceQR invoiceNo="${sale.invoiceNo}" size="${isA4 ? 70 : 50}" /></div>` : ''}
           </div>
         </div>`;
@@ -228,34 +252,34 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
             <div style="display:flex;align-items:center;gap:8px">
               ${shopInfo?.logo ? `<img src="${shopInfo.logo}" style="max-width:40px;max-height:40px;border-radius:8px" />` : `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D9A6);display:flex;align-items:center;justify-content:center;color:#fff">🛒</div>`}
-              <div><h2 style="font-size:${isThermal?'12px':'16px'};font-weight:800;margin:0">${shopInfo?.shopName || 'Shop Name'}</h2><p style="font-size:${isThermal?'8px':'10px'};color:#666;margin:0">${formatAddress(shopInfo?.address)}</p></div>
+              <div><h2 style="font-size:${isThermal?'12px':'16px'};font-weight:800;margin:0">${shopInfo?.shopName || shopNamePlaceholder}</h2><p style="font-size:${isThermal?'8px':'10px'};color:#666;margin:0">${formatAddress(shopInfo?.address)}</p></div>
             </div>
-            <span style="background:#6C63FF;color:#fff;padding:2px 8px;border-radius:4px;font-size:${isThermal?'8px':'11px'};font-weight:700">#${sale.invoiceNo || 'N/A'}</span>
+            <span style="background:#6C63FF;color:#fff;padding:2px 8px;border-radius:4px;font-size:${isThermal?'8px':'11px'};font-weight:700">#${sale.invoiceNo || t('common.notAvailable')}</span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:6px">
             <span>📅 ${formatDate(sale.createdAt)}</span>
             <span>👤 ${cashierName}</span>
-            <span>👥 ${sale.customer?.name || 'Walk-in Customer'}</span>
+            <span>👥 ${sale.customer?.name || walkInCustomerLabel}</span>
           </div>
           <div style="border-top:2px solid #6C63FF;margin:6px 0"></div>
           <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-weight:700;font-size:${isThermal?'9px':'11px'};padding:4px 0;border-bottom:1px solid #ddd"><span>Item</span><span>Qty</span><span>Price</span><span>Total</span></div>
+            <div style="display:flex;justify-content:space-between;font-weight:700;font-size:${isThermal?'9px':'11px'};padding:4px 0;border-bottom:1px solid #ddd"><span>${itemLabel}</span><span>${qtyLabel}</span><span>${priceLabel}</span><span>${totalLabel}</span></div>
             ${sale.items?.map(item => `
               <div style="padding:4px 0;border-bottom:1px dotted #eee">
-                <div style="font-weight:600;font-size:${isThermal?'9px':'11px'}">${item.product?.name || item.name || 'Item'}</div>
+                <div style="font-weight:600;font-size:${isThermal?'9px':'11px'}">${item.product?.name || item.name || itemLabel}</div>
                 <div style="display:flex;justify-content:space-between;font-size:${isThermal?'8px':'10px'};color:#555"><span>${item.quantity} ${item.unit || ''}</span><span>₹${Number(item.price).toFixed(2)}</span><span style="font-weight:700;color:#333">₹${Number(item.total).toFixed(2)}</span></div>
-                ${item.discount > 0 ? `<div style="font-size:8px;color:#e74c3c">-${item.discount}% off</div>` : ''}
+                ${item.discount > 0 ? `<div style="font-size:8px;color:#e74c3c">-${item.discount}% ${t('salesPage.invoice.off')}</div>` : ''}
               </div>
             `).join('')}
           </div>
           <div style="border-top:2px solid #6C63FF;margin:6px 0"></div>
           <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>Subtotal</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
             ${discountHtml}${taxHtml}
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'18px'};font-weight:800;border-top:2px solid #6C63FF;padding-top:4px;margin-top:4px"><span>Grand Total</span><span style="color:#6C63FF">₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>Paid</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'18px'};font-weight:800;border-top:2px solid #6C63FF;padding-top:4px;margin-top:4px"><span>${grandTotalLabel}</span><span style="color:#6C63FF">₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>${paidLabel}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
             ${dueHtml}
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>Payment</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${sale.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>${paymentLabel}</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${paymentText}</span></div>
           </div>
           <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#888;margin-top:6px">
             <p>${footerMsg}</p>
@@ -268,29 +292,29 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
       return `
         <div class="receipt receipt-minimal" style="max-width:${isA4 ? '100%' : isThermal ? '72mm' : '100%'};${isA4 ? 'padding:10mm' : ''}">
           <div style="text-align:center;margin-bottom:6px">
-            <h2 style="font-size:${isThermal?'14px':'20px'};font-weight:300;letter-spacing:1px;text-transform:uppercase;margin:0">${shopInfo?.shopName || 'Shop Name'}</h2>
+            <h2 style="font-size:${isThermal?'14px':'20px'};font-weight:300;letter-spacing:1px;text-transform:uppercase;margin:0">${shopInfo?.shopName || shopNamePlaceholder}</h2>
             <p style="font-size:${isThermal?'8px':'10px'};color:#999;margin:0">${formatAddress(shopInfo?.address)}</p>
             ${shopInfo?.phone ? `<p style="font-size:8px;color:#999">${shopInfo.phone}</p>` : ''}
           </div>
           <div style="border-top:1px solid #333;margin:4px 0"></div>
           <div style="margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>Invoice</span><span>${sale.invoiceNo || 'N/A'}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>Date</span><span>${formatDate(sale.createdAt)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>Customer</span><span>${sale.customer?.name || 'Walk-in'}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>${t('sale.invoice')}</span><span>${sale.invoiceNo || t('common.notAvailable')}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>${t('common.date')}</span><span>${formatDate(sale.createdAt)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>${t('sale.customer')}</span><span>${sale.customer?.name || t('salesPage.invoice.walkIn')}</span></div>
           </div>
           <div style="border-top:1px solid #333;margin:4px 0"></div>
           <div style="margin-bottom:4px">${sale.items?.map(item => `
             <div style="padding:3px 0;border-bottom:1px dotted #eee">
-              <div style="font-size:${isThermal?'9px':'11px'};font-weight:500">${item.product?.name || item.name || 'Item'}</div>
+              <div style="font-size:${isThermal?'9px':'11px'};font-weight:500">${item.product?.name || item.name || itemLabel}</div>
               <div style="display:flex;justify-content:space-between;font-size:${isThermal?'8px':'10px'};color:#666"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span style="font-weight:600;color:#333">₹${Number(item.total).toFixed(2)}</span></div>
             </div>
           `).join('')}</div>
           <div style="border-top:1px solid #333;margin:4px 0"></div>
           <div style="margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>Subtotal</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
             ${discountHtml}${taxHtml}
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'16px'};font-weight:800;border-top:1px solid #333;padding-top:4px;margin-top:4px"><span>Total</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>Paid</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'16px'};font-weight:800;border-top:1px solid #333;padding-top:4px;margin-top:4px"><span>${totalLabel}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${paidLabel}</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
             ${dueHtml}
           </div>
           <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#999;margin-top:6px;font-style:italic"><p>${footerMsg}</p></div>
@@ -302,33 +326,33 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
       <div class="receipt receipt-grocery" style="max-width:${isA4 ? '100%' : isThermal ? '72mm' : '100%'};${isA4 ? 'padding:10mm' : ''}">
         <div style="text-align:center;margin-bottom:6px">
           ${shopInfo?.logo ? `<img src="${shopInfo.logo}" style="max-width:40px;max-height:40px;border-radius:50%;margin-bottom:4px" />` : `<div style="width:40px;height:40px;margin:0 auto 4px;border-radius:50%;background:linear-gradient(135deg,#2ecc71,#00D9A6);display:flex;align-items:center;justify-content:center;color:#fff">🛒</div>`}
-          <h2 style="font-size:${isThermal?'13px':'18px'};font-weight:800;color:#2ecc71;margin:0">${shopInfo?.shopName || 'Grocery Store'}</h2>
+          <h2 style="font-size:${isThermal?'13px':'18px'};font-weight:800;color:#2ecc71;margin:0">${shopInfo?.shopName || groceryStorePlaceholder}</h2>
           <p style="font-size:${isThermal?'8px':'10px'};color:#666;margin:0">${formatAddress(shopInfo?.address)}</p>
           ${shopInfo?.phone ? `<p style="font-size:9px;color:#333">📞 ${shopInfo.phone}</p>` : ''}
         </div>
         <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
         <div style="margin-bottom:4px">
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:2px"><span>🧾 ${sale.invoiceNo || 'N/A'}</span><span>📅 ${formatDate(sale.createdAt)}</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:2px"><span>👤 ${sale.customer?.name || 'Walk-in Customer'}</span><span>👨‍💼 ${cashierName}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:2px"><span>🧾 ${sale.invoiceNo || t('common.notAvailable')}</span><span>📅 ${formatDate(sale.createdAt)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:2px"><span>👤 ${sale.customer?.name || walkInCustomerLabel}</span><span>👨‍💼 ${cashierName}</span></div>
         </div>
         <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
         <div style="margin-bottom:4px">
-          <div style="display:flex;font-weight:700;font-size:${isThermal?'9px':'11px'};border-bottom:1px solid #2ecc71;padding-bottom:3px;margin-bottom:3px;color:#2ecc71"><span style="flex:2">Item</span><span style="flex:0.6;text-align:center">Qty</span><span style="flex:0.7;text-align:right">₹</span><span style="flex:0.7;text-align:right">Total</span></div>
+          <div style="display:flex;font-weight:700;font-size:${isThermal?'9px':'11px'};border-bottom:1px solid #2ecc71;padding-bottom:3px;margin-bottom:3px;color:#2ecc71"><span style="flex:2">${itemLabel}</span><span style="flex:0.6;text-align:center">${qtyLabel}</span><span style="flex:0.7;text-align:right">₹</span><span style="flex:0.7;text-align:right">${totalLabel}</span></div>
           ${itemsHtml}
         </div>
         <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
         <div style="margin-bottom:4px">
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>Subtotal</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
           ${discountHtml}${taxHtml}
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'16px'};font-weight:800;color:#2ecc71;border-top:1px solid #2ecc71;padding-top:4px;margin-top:4px"><span>Total</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>Paid</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'16px'};font-weight:800;color:#2ecc71;border-top:1px solid #2ecc71;padding-top:4px;margin-top:4px"><span>${totalLabel}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${paidLabel}</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
           ${dueHtml}
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>Payment</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${sale.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${paymentLabel}</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${paymentText}</span></div>
         </div>
         <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
         <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#2ecc71;margin-top:6px">
           <p>🛒 ${footerMsg}</p>
-          <p style="font-size:8px;color:#888">Visit again for fresh groceries 🥦🍎</p>
+          <p style="font-size:8px;color:#888">${visitAgainGroceryLabel}</p>
           ${!isThermal ? `<div style="display:flex;justify-content:center;margin-top:8px"><SalesInvoiceQR invoiceNo="${sale.invoiceNo}" size="${isA4 ? 70 : 50}" /></div>` : ''}
         </div>
       </div>`;
@@ -342,7 +366,7 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
         <div className="printer-settings-header">
           <div className="printer-settings-header-left">
             <div className="printer-settings-icon"><BiPrinter size={22} /></div>
-            <h3>Print Invoice</h3>
+            <h3>{t('salesPage.printModal.title')}</h3>
           </div>
           <button className="printer-settings-close" onClick={onClose}><BiX size={20} /></button>
         </div>
@@ -351,9 +375,9 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
             <div className="col-md-4">
               {/* Settings */}
               <div className="printer-settings-group">
-                <label className="printer-settings-label">Paper Size</label>
+                <label className="printer-settings-label">{t('salesPage.printModal.paperSize')}</label>
                 <div className="printer-settings-options" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
-                  {PRINTER_SIZES.map(s => (
+                  {printerSizesList.map(s => (
                     <button key={s.key} className={`printer-settings-option ${size === s.key ? 'active' : ''}`} onClick={() => setSize(s.key)}>
                       {s.icon}<span>{s.label}</span>
                     </button>
@@ -361,11 +385,11 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
                 </div>
               </div>
               <div className="printer-settings-group">
-                <label className="printer-settings-label">Invoice Design</label>
+                <label className="printer-settings-label">{t('salesPage.printModal.invoiceDesign')}</label>
                 <div className="printer-settings-options" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
-                  {INVOICE_TEMPLATES.map(t => (
-                    <button key={t.key} className={`printer-settings-option ${template === t.key ? 'active' : ''}`} onClick={() => setTemplate(t.key)}>
-                      {t.icon}<span>{t.label}</span>
+                  {invoiceTemplatesList.map(tpl => (
+                    <button key={tpl.key} className={`printer-settings-option ${template === tpl.key ? 'active' : ''}`} onClick={() => setTemplate(tpl.key)}>
+                      {tpl.icon}<span>{tpl.label}</span>
                     </button>
                   ))}
                 </div>
@@ -377,12 +401,12 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
                     checked={quickPrint}
                     onChange={(e) => setQuickPrint(e.target.checked)}
                   />
-                  <span>Use saved settings & skip popup</span>
+                  <span>{t('salesPage.printModal.useSavedSettings')}</span>
                 </label>
               </div>
             </div>
             <div className="col-md-8">
-              <label className="printer-settings-label">Preview</label>
+              <label className="printer-settings-label">{t('salesPage.printModal.preview')}</label>
               <div
                 className="sales-print-preview invoice-theme"
                 style={{
@@ -406,9 +430,9 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
           </div>
         </div>
         <div className="printer-settings-footer">
-          <button className="printer-settings-btn printer-settings-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleDownload}><BiDownload size={16} /> PDF</button>
-          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleApplyAndPrint}><BiPrinter size={16} /> Print</button>
+          <button className="printer-settings-btn printer-settings-btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleDownload}><BiDownload size={16} /> {t('common.pdf')}</button>
+          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleApplyAndPrint}><BiPrinter size={16} /> {t('common.print')}</button>
         </div>
       </div>
     </div>
@@ -418,9 +442,11 @@ const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownlo
 // ─── View Drawer (uses standard drawer classes with smooth animation) ─────────
 const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice }) => {
   const { t } = useTranslation();
+  const statusStyles = getStatusStyles(t);
+  const returnStyles = getReturnStyles(t);
 
-  const st = sale ? (STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid) : null;
-  const rs = sale ? (RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none) : null;
+  const st = sale ? (statusStyles[sale.paymentStatus] || statusStyles.paid) : null;
+  const rs = sale ? (returnStyles[sale.returnStatus] || returnStyles.none) : null;
   const pmtIcon = sale ? (PAYMENT_ICONS[sale.paymentMethod] || '💵') : null;
   const allReturns = sale?.returns || [];
   const totalRefunded = allReturns.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
@@ -430,7 +456,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiReceipt size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />Invoice Details</h5>
+          <h5><BiReceipt size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />{t('salesPage.drawer.title')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
@@ -453,7 +479,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                   <BiReceipt size={28} />
                 </div>
                 <h4 style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                  {sale.invoiceNo || 'N/A'}
+                  {sale.invoiceNo || t('common.notAvailable')}
                 </h4>
                 <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                   {formatDate(sale.createdAt)}
@@ -472,27 +498,27 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
                     <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(108,99,255,0.1)', color: '#6C63FF' }}><BiUser size={18} /></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Customer</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customer?.name || 'Walk-in Customer'}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('sale.customer')}</span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customer?.name || t('dashboard.walkInCustomer')}</span>
                       {sale.customer?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {sale.customer.phone}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
                     <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(0,217,166,0.1)', color: '#00D9A6' }}><BiStore size={18} /></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Shop</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.shopName || 'Shop Name'}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.shop')}</span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</span>
                       {shopInfo?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {shopInfo.phone}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
                     <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(255,181,69,0.1)', color: '#F39C12' }}><BiCreditCard size={18} /></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Payment</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {sale.paymentMethod?.toUpperCase() || 'CASH'}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.payment')}</span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {sale.paymentMethod ? sale.paymentMethod.toUpperCase() : t('sale.cash').toUpperCase()}</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                        Paid: <strong style={{ color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
-                        {sale.dueAmount > 0 && <> | Due: <strong style={{ color: '#FF6B6B' }}>₹{Number(sale.dueAmount).toFixed(2)}</strong></>}
+                        {t('common.paid')}: <strong style={{ color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
+                        {sale.dueAmount > 0 && <> | {t('common.due')}: <strong style={{ color: '#FF6B6B' }}>₹{Number(sale.dueAmount).toFixed(2)}</strong></>}
                       </span>
                     </div>
                   </div>
@@ -502,21 +528,21 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
               {/* Items */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                  <BiCart size={16} /><span>Items ({sale.items?.length || 0})</span>
+                  <BiCart size={16} /><span>{t('salesPage.drawer.itemsCount', { count: sale.items?.length || 0 })}</span>
                 </div>
                 <div style={{ borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                   <div style={{ display: 'flex', padding: '0.45rem 0.7rem', background: 'var(--bg-primary)', fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-color)' }}>
-                    <span style={{ flex: 2 }}>Item</span>
-                    <span style={{ flex: 0.5, textAlign: 'center' }}>Qty</span>
-                    <span style={{ flex: 0.6, textAlign: 'center' }}>Rtn</span>
-                    <span style={{ flex: 0.7, textAlign: 'right' }}>Price</span>
-                    <span style={{ flex: 0.7, textAlign: 'right' }}>Total</span>
+                    <span style={{ flex: 2 }}>{t('salesPage.invoice.item')}</span>
+                    <span style={{ flex: 0.5, textAlign: 'center' }}>{t('salesPage.invoice.qty')}</span>
+                    <span style={{ flex: 0.6, textAlign: 'center' }}>{t('salesPage.drawer.rtn')}</span>
+                    <span style={{ flex: 0.7, textAlign: 'right' }}>{t('common.price')}</span>
+                    <span style={{ flex: 0.7, textAlign: 'right' }}>{t('common.total')}</span>
                   </div>
                   {sale.items?.map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', padding: '0.45rem 0.7rem', fontSize: '0.78rem', borderBottom: idx < sale.items.length - 1 ? '1px solid var(--border-light)' : 'none', background: 'var(--bg-card)' }}>
                       <span style={{ flex: 2, fontWeight: 600, wordBreak: 'break-word' }}>
-                        {item.product?.name || item.name || 'Item'}
-                        {item.discount > 0 && <span style={{ display: 'block', color: '#e74c3c', fontSize: '0.6rem', fontWeight: 600 }}>-{item.discount}% off</span>}
+                        {item.product?.name || item.name || t('salesPage.invoice.item')}
+                        {item.discount > 0 && <span style={{ display: 'block', color: '#e74c3c', fontSize: '0.6rem', fontWeight: 600 }}>-{item.discount}% {t('salesPage.invoice.off')}</span>}
                       </span>
                       <span style={{ flex: 0.5, textAlign: 'center', color: 'var(--text-secondary)' }}>{item.quantity}</span>
                       <span style={{ flex: 0.6, textAlign: 'center', color: (item.returnedQty || 0) > 0 ? '#6C63FF' : 'var(--text-muted)', fontWeight: (item.returnedQty || 0) > 0 ? 700 : 400 }}>
@@ -533,32 +559,32 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                    <span>Subtotal</span><span>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
+                    <span>{t('sale.subtotal')}</span><span>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
                   </div>
                   {Number(sale.discount || 0) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#e74c3c' }}>
-                      <span>Discount</span><span>-₹{Number(sale.discount).toFixed(2)}</span>
+                      <span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span>
                     </div>
                   )}
                   {Number(sale.tax || 0) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                      <span>Tax</span><span>₹{Number(sale.tax).toFixed(2)}</span>
+                      <span>{t('sale.tax')}</span><span>₹{Number(sale.tax).toFixed(2)}</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))', fontSize: '0.9rem', color: '#fff', fontWeight: 700, boxShadow: '0 2px 10px rgba(108,99,255,0.2)' }}>
-                    <span>Grand Total</span><span style={{ fontSize: '1.05rem', fontWeight: 800 }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                    <span>{t('salesPage.invoice.grandTotal')}</span><span style={{ fontSize: '1.05rem', fontWeight: 800 }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#2ecc71', fontWeight: 600 }}>
-                    <span>Paid</span><span>₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
+                    <span>{t('common.paid')}</span><span>₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
                   </div>
                   {Number(sale.dueAmount || 0) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#FF6B6B', fontWeight: 600 }}>
-                      <span>Due</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span>
+                      <span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span>
                     </div>
                   )}
                   {totalRefunded > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#6C63FF', fontWeight: 600 }}>
-                      <span>Total Refunded</span><span>₹{Number(totalRefunded).toFixed(2)}</span>
+                      <span>{t('salesPage.totalRefund')}</span><span>₹{Number(totalRefunded).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -568,7 +594,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
               {allReturns.length > 0 && (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                    <BiUndo size={16} /><span>Return History ({allReturns.length})</span>
+                    <BiUndo size={16} /><span>{t('salesPage.drawer.returnHistory', { count: allReturns.length })}</span>
                   </div>
                   {allReturns.map((ret, rIdx) => (
                     <div key={rIdx} style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'rgba(108,99,255,0.04)', border: '1px solid rgba(108,99,255,0.1)', marginBottom: 8 }}>
@@ -578,16 +604,16 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                       </div>
                       {ret.items.map((ritem, riIdx) => (
                         <div key={riIdx} style={{ padding: '4px 0', borderBottom: riIdx < ret.items.length - 1 ? '1px solid var(--border-light)' : 'none' }}>
-                          <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{ritem.productName || 'Item'}</span>
+                          <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{ritem.productName || t('salesPage.invoice.item')}</span>
                           <div style={{ display: 'flex', gap: 12, fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 1 }}>
-                            <span>Qty: {ritem.quantity}</span>
-                            <span>Refund: ₹{Number(ritem.refundAmount).toFixed(2)}</span>
+                            <span>{t('salesPage.invoice.qty')}: {ritem.quantity}</span>
+                            <span>{t('salesPage.refund')}: ₹{Number(ritem.refundAmount).toFixed(2)}</span>
                           </div>
                           {ritem.reason && <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 2 }}>{ritem.reason}</span>}
                         </div>
                       ))}
                       <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(108,99,255,0.1)' }}>
-                        Total Refund: <strong style={{ color: 'var(--primary)', marginLeft: 4 }}>₹{Number(ret.totalRefund).toFixed(2)}</strong>
+                        {t('salesPage.totalRefund')}: <strong style={{ color: 'var(--primary)', marginLeft: 4 }}>₹{Number(ret.totalRefund).toFixed(2)}</strong>
                       </div>
                     </div>
                   ))}
@@ -597,7 +623,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
               {sale.notes && (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                    <BiNote size={16} /><span>Notes</span>
+                    <BiNote size={16} /><span>{t('common.notes')}</span>
                   </div>
                   <p style={{ padding: '0.65rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,181,69,0.06)', border: '1px solid rgba(255,181,69,0.12)', fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{sale.notes}</p>
                 </div>
@@ -606,11 +632,11 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
           )}
         </div>
         <div className="drawer-footer">
-          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>Close</button>
+          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.close')}</button>
           {sale && (
             <>
-              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice?.(sale.invoiceNo)} title="Copy Invoice Number"><BiCopy size={16} /></button>
-              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint?.(sale)}><BiPrinter size={16} /> Reprint</button>
+              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice?.(sale.invoiceNo)} title={t('salesPage.copyInvoiceNumber')}><BiCopy size={16} /></button>
+              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint?.(sale)}><BiPrinter size={16} /> {t('salesPage.reprint')}</button>
             </>
           )}
         </div>
@@ -621,6 +647,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
 
 // ─── Return Drawer (uses standard drawer classes with smooth animation) ──────
 const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
+  const { t } = useTranslation();
   const [returnItems, setReturnItems] = useState([]);
   const [refundMethod, setRefundMethod] = useState('cash');
   const [reason, setReason] = useState('');
@@ -631,7 +658,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
     if (sale && open) {
       setReturnItems((sale.items || []).map(item => ({
         productId: item.product?._id || item.product,
-        productName: item.product?.name || item.name || 'Item',
+        productName: item.product?.name || item.name || t('salesPage.invoice.item'),
         soldQty: item.quantity || 0,
         returnedQty: item.returnedQty || 0,
         maxReturnable: Math.max(0, (item.quantity || 0) - (item.returnedQty || 0)),
@@ -681,7 +708,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
   };
 
   const handleSubmit = async () => {
-    if (!hasItems) { showToast.error('Select at least one item to return'); return; }
+    if (!hasItems) { showToast.error(t('salesPage.returnDrawer.selectAtLeastOneItem')); return; }
     setProcessing(true);
     try {
       const { data } = await api.post(`/sales/${sale._id}/return`, {
@@ -692,11 +719,11 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
         })),
         reason, refundMethod,
       });
-      showToast.success('Return processed successfully');
+      showToast.success(t('salesPage.returnDrawer.returnProcessedSuccess'));
       onReturnProcessed?.(data.sale);
       onClose();
     } catch (err) {
-      showToast.error(err.response?.data?.message || 'Return failed');
+      showToast.error(err.response?.data?.message || t('salesPage.returnDrawer.returnFailed'));
     } finally { setProcessing(false); }
   };
 
@@ -707,7 +734,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiUndo size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />Process Return</h5>
+          <h5><BiUndo size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />{t('salesPage.returnDrawer.title')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
@@ -730,7 +757,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                   <BiUndo size={28} />
                 </div>
                 <h4 style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                  {sale.invoiceNo || 'N/A'}
+                  {sale.invoiceNo || t('common.notAvailable')}
                 </h4>
                 <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {formatDate(sale.createdAt)}
@@ -740,8 +767,8 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
               {allFullyReturned ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <BiCheck size={48} style={{ color: 'var(--secondary)', marginBottom: 12 }} />
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>All Items Returned</h4>
-                  <p style={{ fontSize: '0.85rem', margin: 0 }}>All items in this invoice have been fully returned.</p>
+                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{t('salesPage.returnDrawer.allReturnedTitle')}</h4>
+                  <p style={{ fontSize: '0.85rem', margin: 0 }}>{t('salesPage.returnDrawer.allReturnedDesc')}</p>
                 </div>
               ) : (
                 <>
@@ -768,7 +795,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                           justifyContent: 'center',
                         }}
                       >
-                        {allSelected ? <><BiTrash size={16} /> Clear All</> : <><BiCheck size={16} /> Return All Products</>}
+                        {allSelected ? <><BiTrash size={16} /> {t('salesPage.returnDrawer.clearAll')}</> : <><BiCheck size={16} /> {t('salesPage.returnDrawer.returnAllProducts')}</>}
                       </button>
                     </div>
                   )}
@@ -776,24 +803,24 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                   {/* Items to return */}
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                      <BiPackage size={16} /><span>Select Items to Return</span>
+                      <BiPackage size={16} /><span>{t('salesPage.returnDrawer.selectItemsToReturn')}</span>
                     </div>
                     {returnItems.map((item, idx) => (
                       <div key={idx} style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.productName}</span>
-                          {item.maxReturnable <= 0 && <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 10 }}>Fully Returned</span>}
+                          {item.maxReturnable <= 0 && <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 10 }}>{t('salesPage.returnStatusLabels.full')}</span>}
                         </div>
                         <div style={{ display: 'flex', gap: 12, fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
-                          <span>Sold: <strong style={{ color: 'var(--text-primary)' }}>{item.soldQty}</strong></span>
-                          <span>Returned: <strong style={{ color: 'var(--text-primary)' }}>{item.returnedQty}</strong></span>
-                          <span>Available: <strong style={{ color: 'var(--text-primary)' }}>{item.maxReturnable}</strong></span>
+                          <span>{t('salesPage.returnDrawer.sold')} <strong style={{ color: 'var(--text-primary)' }}>{item.soldQty}</strong></span>
+                          <span>{t('salesPage.returnDrawer.returned')} <strong style={{ color: 'var(--text-primary)' }}>{item.returnedQty}</strong></span>
+                          <span>{t('salesPage.returnDrawer.available')} <strong style={{ color: 'var(--text-primary)' }}>{item.maxReturnable}</strong></span>
                         </div>
                         {item.maxReturnable > 0 && (
                           <>
                             <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Qty to Return</label>
+                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.qtyToReturn')}</label>
                                 <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
                                   <button onClick={() => handleQtyChange(idx, item.returnQty - 1)} disabled={item.returnQty <= 0} style={{ width: 30, height: 30, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
                                   <input type="number" value={item.returnQty} onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 0)} min="0" max={item.maxReturnable} style={{ flex: 1, border: 'none', outline: 'none', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', width: 50, padding: '4px 0', MozAppearance: 'textfield' }} />
@@ -801,7 +828,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                                 </div>
                               </div>
                               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Refund Amount</label>
+                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundAmount')}</label>
                                 <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
                                   <span style={{ padding: '0 6px 0 10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-input)', lineHeight: '30px', borderRight: '1px solid var(--border-color)' }}>₹</span>
                                   <input type="number" value={item.refundAmount} onChange={(e) => { const n = [...returnItems]; n[idx].refundAmount = Math.max(0, Number(e.target.value)); setReturnItems(n); }} min="0" style={{ flex: 1, border: 'none', outline: 'none', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', minWidth: 0, MozAppearance: 'textfield' }} />
@@ -809,7 +836,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                               </div>
                             </div>
                             <div style={{ marginTop: 4 }}>
-                              <input type="text" placeholder="Reason (optional)" value={item.itemReason} onChange={(e) => { const n = [...returnItems]; n[idx].itemReason = e.target.value; setReturnItems(n); }} style={{ width: '100%', padding: '6px 10px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
+                              <input type="text" placeholder={t('salesPage.returnDrawer.reasonPlaceholder')} value={item.itemReason} onChange={(e) => { const n = [...returnItems]; n[idx].itemReason = e.target.value; setReturnItems(n); }} style={{ width: '100%', padding: '6px 10px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
                             </div>
                           </>
                         )}
@@ -820,25 +847,25 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                   {/* Refund Details */}
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                      <BiWallet size={16} /><span>Refund Details</span>
+                      <BiWallet size={16} /><span>{t('salesPage.returnDrawer.refundDetails')}</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(var(--primary-rgb), 0.06)', border: '1px solid rgba(var(--primary-rgb), 0.12)', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                        <span>Total Refund</span>
+                        <span>{t('salesPage.totalRefund')}</span>
                         <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{totalRefund.toFixed(2)}</span>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Refund Method</label>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundMethod')}</label>
                         <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}>
-                          <option value="cash">Cash</option>
-                          <option value="card">Card</option>
-                          <option value="upi">UPI</option>
-                          <option value="mobile_banking">Mobile Banking</option>
+                          <option value="cash">{t('sale.cash')}</option>
+                          <option value="card">{t('sale.card')}</option>
+                          <option value="upi">{t('sale.upi')}</option>
+                          <option value="mobile_banking">{t('sale.mobileBanking')}</option>
                         </select>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Overall Reason (optional)</label>
-                        <input type="text" placeholder="e.g. Damaged product" value={reason} onChange={(e) => setReason(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }} />
+                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.overallReasonLabel')}</label>
+                        <input type="text" placeholder={t('salesPage.returnDrawer.reasonExamplePlaceholder')} value={reason} onChange={(e) => setReason(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }} />
                       </div>
                     </div>
                   </div>
@@ -849,9 +876,9 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
         </div>
         {sale && !allFullyReturned && (
           <div className="drawer-footer">
-            <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>Cancel</button>
+            <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.cancel')}</button>
             <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={handleSubmit} disabled={!hasItems || processing}>
-              {processing ? <><span className="spinner-border spinner-border-sm" /> Processing...</> : <><BiUndo size={16} /> Process Return — ₹{totalRefund.toFixed(2)}</>}
+              {processing ? <><span className="spinner-border spinner-border-sm" /> {t('salesPage.returnDrawer.processing')}</> : <><BiUndo size={16} /> {t('salesPage.returnDrawer.processReturn', { amount: totalRefund.toFixed(2) })}</>}
             </button>
           </div>
         )}
@@ -900,10 +927,10 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 <BiUndo size={24} />
               </div>
               <h5 style={{ fontWeight: 700, fontSize: '1rem', margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
-                Return All Products?
+                {t('salesPage.returnDrawer.confirmReturnAllTitle')}
               </h5>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                This will set the return quantity to the maximum available for all products. You can still adjust individual quantities afterward.
+                {t('salesPage.returnDrawer.confirmReturnAllDesc')}
               </p>
             </div>
             <div
@@ -919,13 +946,13 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 className="btn-premium btn-premium-secondary btn-premium-sm"
                 onClick={() => setShowConfirmReturnAll(false)}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 className="btn-premium btn-premium-primary btn-premium-sm"
                 onClick={executeReturnAll}
               >
-                <BiCheck size={16} /> Return All
+                <BiCheck size={16} /> {t('salesPage.returnDrawer.confirmReturnAllBtn')}
               </button>
             </div>
           </div>
@@ -938,6 +965,10 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
 // ─── Main Sales Component ────────────────────────────────────
 const Sales = () => {
   const { t } = useTranslation();
+  const STATUS_STYLES = getStatusStyles(t);
+  const RETURN_STYLES = getReturnStyles(t);
+  const STATUS_OPTIONS = getStatusOptions(t);
+  const DATE_PRESETS = getDatePresets(t);
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -1057,7 +1088,7 @@ const Sales = () => {
   const handleCopyInvoice = (invoiceNo) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(invoiceNo || '');
-      showToast.success('Invoice number copied');
+      showToast.success(t('salesPage.invoiceNumberCopied'));
     }
   };
 
@@ -1084,20 +1115,21 @@ const Sales = () => {
     const pageWidth = settings.size === '58mm' ? '58mm' : settings.size === '80mm' ? '80mm' : '210mm';
     const template = settings.template || 'modern';
 
+    const itemFallback = t('salesPage.invoice.item');
     const itemsHtml = sale.items?.map(item => {
       if (template === 'grocery') {
-        return `<div class="receipt-grocery-item"><span class="receipt-grocery-item-name">${item.product?.name || item.name || 'Item'}</span><span class="receipt-grocery-item-qty">${item.quantity}${item.unit || ''}</span><span class="receipt-grocery-item-price">₹${Number(item.price).toFixed(2)}</span><span class="receipt-grocery-item-total">₹${Number(item.total).toFixed(2)}</span></div>`;
+        return `<div class="receipt-grocery-item"><span class="receipt-grocery-item-name">${item.product?.name || item.name || itemFallback}</span><span class="receipt-grocery-item-qty">${item.quantity}${item.unit || ''}</span><span class="receipt-grocery-item-price">₹${Number(item.price).toFixed(2)}</span><span class="receipt-grocery-item-total">₹${Number(item.total).toFixed(2)}</span></div>`;
       }
       if (template === 'minimal') {
-        return `<div class="receipt-minimal-item"><div class="receipt-minimal-item-name">${item.product?.name || item.name || 'Item'}</div><div class="receipt-minimal-item-line"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span class="receipt-minimal-item-total">₹${Number(item.total).toFixed(2)}</span></div></div>`;
+        return `<div class="receipt-minimal-item"><div class="receipt-minimal-item-name">${item.product?.name || item.name || itemFallback}</div><div class="receipt-minimal-item-line"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span class="receipt-minimal-item-total">₹${Number(item.total).toFixed(2)}</span></div></div>`;
       }
-      return `<tr><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px">${item.product?.name || item.name || 'Item'}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:center">${item.quantity} ${item.unit || ''}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.price).toFixed(2)}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.total).toFixed(2)}</td></tr>`;
+      return `<tr><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px">${item.product?.name || item.name || itemFallback}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:center">${item.quantity} ${item.unit || ''}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.price).toFixed(2)}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.total).toFixed(2)}</td></tr>`;
     }).join('') || '';
 
-    const discountHtml = Number(sale.discount || 0) > 0 ? `<div class="total-row" style="color:#e74c3c"><span>Discount</span><span>-₹${Number(sale.discount).toFixed(2)}</span></div>` : '';
-    const taxHtml = Number(sale.tax || 0) > 0 ? `<div class="total-row"><span>Tax</span><span>₹${Number(sale.tax).toFixed(2)}</span></div>` : '';
-    const dueHtml = Number(sale.dueAmount || 0) > 0 ? `<div class="total-row"><span>Due</span><span style="color:#e74c3c;font-weight:700">₹${Number(sale.dueAmount).toFixed(2)}</span></div>` : '';
-    const footerMsg = shopInfo?.settings?.receiptFooter || 'Thank you for your purchase!';
+    const discountHtml = Number(sale.discount || 0) > 0 ? `<div class="total-row" style="color:#e74c3c"><span>${t('sale.discount')}</span><span>-₹${Number(sale.discount).toFixed(2)}</span></div>` : '';
+    const taxHtml = Number(sale.tax || 0) > 0 ? `<div class="total-row"><span>${t('sale.tax')}</span><span>₹${Number(sale.tax).toFixed(2)}</span></div>` : '';
+    const dueHtml = Number(sale.dueAmount || 0) > 0 ? `<div class="total-row"><span>${t('common.due')}</span><span style="color:#e74c3c;font-weight:700">₹${Number(sale.dueAmount).toFixed(2)}</span></div>` : '';
+    const footerMsg = shopInfo?.settings?.receiptFooter || t('salesPage.invoice.thankYou');
 
     printWindow.document.write(`<!DOCTYPE html><html><head><title>Invoice - ${sale.invoiceNo || ''}</title>
     <style>
@@ -1123,77 +1155,77 @@ const Sales = () => {
     </style></head><body>
     ${template === 'grocery' ? `
       <div style="text-align:center;margin-bottom:6px">
-        <h2 style="font-size:${isThermal ? '13px' : '18px'};font-weight:800;color:#2ecc71">${shopInfo?.shopName || 'Grocery Store'}</h2>
+        <h2 style="font-size:${isThermal ? '13px' : '18px'};font-weight:800;color:#2ecc71">${shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2>
         <p style="font-size:${isThermal ? '8px' : '10px'};color:#666">${formatAddress(shopInfo?.address)}</p>
         ${shopInfo?.phone ? `<p style="font-size:9px;color:#333">📞 ${shopInfo.phone}</p>` : ''}
       </div>
       <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
       <div style="margin-bottom:4px">
-        <div style="display:flex;justify-content:space-between;font-size:${isThermal ? '9px' : '11px'};color:#555"><span>🧾 ${sale.invoiceNo || 'N/A'}</span><span>📅 ${formatDate(sale.createdAt)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:${isThermal ? '9px' : '11px'};color:#555"><span>👤 ${sale.customer?.name || 'Walk-in Customer'}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:${isThermal ? '9px' : '11px'};color:#555"><span>🧾 ${sale.invoiceNo || t('common.notAvailable')}</span><span>📅 ${formatDate(sale.createdAt)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:${isThermal ? '9px' : '11px'};color:#555"><span>👤 ${sale.customer?.name || t('dashboard.walkInCustomer')}</span></div>
       </div>
       <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-      <div style="display:flex;font-weight:700;font-size:${isThermal ? '9px' : '11px'};color:#2ecc71;border-bottom:1px solid #2ecc71;padding-bottom:3px;margin-bottom:3px"><span style="flex:2">Item</span><span style="flex:0.6;text-align:center">Qty</span><span style="flex:0.7;text-align:right">₹</span><span style="flex:0.7;text-align:right">Total</span></div>
+      <div style="display:flex;font-weight:700;font-size:${isThermal ? '9px' : '11px'};color:#2ecc71;border-bottom:1px solid #2ecc71;padding-bottom:3px;margin-bottom:3px"><span style="flex:2">${t('salesPage.invoice.item')}</span><span style="flex:0.6;text-align:center">${t('salesPage.invoice.qty')}</span><span style="flex:0.7;text-align:right">₹</span><span style="flex:0.7;text-align:right">${t('common.total')}</span></div>
       ${itemsHtml}
       <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
       <div style="font-size:${isThermal ? '10px' : '12px'}">
-        <div class="total-row"><span>Subtotal</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
+        <div class="total-row"><span>${t('sale.subtotal')}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
         ${discountHtml}${taxHtml}
-        <div class="total-row" style="font-size:${isThermal ? '13px' : '16px'};font-weight:800;color:#2ecc71"><span>Total</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-        <div class="total-row"><span>Paid</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+        <div class="total-row" style="font-size:${isThermal ? '13px' : '16px'};font-weight:800;color:#2ecc71"><span>${t('common.total')}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+        <div class="total-row"><span>${t('common.paid')}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
         ${dueHtml}
-        <div class="total-row"><span>Payment</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${sale.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+        <div class="total-row"><span>${t('salesPage.invoice.payment')}</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${sale.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
       </div>
       <div style="text-align:center;font-size:${isThermal ? '9px' : '11px'};color:#2ecc71;margin-top:6px"><p>🛒 ${footerMsg}</p></div>
     ` : template === 'minimal' ? `
       <div style="text-align:center;margin-bottom:6px">
-        <h2 style="font-size:${isThermal ? '14px' : '20px'};font-weight:300;letter-spacing:1px;text-transform:uppercase">${shopInfo?.shopName || 'Shop Name'}</h2>
+        <h2 style="font-size:${isThermal ? '14px' : '20px'};font-weight:300;letter-spacing:1px;text-transform:uppercase">${shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</h2>
         <p style="font-size:${isThermal ? '8px' : '10px'};color:#999">${formatAddress(shopInfo?.address)}</p>
         ${shopInfo?.phone ? `<p style="font-size:8px;color:#999">${shopInfo.phone}</p>` : ''}
       </div>
       <div style="border-top:1px solid #333;margin:4px 0"></div>
-      <div style="font-size:${isThermal ? '9px' : '11px'};color:#555"><div style="display:flex;justify-content:space-between"><span>Invoice</span><span>${sale.invoiceNo || 'N/A'}</span></div><div style="display:flex;justify-content:space-between"><span>Date</span><span>${formatDate(sale.createdAt)}</span></div><div style="display:flex;justify-content:space-between"><span>Customer</span><span>${sale.customer?.name || 'Walk-in'}</span></div></div>
+      <div style="font-size:${isThermal ? '9px' : '11px'};color:#555"><div style="display:flex;justify-content:space-between"><span>${t('sale.invoice')}</span><span>${sale.invoiceNo || t('common.notAvailable')}</span></div><div style="display:flex;justify-content:space-between"><span>${t('common.date')}</span><span>${formatDate(sale.createdAt)}</span></div><div style="display:flex;justify-content:space-between"><span>${t('sale.customer')}</span><span>${sale.customer?.name || t('salesPage.invoice.walkIn')}</span></div></div>
       <div style="border-top:1px solid #333;margin:4px 0"></div>
       ${itemsHtml}
       <div style="border-top:1px solid #333;margin:4px 0"></div>
       <div style="font-size:${isThermal ? '10px' : '12px'}">
-        <div class="total-row"><span>Subtotal</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
+        <div class="total-row"><span>${t('sale.subtotal')}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
         ${discountHtml}${taxHtml}
-        <div class="total-row" style="font-size:${isThermal ? '13px' : '16px'};font-weight:800;border-top:1px solid #333;padding-top:4px;margin-top:4px"><span>Total</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-        <div class="total-row"><span>Paid</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+        <div class="total-row" style="font-size:${isThermal ? '13px' : '16px'};font-weight:800;border-top:1px solid #333;padding-top:4px;margin-top:4px"><span>${t('common.total')}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+        <div class="total-row"><span>${t('common.paid')}</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
         ${dueHtml}
       </div>
       <div style="text-align:center;font-size:${isThermal ? '9px' : '11px'};color:#999;margin-top:6px;font-style:italic"><p>${footerMsg}</p></div>
     ` : `
       <div style="text-align:center;margin-bottom:8px">
-        <h2 style="font-size:${isThermal ? '13px' : '18px'};font-weight:800">${shopInfo?.shopName || 'Shop Name'}</h2>
+        <h2 style="font-size:${isThermal ? '13px' : '18px'};font-weight:800">${shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</h2>
         <p style="font-size:${isThermal ? '9px' : '11px'};color:#555">${formatAddress(shopInfo?.address)}</p>
-        ${shopInfo?.phone ? `<p style="font-size:9px;color:#555">Tel: ${shopInfo.phone}</p>` : ''}
+        ${shopInfo?.phone ? `<p style="font-size:9px;color:#555">${t('salesPage.invoice.tel')} ${shopInfo.phone}</p>` : ''}
       </div>
       <div style="border-top:1px dashed #999;margin:6px 0"></div>
       <div style="font-size:${isThermal ? '10px' : '12px'};margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">Invoice:</span><span style="font-weight:700">${sale.invoiceNo || 'N/A'}</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">Date:</span><span style="font-weight:700">${formatDate(sale.createdAt)}</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">Customer:</span><span style="font-weight:700">${sale.customer?.name || 'Walk-in Customer'}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">${t('salesPage.invoice.invoiceLabel')}</span><span style="font-weight:700">${sale.invoiceNo || t('common.notAvailable')}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">${t('salesPage.invoice.dateLabel')}</span><span style="font-weight:700">${formatDate(sale.createdAt)}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">${t('salesPage.invoice.customerLabel')}</span><span style="font-weight:700">${sale.customer?.name || t('dashboard.walkInCustomer')}</span></div>
       </div>
       <div style="border-top:1px dashed #999;margin:6px 0"></div>
       <table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:${isThermal ? '10px' : '12px'}">
-        <tr><th style="text-align:left;border-bottom:1px solid #333;padding:4px 6px">Item</th><th style="text-align:center;border-bottom:1px solid #333;padding:4px 6px">Qty</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">Price</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">Total</th></tr>
+        <tr><th style="text-align:left;border-bottom:1px solid #333;padding:4px 6px">${t('salesPage.invoice.item')}</th><th style="text-align:center;border-bottom:1px solid #333;padding:4px 6px">${t('salesPage.invoice.qty')}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${t('common.price')}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${t('common.total')}</th></tr>
         ${itemsHtml}
       </table>
       <div style="border-top:1px dashed #999;margin:6px 0"></div>
       <div style="font-size:${isThermal ? '11px' : '13px'}">
-        <div class="total-row"><span>Subtotal</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
+        <div class="total-row"><span>${t('sale.subtotal')}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
         ${discountHtml}${taxHtml}
-        <div class="total-row grand-total-row"><span>Grand Total</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-        <div class="total-row"><span>Paid</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+        <div class="total-row grand-total-row"><span>${t('salesPage.invoice.grandTotal')}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+        <div class="total-row"><span>${t('common.paid')}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
         ${dueHtml}
-        <div class="total-row"><span>Payment</span><span style="font-weight:800;color:#2ecc71">${sale.paymentMethod?.toUpperCase() || 'CASH'}</span></div>
+        <div class="total-row"><span>${t('salesPage.invoice.payment')}</span><span style="font-weight:800;color:#2ecc71">${sale.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
       </div>
       <div style="border-top:1px dashed #999;margin:6px 0"></div>
       <div style="text-align:center;font-size:${isThermal ? '9px' : '11px'};color:#888;margin-top:6px">
         <p>${footerMsg}</p>
-        <p style="font-size:${isThermal ? '8px' : '9px'}">Visit us again!</p>
+        <p style="font-size:${isThermal ? '8px' : '9px'}">${t('salesPage.invoice.visitAgain')}</p>
       </div>
     `}
     </body></html>`);
@@ -1202,10 +1234,10 @@ const Sales = () => {
   };
 
   const statCards = [
-    { label: "Today's Sales", value: stats?.todaySales || 0, icon: BiDollar, color: 'primary', isCurrency: true },
-    { label: "Today's Revenue", value: stats?.todayRevenue || 0, icon: BiTrendingUp, color: 'success', isCurrency: true },
-    { label: 'Total Due', value: stats?.todayDue || 0, icon: BiWallet, color: 'danger', isCurrency: true },
-    { label: 'Transactions', value: stats?.count || 0, icon: BiCart, color: 'warning', isCurrency: false },
+    { label: t('salesPage.stats.todaySales'), value: stats?.todaySales || 0, icon: BiDollar, color: 'primary', isCurrency: true },
+    { label: t('salesPage.stats.todayRevenue'), value: stats?.todayRevenue || 0, icon: BiTrendingUp, color: 'success', isCurrency: true },
+    { label: t('salesPage.stats.totalDue'), value: stats?.todayDue || 0, icon: BiWallet, color: 'danger', isCurrency: true },
+    { label: t('salesPage.stats.transactions'), value: stats?.count || 0, icon: BiCart, color: 'warning', isCurrency: false },
   ];
 
   return (
@@ -1213,11 +1245,11 @@ const Sales = () => {
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.sales')}</h4>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>Manage your sales and invoices</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>{t('salesPage.subtitle')}</p>
         </div>
         <div className="d-flex gap-2">
-          <button className="btn-premium btn-premium-secondary" onClick={refreshAll}><BiRefresh size={18} /> Refresh</button>
-          <button className="btn-premium btn-premium-primary" onClick={() => window.location.href = '/pos'}><BiDollar size={18} /> New Sale</button>
+          <button className="btn-premium btn-premium-secondary" onClick={refreshAll}><BiRefresh size={18} /> {t('common.refresh')}</button>
+          <button className="btn-premium btn-premium-primary" onClick={() => window.location.href = '/pos'}><BiDollar size={18} /> {t('salesPage.newSale')}</button>
         </div>
       </div>
 
@@ -1233,7 +1265,7 @@ const Sales = () => {
         <div className="sales-filters">
           <div className="sales-filter search-box">
             <BiSearch className="search-icon" />
-            <input className="form-control sales-filter-input" placeholder="Search by Invoice, Customer Name or Phone..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="form-control sales-filter-input" placeholder={t('salesPage.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <div className="sales-date-filters-scroll">
@@ -1282,26 +1314,26 @@ const Sales = () => {
           <table className="sales-table">
             <thead>
               <tr>
-                <th>Invoice</th>
-                <th>Date & Time</th>
-                <th>Customer</th>
-                <th>Total Amount</th>
-                <th>Payment Status</th>
-                <th>Return Status</th>
-                <th style={{ width: '110px' }}>Actions</th>
+                <th>{t('sale.invoice')}</th>
+                <th>{t('salesPage.table.dateTime')}</th>
+                <th>{t('sale.customer')}</th>
+                <th>{t('salesPage.table.totalAmount')}</th>
+                <th>{t('salesPage.table.paymentStatus')}</th>
+                <th>{t('salesPage.table.returnStatus')}</th>
+                <th style={{ width: '110px' }}>{t('salesPage.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> Loading...</div></td></tr>
+                <tr><td colSpan={7}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : sales.length === 0 ? (
-                <tr><td colSpan={7}><div className="sales-empty-state"><span className="sales-empty-icon">🧾</span><p>No sales found</p></div></td></tr>
+                <tr><td colSpan={7}><div className="sales-empty-state"><span className="sales-empty-icon">🧾</span><p>{t('salesPage.noSalesFound')}</p></div></td></tr>
               ) : sales.map((sale, idx) => {
                 const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
                 const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
                 return (
                   <tr key={sale._id} className={idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'}>
-                    <td><span className="sales-invoice-badge"><BiHash size={12} />{sale.invoiceNo || 'N/A'}</span></td>
+                    <td><span className="sales-invoice-badge"><BiHash size={12} />{sale.invoiceNo || t('common.notAvailable')}</span></td>
                     <td>
                       <div className="sales-date-cell">
                         <span className="sales-date-text">{formatDate(sale.createdAt)}</span>
@@ -1310,7 +1342,7 @@ const Sales = () => {
                     </td>
                     <td>
                       <div className="sales-customer-cell">
-                        <span className="sales-customer-name">{sale.customer?.name || 'Walk-in'}</span>
+                        <span className="sales-customer-name">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
                         {sale.customer?.phone && <span className="sales-customer-phone">{sale.customer.phone}</span>}
                       </div>
                     </td>
@@ -1319,9 +1351,9 @@ const Sales = () => {
                     <td><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>{rs.label}</span></td>
                     <td>
                       <div className="sales-actions">
-                        <button className="sales-action-btn sales-action-view" title="View" onClick={() => handleView(sale)}><BiShow size={16} /></button>
-                        <button className="sales-action-btn sales-action-print" title="Print" onClick={() => handlePrintClick(sale)}><BiPrinter size={16} /></button>
-                        <button className="sales-action-btn sales-action-return" title="Return" onClick={() => handleReturn(sale)}><BiUndo size={16} /></button>
+                        <button className="sales-action-btn sales-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow size={16} /></button>
+                        <button className="sales-action-btn sales-action-print" title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter size={16} /></button>
+                        <button className="sales-action-btn sales-action-return" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -1336,12 +1368,12 @@ const Sales = () => {
       <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
         {loading ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : sales.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🧾</div>
-            No sales found
+            {t('salesPage.noSalesFound')}
           </div>
         ) : sales.map((sale) => {
           const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
@@ -1352,13 +1384,13 @@ const Sales = () => {
               compact={
                 <>
                   <div className="expandable-card__compact-row">
-                    <span className="expandable-card__name">{sale.invoiceNo || 'N/A'}</span>
+                    <span className="expandable-card__name">{sale.invoiceNo || t('common.notAvailable')}</span>
                     <span className="expandable-card__price">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
                   </div>
                   <div className="expandable-card__meta">
                     <span className="expandable-card__meta-item">
                       <BiUser />
-                      <span>{sale.customer?.name || 'Walk-in'}</span>
+                      <span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
                     </span>
                     <span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
                   </div>
@@ -1367,42 +1399,42 @@ const Sales = () => {
               expanded={
                 <div className="expandable-card__rows">
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Invoice</span>
+                    <span className="expandable-card__row-label">{t('sale.invoice')}</span>
                     <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{sale.invoiceNo || 'N/A'}</span>
+                    <span className="expandable-card__row-value">{sale.invoiceNo || t('common.notAvailable')}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Customer</span>
+                    <span className="expandable-card__row-label">{t('sale.customer')}</span>
                     <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{sale.customer?.name || 'Walk-in'}</span>
+                    <span className="expandable-card__row-value">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Date</span>
+                    <span className="expandable-card__row-label">{t('common.date')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value">{formatDate(sale.createdAt)}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Total Amount</span>
+                    <span className="expandable-card__row-label">{t('salesPage.table.totalAmount')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Paid Amount</span>
+                    <span className="expandable-card__row-label">{t('salesPage.table.paidAmount')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value">₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Due Amount</span>
+                    <span className="expandable-card__row-label">{t('salesPage.table.dueAmount')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value" style={sale.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{Number(sale.dueAmount || 0).toFixed(2)}</span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Payment Status</span>
+                    <span className="expandable-card__row-label">{t('salesPage.table.paymentStatus')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value"><span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span>
                   </div>
                   <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">Return Status</span>
+                    <span className="expandable-card__row-label">{t('salesPage.table.returnStatus')}</span>
                     <span className="expandable-card__row-dots" />
                     <span className="expandable-card__row-value"><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span></span>
                   </div>
@@ -1410,13 +1442,13 @@ const Sales = () => {
               }
               actions={
                 <>
-                  <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(sale)}>
+                  <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
                     <BiShow />
                   </button>
-                  <button className="btn-action btn-action-toggle" data-tooltip="Print" onClick={() => handlePrintClick(sale)}>
+                  <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
                     <BiPrinter />
                   </button>
-                  <button className="btn-action btn-action-edit" data-tooltip="Return" onClick={() => handleReturn(sale)}>
+                  <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
                     <BiUndo />
                   </button>
                 </>
@@ -1428,10 +1460,10 @@ const Sales = () => {
 
       {totalPages > 1 && (
         <div className="sales-pagination">
-          <span className="sales-pagination-info">Page {page} of {totalPages} ({total} total)</span>
+          <span className="sales-pagination-info">{t('salesPage.pagination.info', { page, totalPages, total })}</span>
           <div className="sales-pagination-btns">
-            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><BiChevronLeft size={16} /> Previous</button>
-            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next <BiChevronRight size={16} /></button>
+            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><BiChevronLeft size={16} /> {t('salesPage.pagination.previous')}</button>
+            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>{t('salesPage.pagination.next')} <BiChevronRight size={16} /></button>
           </div>
         </div>
       )}

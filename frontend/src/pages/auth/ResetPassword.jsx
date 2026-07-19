@@ -20,11 +20,11 @@ const ResetPassword = () => {
     e.preventDefault();
 
     if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.passwordMinLength'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordMismatch'));
       return;
     }
 
@@ -35,7 +35,7 @@ const ResetPassword = () => {
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reset password. The link may have expired.');
+      setError(err.response?.data?.message || t('auth.passwordResetFailed'));
     } finally {
       setLoading(false);
     }
@@ -52,9 +52,9 @@ const ResetPassword = () => {
           <div className="login-brand-logo">
             <div className="login-brand-logo-icon">GS</div>
           </div>
-          <h1 className="login-brand-title">Set New Password</h1>
+          <h1 className="login-brand-title">{t('auth.setNewPassword')}</h1>
           <p className="login-brand-subtitle">
-            Choose a strong password that you don't use on other sites.
+            {t('auth.setNewPasswordSub')}
           </p>
         </div>
       </div>
@@ -79,10 +79,10 @@ const ResetPassword = () => {
                 <BiCheckCircle />
               </div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}>
-                Password Reset!
+                {t('auth.passwordResetSuccess')}
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: '0 0 1.5rem' }}>
-                Your password has been successfully reset. Redirecting you to login...
+                {t('auth.passwordResetSuccessSub')}
               </p>
               <Link
                 to="/login"
@@ -92,13 +92,13 @@ const ResetPassword = () => {
                   textDecoration: 'none',
                 }}
               >
-                <BiArrowBack /> Go to Login
+                <BiArrowBack /> {t('auth.goToLogin')}
               </Link>
             </div>
           ) : (
             <>
-              <h2 className="login-form-heading">Reset Password</h2>
-              <p className="login-form-subheading">Enter your new password below.</p>
+              <h2 className="login-form-heading">{t('auth.resetPassword')}</h2>
+              <p className="login-form-subheading">{t('auth.enterNewPasswordBelow')}</p>
 
               {error && (
                 <div className="login-form-error">
@@ -110,7 +110,7 @@ const ResetPassword = () => {
               <form onSubmit={handleSubmit} className="login-form">
                 {/* New Password */}
                 <div className="login-form-group">
-                  <label className="login-form-label">New Password</label>
+                  <label className="login-form-label">{t('auth.newPassword')}</label>
                   <div className="login-input-wrapper">
                     <span className="login-input-icon"><BiLockAlt /></span>
                     <input
@@ -135,7 +135,7 @@ const ResetPassword = () => {
 
                 {/* Confirm Password */}
                 <div className="login-form-group">
-                  <label className="login-form-label">Confirm New Password</label>
+                  <label className="login-form-label">{t('auth.confirmNewPassword')}</label>
                   <div className="login-input-wrapper">
                     <span className="login-input-icon"><BiLockAlt /></span>
                     <input
@@ -152,9 +152,9 @@ const ResetPassword = () => {
 
                 <button type="submit" className="login-submit-btn" disabled={loading}>
                   {loading ? (
-                    <><span className="login-spinner" /> Resetting...</>
+                    <><span className="login-spinner" /> {t('auth.resetting')}...</>
                   ) : (
-                    'Reset Password'
+                    t('auth.resetPassword')
                   )}
                 </button>
               </form>
@@ -168,13 +168,13 @@ const ResetPassword = () => {
                     textDecoration: 'none',
                   }}
                 >
-                  <BiArrowBack /> Back to Login
+                  <BiArrowBack /> {t('auth.backToLogin')}
                 </Link>
               </div>
 
               <div className="login-lang-switcher">
                 <span className="login-lang-icon" aria-hidden="true"><BiGlobe /></span>
-                <div className="login-lang-toggle" role="group" aria-label="Select language">
+                <div className="login-lang-toggle" role="group" aria-label={t('auth.selectLanguage')}>
                   <button type="button" className={`login-lang-btn ${i18n.language === 'en' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('en')}>English</button>
                   <button type="button" className={`login-lang-btn ${i18n.language === 'bn' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('bn')}>বাংলা</button>
                 </div>

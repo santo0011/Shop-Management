@@ -74,23 +74,23 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       const rowErrors = [];
 
       // Required fields (category validation removed - uses global selection)
-      if (!row.name?.trim()) rowErrors.push('Product name is required');
+      if (!row.name?.trim()) rowErrors.push(t('validation.nameRequired'));
       if (row.purchasePrice === '' || row.purchasePrice === null || isNaN(Number(row.purchasePrice)) || Number(row.purchasePrice) < 0)
-        rowErrors.push('Valid purchase price required');
+        rowErrors.push(t('validation.invalidPurchasePrice'));
       if (row.sellingPrice === '' || row.sellingPrice === null || isNaN(Number(row.sellingPrice)) || Number(row.sellingPrice) < 0)
-        rowErrors.push('Valid selling price required');
+        rowErrors.push(t('validation.invalidSellingPrice'));
       if (row.stock === '' || row.stock === null || isNaN(Number(row.stock)) || Number(row.stock) < 0)
-        rowErrors.push('Valid stock quantity required');
+        rowErrors.push(t('validation.invalidStockQuantity'));
 
       // Validate unit
       if (row.unit && !units.includes(row.unit?.toLowerCase())) {
-        rowErrors.push(`Invalid unit "${row.unit}". Valid: ${units.join(', ')}`);
+        rowErrors.push(t('productsPage.bulkImport.invalidUnit', { unit: row.unit, validUnits: units.join(', ') }));
       }
 
       // Validate expiry date
       if (row.expiryDate) {
         const d = new Date(row.expiryDate);
-        if (isNaN(d.getTime())) rowErrors.push('Invalid expiry date format (use YYYY-MM-DD)');
+        if (isNaN(d.getTime())) rowErrors.push(t('productsPage.bulkImport.invalidExpiryDate'));
       }
 
       // Check duplicates by barcode or name
@@ -134,7 +134,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
         if (jsonData.length === 0) {
-          Swal.fire({ icon: 'warning', title: 'Empty File', text: 'The file contains no data.', confirmButtonColor: '#6C63FF' });
+          Swal.fire({ icon: 'warning', title: t('productsPage.bulkImport.emptyFileTitle'), text: t('productsPage.bulkImport.emptyFileText'), confirmButtonColor: '#6C63FF' });
           return;
         }
 
@@ -164,7 +164,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         setShowPreview(true);
         detectDuplicates(mapped);
       } catch (err) {
-        Swal.fire({ icon: 'error', title: 'Parse Error', text: 'Failed to parse the file. Please check the format.', confirmButtonColor: '#6C63FF' });
+        Swal.fire({ icon: 'error', title: t('productsPage.bulkImport.parseErrorTitle'), text: t('productsPage.bulkImport.parseErrorText'), confirmButtonColor: '#6C63FF' });
       }
     };
     reader.readAsArrayBuffer(file);
@@ -202,7 +202,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   // ─── Paste Import ───────────────────────────────────────────────────────
   const handleParsePaste = () => {
     if (!pasteData.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Empty Data', text: 'Please paste product data first.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('productsPage.bulkImport.emptyDataTitle'), text: t('productsPage.bulkImport.emptyDataText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -230,7 +230,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     });
 
     if (parsed.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Data', text: 'Could not parse any rows from the pasted data.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('productsPage.bulkImport.noDataTitle'), text: t('productsPage.bulkImport.noDataText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -250,7 +250,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   const handleImport = async () => {
     // Validate category is selected
     if (!selectedCategory) {
-      Swal.fire({ icon: 'warning', title: 'Category Required', text: 'Please select a category before importing.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('productsPage.bulkImport.categoryRequiredTitle'), text: t('productsPage.bulkImport.categoryRequiredText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -261,7 +261,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     });
 
     if (validRows.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Valid Rows', text: 'All rows have errors or are duplicates. Fix them or adjust settings.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('productsPage.bulkImport.noValidRowsTitle'), text: t('productsPage.bulkImport.noValidRowsText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -337,7 +337,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`} style={{ width: '720px', maxWidth: '100vw' }}>
         <div className="drawer-header">
-          <h5><BiUpload className="me-2" />Bulk Import Products</h5>
+          <h5><BiUpload className="me-2" />{t('productsPage.bulkImport.title')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
@@ -347,13 +347,13 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               className={`bulk-import-tab ${activeTab === 'excel' ? 'active' : ''}`}
               onClick={() => { setActiveTab('excel'); setShowPreview(false); setParsedRows([]); }}
             >
-              <BiFile /> Excel / CSV Import
+              <BiFile /> {t('productsPage.bulkImport.tabExcel')}
             </button>
             <button
               className={`bulk-import-tab ${activeTab === 'paste' ? 'active' : ''}`}
               onClick={() => { setActiveTab('paste'); setShowPreview(false); setParsedRows([]); }}
             >
-              <BiPaste /> Copy & Paste Import
+              <BiPaste /> {t('productsPage.bulkImport.tabPaste')}
             </button>
           </div>
 
@@ -361,21 +361,21 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
             {/* ─── Category Selection (Mandatory - Gates all import actions) ── */}
             <div className="bulk-import-category-select">
               <label className="bulk-import-category-label">
-                <BiInfoCircle /> Step 1: Select Category <span style={{ color: 'var(--danger)' }}>*</span>
+                <BiInfoCircle /> {t('productsPage.bulkImport.step1SelectCategory')} <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <select
                 className="form-select"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
               >
-                <option value="">— Select a category to enable import —</option>
+                <option value="">{t('productsPage.bulkImport.selectCategoryOption')}</option>
                 {categories.map((cat) => (
                   <option key={cat._id} value={cat._id}>{cat.name}</option>
                 ))}
               </select>
               {!selectedCategory && (
                 <div className="bulk-import-category-hint">
-                  <BiInfoCircle /> Please select a category above to proceed with import
+                  <BiInfoCircle /> {t('productsPage.bulkImport.selectCategoryHint')}
                 </div>
               )}
             </div>
@@ -385,21 +385,21 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               <div className={`bulk-import-upload-area ${!selectedCategory ? 'bulk-import-disabled' : ''}`}>
                 <div className="bulk-import-upload-box">
                   <BiUpload size={48} />
-                  <h6>Upload Excel or CSV File</h6>
-                  <p>Supports .xlsx, .xls, and .csv files</p>
+                  <h6>{t('productsPage.bulkImport.uploadTitle')}</h6>
+                  <p>{t('productsPage.bulkImport.uploadSubtitle')}</p>
                   <div className="d-flex gap-2 justify-content-center flex-wrap">
                     <button
                       className="btn-premium btn-premium-primary"
                       onClick={() => selectedCategory && fileInputRef.current?.click()}
                       disabled={!selectedCategory}
                     >
-                      <BiUpload /> Select File
+                      <BiUpload /> {t('productsPage.bulkImport.selectFile')}
                     </button>
                     <button
                       className="btn-premium btn-premium-secondary"
                       onClick={handleDownloadTemplate}
                     >
-                      <BiDownload /> Download Template
+                      <BiDownload /> {t('productsPage.bulkImport.downloadTemplate')}
                     </button>
                   </div>
                   <input
@@ -411,7 +411,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   />
                   <div className="bulk-import-format-info">
                     <BiInfoCircle />
-                    <small>Expected: Name, Supplier, Purchase Price, Selling Price, Stock, Unit, Barcode, Expiry Date</small>
+                    <small>{t('productsPage.bulkImport.expectedFormat')}</small>
                   </div>
                 </div>
               </div>
@@ -422,13 +422,13 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               <div className={`bulk-import-paste-area ${!selectedCategory ? 'bulk-import-disabled' : ''}`}>
                 <div className="bulk-import-paste-header">
                   <BiPaste size={28} />
-                  <h6>Paste Product Data</h6>
+                  <h6>{t('productsPage.bulkImport.pasteTitle')}</h6>
                 </div>
                 <p className="bulk-import-paste-desc">
-                  Paste comma-separated values. One product per line.
+                  {t('productsPage.bulkImport.pasteDesc')}
                 </p>
                 <div className="bulk-import-format-example">
-                  <strong>Format:</strong> Product Name, Supplier, Purchase Price, Selling Price, Stock, Unit, Barcode, Expiry Date
+                  <strong>{t('productsPage.bulkImport.formatLabel')}</strong> {t('productsPage.bulkImport.formatExample')}
                 </div>
                 <textarea
                   className="bulk-import-textarea"
@@ -436,14 +436,14 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   value={pasteData}
                   onChange={(e) => setPasteData(e.target.value)}
                   disabled={!selectedCategory}
-                  placeholder={selectedCategory ? `Rice 25kg,ABC Suppliers,1200,1400,50,Bag,8901234567890,2027-12-31\nCoca Cola 500ml,XYZ Foods,25,35,200,Bottle,8901234567891,2027-06-30` : 'Select a category first to enable data entry'}
+                  placeholder={selectedCategory ? t('productsPage.bulkImport.pastePlaceholderReady') : t('productsPage.bulkImport.pastePlaceholderDisabled')}
                 />
                 <button
                   className="btn-premium btn-premium-primary w-100 mt-2"
                   onClick={handleParsePaste}
                   disabled={!selectedCategory}
                 >
-                  <BiTable /> Parse & Preview
+                  <BiTable /> {t('productsPage.bulkImport.parsePreview')}
                 </button>
               </div>
             )}
@@ -455,33 +455,33 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                 <div className="bulk-import-summary">
                   <div className="bulk-import-stat">
                     <span className="bulk-import-stat-value">{parsedRows.length}</span>
-                    <span className="bulk-import-stat-label">Total Rows</span>
+                    <span className="bulk-import-stat-label">{t('productsPage.bulkImport.totalRows')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-valid">
                     <span className="bulk-import-stat-value">{validCount}</span>
-                    <span className="bulk-import-stat-label">Valid</span>
+                    <span className="bulk-import-stat-label">{t('productsPage.bulkImport.valid')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-error">
                     <span className="bulk-import-stat-value">{errorCount}</span>
-                    <span className="bulk-import-stat-label">Errors</span>
+                    <span className="bulk-import-stat-label">{t('productsPage.bulkImport.errors')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-dup">
                     <span className="bulk-import-stat-value">{duplicateCount}</span>
-                    <span className="bulk-import-stat-label">Duplicates</span>
+                    <span className="bulk-import-stat-label">{t('productsPage.bulkImport.duplicates')}</span>
                   </div>
                 </div>
 
                 {/* Category Selection */}
                 <div className="bulk-import-category-select">
                   <label className="bulk-import-category-label">
-                    <BiInfoCircle /> Select Category for All Products
+                    <BiInfoCircle /> {t('productsPage.bulkImport.selectCategoryForAll')}
                   </label>
                   <select
                     className="form-select"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
                   >
-                    <option value="">— Select a category —</option>
+                    <option value="">{t('productsPage.bulkImport.selectCategoryOptionShort')}</option>
                     {categories.map((cat) => (
                       <option key={cat._id} value={cat._id}>{cat.name}</option>
                     ))}
@@ -497,10 +497,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         checked={skipDuplicates}
                         onChange={(e) => setSkipDuplicates(e.target.checked)}
                       />
-                      <span>Skip existing products ({duplicateCount} found)</span>
+                      <span>{t('productsPage.bulkImport.skipExisting', { count: duplicateCount })}</span>
                     </label>
                     <span className="bulk-import-toggle-hint">
-                      Uncheck to update existing records instead
+                      {t('productsPage.bulkImport.skipExistingHint')}
                     </span>
                   </div>
                 )}
@@ -515,7 +515,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                       />
                     </div>
                     <span className="bulk-import-progress-text">
-                      <BiLoader className="spin" /> Importing {importProgress.current} of {importProgress.total}...
+                      <BiLoader className="spin" /> {t('productsPage.bulkImport.importingProgress', { current: importProgress.current, total: importProgress.total })}
                     </span>
                   </div>
                 )}
@@ -526,16 +526,16 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     <div className="bulk-import-result-icon">
                       <BiCheck size={32} />
                     </div>
-                    <h6>Import Complete</h6>
+                    <h6>{t('productsPage.bulkImport.importComplete')}</h6>
                     <div className="bulk-import-result-stats">
-                      <span>Imported: <strong>{importResult.imported}</strong></span>
-                      <span>Updated: <strong>{importResult.updated}</strong></span>
-                      <span>Skipped: <strong>{importResult.skipped}</strong></span>
-                      <span>Failed: <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
+                      <span>{t('productsPage.bulkImport.imported')} <strong>{importResult.imported}</strong></span>
+                      <span>{t('productsPage.bulkImport.updated')} <strong>{importResult.updated}</strong></span>
+                      <span>{t('productsPage.bulkImport.skipped')} <strong>{importResult.skipped}</strong></span>
+                      <span>{t('productsPage.bulkImport.failed')} <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
                     </div>
                     {importResult.failedDetails.length > 0 && (
                       <div className="bulk-import-result-failures">
-                        <small>Details:</small>
+                        <small>{t('productsPage.bulkImport.details')}</small>
                         {importResult.failedDetails.map((detail, i) => (
                           <div key={i} className="bulk-import-failure-item">{detail}</div>
                         ))}
@@ -545,7 +545,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                       className="btn-premium btn-premium-primary mt-3"
                       onClick={() => { setShowPreview(false); setImportResult(null); setParsedRows([]); }}
                     >
-                      <BiRefresh /> Import More
+                      <BiRefresh /> {t('productsPage.bulkImport.importMore')}
                     </button>
                   </div>
                 )}
@@ -558,15 +558,15 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         <thead>
                           <tr>
                             <th style={{ width: '36px' }}>#</th>
-                            <th>Name</th>
-                            <th>Supplier</th>
-                            <th>Purchase</th>
-                            <th>Selling</th>
-                            <th>Stock</th>
-                            <th>Unit</th>
-                            <th>Barcode</th>
-                            <th>Expiry</th>
-                            <th style={{ width: '70px' }}>Status</th>
+                            <th>{t('common.name')}</th>
+                            <th>{t('purchase.supplier')}</th>
+                            <th>{t('productsPage.bulkImport.colPurchase')}</th>
+                            <th>{t('productsPage.bulkImport.colSelling')}</th>
+                            <th>{t('product.stock')}</th>
+                            <th>{t('product.unit')}</th>
+                            <th>{t('product.barcode')}</th>
+                            <th>{t('productsPage.bulkImport.colExpiry')}</th>
+                            <th style={{ width: '70px' }}>{t('common.status')}</th>
                             <th style={{ width: '36px' }}></th>
                           </tr>
                         </thead>
@@ -589,22 +589,22 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                                 <td>
                                   {status === 'error' && (
                                     <span className="bulk-import-status-badge status-error" title={errors[idx]?.join(', ')}>
-                                      <BiError /> Error
+                                      <BiError /> {t('common.error')}
                                     </span>
                                   )}
                                   {status === 'duplicate-skip' && (
-                                    <span className="bulk-import-status-badge status-dup-skip" title={`Duplicate of ${duplicates[idx]?.existing?.name}`}>
-                                      <BiX /> Skip
+                                    <span className="bulk-import-status-badge status-dup-skip" title={t('productsPage.bulkImport.duplicateOf', { name: duplicates[idx]?.existing?.name })}>
+                                      <BiX /> {t('productsPage.bulkImport.statusSkip')}
                                     </span>
                                   )}
                                   {status === 'duplicate-update' && (
-                                    <span className="bulk-import-status-badge status-dup-update" title={`Will update ${duplicates[idx]?.existing?.name}`}>
-                                      <BiRefresh /> Update
+                                    <span className="bulk-import-status-badge status-dup-update" title={t('productsPage.bulkImport.willUpdate', { name: duplicates[idx]?.existing?.name })}>
+                                      <BiRefresh /> {t('common.update')}
                                     </span>
                                   )}
                                   {status === 'valid' && (
                                     <span className="bulk-import-status-badge status-valid">
-                                      <BiCheck /> Valid
+                                      <BiCheck /> {t('productsPage.bulkImport.valid')}
                                     </span>
                                   )}
                                 </td>
@@ -612,7 +612,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                                   <button
                                     className="bulk-import-remove-row"
                                     onClick={() => removeRow(idx)}
-                                    title="Remove row"
+                                    title={t('productsPage.bulkImport.removeRow')}
                                   >
                                     <BiX />
                                   </button>
@@ -627,10 +627,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     {/* Error Details */}
                     {errorCount > 0 && (
                       <div className="bulk-import-errors-section">
-                        <h6><BiError /> Row Errors</h6>
+                        <h6><BiError /> {t('productsPage.bulkImport.rowErrorsHeading')}</h6>
                         {Object.entries(errors).map(([idx, errs]) => (
                           <div key={idx} className="bulk-import-error-item">
-                            <strong>Row {parseInt(idx) + 1}:</strong> {parsedRows[parseInt(idx)]?.name} — {errs.join(', ')}
+                            <strong>{t('productsPage.bulkImport.rowLabel', { number: parseInt(idx) + 1 })}</strong> {parsedRows[parseInt(idx)]?.name} — {errs.join(', ')}
                           </div>
                         ))}
                       </div>
@@ -642,7 +642,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         className="btn-premium btn-premium-secondary"
                         onClick={() => { setShowPreview(false); setImportResult(null); }}
                       >
-                        <BiX /> Cancel
+                        <BiX /> {t('common.cancel')}
                       </button>
                       <button
                         className="btn-premium btn-premium-primary"
@@ -650,9 +650,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         disabled={importing || validCount === 0}
                       >
                         {importing ? (
-                          <><span className="spinner-border spinner-border-sm" /> Importing...</>
+                          <><span className="spinner-border spinner-border-sm" /> {t('productsPage.bulkImport.importingButton')}</>
                         ) : (
-                          <><BiUpload /> Import {validCount} Product{validCount !== 1 ? 's' : ''}</>
+                          <><BiUpload /> {t('productsPage.bulkImport.importProducts', { count: validCount })}</>
                         )}
                       </button>
                     </div>
@@ -762,12 +762,12 @@ const Products = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.products')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage your product inventory
+            {t('productsPage.subtitle')}
           </p>
         </div>
         <div className="d-flex gap-2">
           <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
-            <BiUpload /> Bulk Import
+            <BiUpload /> {t('productsPage.bulkImportButton')}
           </button>
           <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
             <BiPlus /> {t('product.addProduct')}
@@ -781,7 +781,7 @@ const Products = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder={`${t('common.search')} products...`}
+            placeholder={t('product.searchProductsPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -806,14 +806,14 @@ const Products = () => {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> Loading...
+                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
-                    No products found
+                    {t('empty.noProducts')}
                   </td>
                 </tr>
               ) : products.map((product) => (
@@ -831,17 +831,17 @@ const Products = () => {
                   </td>
                   <td>
                     {product.stock <= product.minStock ? (
-                      <span className="badge badge-danger">{t('common.lowStock') || 'Low'}</span>
+                      <span className="badge badge-danger">{t('product.lowStock')}</span>
                     ) : (
                       <span className="badge badge-success">{t('common.active')}</span>
                     )}
                   </td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(product)}>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(product)}>
                         <BiEdit />
                       </button>
-                      <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(product._id)}>
+                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(product._id)}>
                         <BiTrash />
                       </button>
                     </div>
@@ -857,12 +857,12 @@ const Products = () => {
       <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
         {loading ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : products.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
-            No products found
+            {t('empty.noProducts')}
           </div>
         ) : products.map((product) => (
           <ExpandableCard
@@ -879,7 +879,7 @@ const Products = () => {
                     <strong>{product.stock}</strong> {product.unit}
                   </span>
                   <span className={`expandable-card__stock ${product.stock <= product.minStock ? 'expandable-card__stock--low' : 'expandable-card__stock--ok'}`}>
-                    {product.stock <= product.minStock ? 'Low Stock' : 'In Stock'}
+                    {product.stock <= product.minStock ? t('product.lowStock') : t('product.inStock')}
                   </span>
                 </div>
               </>
@@ -887,48 +887,48 @@ const Products = () => {
             expanded={
               <div className="expandable-card__rows">
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Category</span>
+                  <span className="expandable-card__row-label">{t('product.category')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{product.category?.name || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Barcode</span>
+                  <span className="expandable-card__row-label">{t('product.barcode')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value expandable-card__row-value--mono">{product.barcode || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Purchase Price</span>
+                  <span className="expandable-card__row-label">{t('product.purchasePrice')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">₹{product.purchasePrice || 0}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Wholesale Price</span>
+                  <span className="expandable-card__row-label">{t('product.wholesalePrice')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">₹{product.wholesalePrice || 0}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Unit</span>
+                  <span className="expandable-card__row-label">{t('product.unit')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{product.unit || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Min Stock</span>
+                  <span className="expandable-card__row-label">{t('product.minStock')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{product.minStock || 0}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Status</span>
+                  <span className="expandable-card__row-label">{t('common.status')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">
                     {product.stock <= product.minStock ? (
-                      <span className="badge badge-danger">{t('common.lowStock') || 'Low'}</span>
+                      <span className="badge badge-danger">{t('product.lowStock')}</span>
                     ) : (
                       <span className="badge badge-success">{t('common.active')}</span>
                     )}
                   </span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-label">{t('productsPage.created')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{new Date(product.createdAt).toLocaleDateString()}</span>
                 </div>
@@ -936,10 +936,10 @@ const Products = () => {
             }
             actions={
               <>
-                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(product)}>
+                <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(product)}>
                   <BiEdit />
                 </button>
-                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(product._id)}>
+                <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(product._id)}>
                   <BiTrash />
                 </button>
               </>
@@ -972,7 +972,7 @@ const Products = () => {
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-premium-header">
-              <h5>Delete Product</h5>
+              <h5>{t('confirm.deleteTitle')}</h5>
               <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
             </div>
             <div className="modal-premium-body text-center">
@@ -984,12 +984,12 @@ const Products = () => {
                 <BiTrash />
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-                Are you sure you want to delete this product? This action cannot be undone.
+                {t('confirm.deleteMessage')}
               </p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
-              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
             </div>
           </div>
         </div>

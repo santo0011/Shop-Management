@@ -17,7 +17,7 @@ const REQUIRED_FIELDS = ['name'];
 
 const validateField = (name, value) => {
   switch (name) {
-    case 'name': return String(value || '').trim() ? '' : 'Category name is required';
+    case 'name': return String(value || '').trim() ? '' : 'categoriesPage.nameRequired';
     default: return '';
   }
 };
@@ -67,15 +67,15 @@ const CategoryDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     try {
       if (editing) {
         await api.put(`/categories/${editing._id}`, form);
-        showToast.success('Category updated successfully.');
+        showToast.success(t('categoriesPage.updateSuccess'));
       } else {
         await api.post('/categories', form);
-        showToast.success('Category added successfully.');
+        showToast.success(t('categoriesPage.addSuccess'));
       }
       onSuccess();
       onClose();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to save category';
+      const msg = err.response?.data?.message || t('categoriesPage.saveFailed');
       setSubmitError(msg);
       showToast.error(msg);
     } finally {
@@ -99,7 +99,7 @@ const CategoryDrawer = ({ open, onClose, onSuccess, editing, t }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header" style={{ padding: '0.85rem 1.25rem', minHeight: 'auto' }}>
-          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? 'Edit Category' : 'Add Category'}</h5>
+          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? t('categoriesPage.editCategory') : t('categoriesPage.addCategory')}</h5>
           <button className="btn-close-premium" onClick={onClose} style={{ width: '32px', height: '32px' }}><BiX /></button>
         </div>
         <div className="drawer-body category-drawer-body" style={{ padding: '0.85rem 1rem 0.4rem 1rem' }}>
@@ -120,12 +120,12 @@ const CategoryDrawer = ({ open, onClose, onSuccess, editing, t }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <div>
                 <label className="form-label" style={labelStyle}>{t('product.productName')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <input {...field('name')} placeholder="Enter category name" />
-                {errors.name && <div className="invalid-feedback-premium" style={errorStyle}>{errors.name}</div>}
+                <input {...field('name')} placeholder={t('categoriesPage.enterCategoryName')} />
+                {errors.name && <div className="invalid-feedback-premium" style={errorStyle}>{t(errors.name)}</div>}
               </div>
               <div>
                 <label className="form-label" style={labelStyle}>{t('product.productName')} (BN)</label>
-                <input {...field('nameBn')} placeholder="বিভাগের নাম লিখুন" />
+                <input {...field('nameBn')} placeholder={t('categoriesPage.enterCategoryNameBn')} />
               </div>
             </div>
           </form>
@@ -133,7 +133,7 @@ const CategoryDrawer = ({ open, onClose, onSuccess, editing, t }) => {
         <div className="drawer-footer category-drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
           <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>{t('common.cancel')}</button>
           <button type="submit" form="category-form" className="btn-premium btn-premium-primary" disabled={saving} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
-            {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
+            {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('common.save')}</>}
           </button>
         </div>
       </div>
@@ -186,7 +186,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     const errorMap = {};
     rows.forEach((row, idx) => {
       const rowErrors = [];
-      if (!row.name?.trim()) rowErrors.push('Name is required');
+      if (!row.name?.trim()) rowErrors.push(t('categoriesPage.nameRequired'));
 
       const existing = existingCategories.find(s =>
         s.name?.toLowerCase() === row.name?.trim()?.toLowerCase()
@@ -202,7 +202,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     setErrors(errorMap);
     setDuplicates(dupMap);
     return { errorMap, dupMap };
-  }, [existingCategories]);
+  }, [existingCategories, t]);
 
   // ─── Excel/CSV Import ───────────────────────────────────────────────────
   const handleFileUpload = (e) => {
@@ -218,7 +218,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
         if (jsonData.length === 0) {
-          Swal.fire({ icon: 'warning', title: 'Empty File', text: 'The file contains no data.', confirmButtonColor: '#6C63FF' });
+          Swal.fire({ icon: 'warning', title: t('categoriesPage.emptyFileTitle'), text: t('categoriesPage.emptyFileText'), confirmButtonColor: '#6C63FF' });
           return;
         }
 
@@ -238,7 +238,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         setShowPreview(true);
         detectDuplicates(mapped);
       } catch (err) {
-        Swal.fire({ icon: 'error', title: 'Parse Error', text: 'Failed to parse the file. Please check the format.', confirmButtonColor: '#6C63FF' });
+        Swal.fire({ icon: 'error', title: t('categoriesPage.parseErrorTitle'), text: t('categoriesPage.parseErrorText'), confirmButtonColor: '#6C63FF' });
       }
     };
     reader.readAsArrayBuffer(file);
@@ -259,7 +259,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   // ─── Paste Import ───────────────────────────────────────────────────────
   const handleParsePaste = () => {
     if (!pasteData.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Empty Data', text: 'Please paste category data first.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('categoriesPage.emptyDataTitle'), text: t('categoriesPage.emptyDataText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -277,7 +277,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     });
 
     if (parsed.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Data', text: 'Could not parse any rows from the pasted data.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('categoriesPage.noDataTitle'), text: t('categoriesPage.noDataText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -302,7 +302,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     });
 
     if (validRows.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Valid Rows', text: 'All rows have errors or are duplicates. Fix them or disable skip duplicates.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('categoriesPage.noValidRowsTitle'), text: t('categoriesPage.noValidRowsText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -359,7 +359,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`} style={{ width: '640px', maxWidth: '100vw' }}>
         <div className="drawer-header">
-          <h5><BiUpload className="me-2" />Bulk Import Categories</h5>
+          <h5><BiUpload className="me-2" />{t('categoriesPage.bulkImportCategories')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
@@ -369,13 +369,13 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               className={`bulk-import-tab ${activeTab === 'excel' ? 'active' : ''}`}
               onClick={() => { setActiveTab('excel'); setShowPreview(false); setParsedRows([]); }}
             >
-              <BiFile /> Excel / CSV Import
+              <BiFile /> {t('categoriesPage.excelCsvImport')}
             </button>
             <button
               className={`bulk-import-tab ${activeTab === 'paste' ? 'active' : ''}`}
               onClick={() => { setActiveTab('paste'); setShowPreview(false); setParsedRows([]); }}
             >
-              <BiPaste /> Copy & Paste Import
+              <BiPaste /> {t('categoriesPage.copyPasteImport')}
             </button>
           </div>
 
@@ -385,20 +385,20 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               <div className="bulk-import-upload-area">
                 <div className="bulk-import-upload-box">
                   <BiUpload size={48} />
-                  <h6>Upload Excel or CSV File</h6>
-                  <p>Supports .xlsx, .xls, and .csv files</p>
+                  <h6>{t('categoriesPage.uploadExcelCsvFile')}</h6>
+                  <p>{t('categoriesPage.supportsFileTypes')}</p>
                   <div className="d-flex gap-2 justify-content-center flex-wrap">
                     <button
                       className="btn-premium btn-premium-primary"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <BiUpload /> Select File
+                      <BiUpload /> {t('categoriesPage.selectFile')}
                     </button>
                     <button
                       className="btn-premium btn-premium-secondary"
                       onClick={handleDownloadTemplate}
                     >
-                      <BiDownload /> Download Template
+                      <BiDownload /> {t('categoriesPage.downloadTemplate')}
                     </button>
                   </div>
                   <input
@@ -410,7 +410,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   />
                   <div className="bulk-import-format-info">
                     <BiInfoCircle />
-                    <small>Expected columns: Name, Name (Bangla), Description</small>
+                    <small>{t('categoriesPage.expectedColumns')}</small>
                   </div>
                 </div>
               </div>
@@ -421,13 +421,13 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               <div className="bulk-import-paste-area">
                 <div className="bulk-import-paste-header">
                   <BiPaste size={28} />
-                  <h6>Paste Category Data</h6>
+                  <h6>{t('categoriesPage.pasteCategoryData')}</h6>
                 </div>
                 <p className="bulk-import-paste-desc">
-                  Paste comma-separated values. One category per line.
+                  {t('categoriesPage.pasteInstructions')}
                 </p>
                 <div className="bulk-import-format-example">
-                  <strong>Format:</strong> Category Name, Description, Name (Bangla)
+                  <strong>{t('categoriesPage.formatLabel')}</strong> {t('categoriesPage.formatExample')}
                 </div>
                 <textarea
                   className="bulk-import-textarea"
@@ -440,7 +440,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   className="btn-premium btn-premium-primary w-100 mt-2"
                   onClick={handleParsePaste}
                 >
-                  <BiTable /> Parse & Preview
+                  <BiTable /> {t('categoriesPage.parseAndPreview')}
                 </button>
               </div>
             )}
@@ -452,19 +452,19 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                 <div className="bulk-import-summary">
                   <div className="bulk-import-stat">
                     <span className="bulk-import-stat-value">{parsedRows.length}</span>
-                    <span className="bulk-import-stat-label">Total Rows</span>
+                    <span className="bulk-import-stat-label">{t('categoriesPage.totalRows')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-valid">
                     <span className="bulk-import-stat-value">{validCount}</span>
-                    <span className="bulk-import-stat-label">Valid</span>
+                    <span className="bulk-import-stat-label">{t('categoriesPage.valid')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-error">
                     <span className="bulk-import-stat-value">{errorCount}</span>
-                    <span className="bulk-import-stat-label">Errors</span>
+                    <span className="bulk-import-stat-label">{t('categoriesPage.errors')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-dup">
                     <span className="bulk-import-stat-value">{duplicateCount}</span>
-                    <span className="bulk-import-stat-label">Duplicates</span>
+                    <span className="bulk-import-stat-label">{t('categoriesPage.duplicates')}</span>
                   </div>
                 </div>
 
@@ -477,10 +477,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         checked={skipDuplicates}
                         onChange={(e) => setSkipDuplicates(e.target.checked)}
                       />
-                      <span>Skip duplicate categories ({duplicateCount} found)</span>
+                      <span>{t('categoriesPage.skipDuplicatesLabel', { count: duplicateCount })}</span>
                     </label>
                     <span className="bulk-import-toggle-hint">
-                      Uncheck to update existing records instead
+                      {t('categoriesPage.uncheckToUpdateHint')}
                     </span>
                   </div>
                 )}
@@ -491,15 +491,15 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     <div className="bulk-import-result-icon">
                       <BiCheck size={32} />
                     </div>
-                    <h6>Import Complete</h6>
+                    <h6>{t('categoriesPage.importComplete')}</h6>
                     <div className="bulk-import-result-stats">
-                      <span>Imported: <strong>{importResult.imported}</strong></span>
-                      <span>Updated: <strong>{importResult.updated}</strong></span>
-                      <span>Failed: <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
+                      <span>{t('categoriesPage.imported')}: <strong>{importResult.imported}</strong></span>
+                      <span>{t('categoriesPage.updatedCount')}: <strong>{importResult.updated}</strong></span>
+                      <span>{t('categoriesPage.failedCount')}: <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
                     </div>
                     {importResult.failedDetails.length > 0 && (
                       <div className="bulk-import-result-failures">
-                        <small>Failed rows:</small>
+                        <small>{t('categoriesPage.failedRows')}</small>
                         {importResult.failedDetails.map((detail, i) => (
                           <div key={i} className="bulk-import-failure-item">{detail}</div>
                         ))}
@@ -509,7 +509,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                       className="btn-premium btn-premium-primary mt-3"
                       onClick={() => { setShowPreview(false); setImportResult(null); setParsedRows([]); }}
                     >
-                      <BiRefresh /> Import More
+                      <BiRefresh /> {t('categoriesPage.importMore')}
                     </button>
                   </div>
                 )}
@@ -522,10 +522,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         <thead>
                           <tr>
                             <th style={{ width: '40px' }}>#</th>
-                            <th>Name</th>
-                            <th>Name (BN)</th>
-                            <th>Description</th>
-                            <th style={{ width: '80px' }}>Status</th>
+                            <th>{t('common.name')}</th>
+                            <th>{t('common.name')} (BN)</th>
+                            <th>{t('common.description')}</th>
+                            <th style={{ width: '80px' }}>{t('common.status')}</th>
                             <th style={{ width: '40px' }}></th>
                           </tr>
                         </thead>
@@ -543,22 +543,22 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                                 <td>
                                   {status === 'error' && (
                                     <span className="bulk-import-status-badge status-error" title={errors[idx]?.join(', ')}>
-                                      <BiError /> Error
+                                      <BiError /> {t('categoriesPage.statusError')}
                                     </span>
                                   )}
                                   {status === 'duplicate-skip' && (
-                                    <span className="bulk-import-status-badge status-dup-skip" title={`Duplicate of ${duplicates[idx]?.name}`}>
-                                      <BiX /> Skip
+                                    <span className="bulk-import-status-badge status-dup-skip" title={t('categoriesPage.duplicateOfTitle', { name: duplicates[idx]?.name })}>
+                                      <BiX /> {t('categoriesPage.statusSkip')}
                                     </span>
                                   )}
                                   {status === 'duplicate-update' && (
-                                    <span className="bulk-import-status-badge status-dup-update" title={`Will update ${duplicates[idx]?.name}`}>
-                                      <BiRefresh /> Update
+                                    <span className="bulk-import-status-badge status-dup-update" title={t('categoriesPage.willUpdateTitle', { name: duplicates[idx]?.name })}>
+                                      <BiRefresh /> {t('categoriesPage.statusUpdate')}
                                     </span>
                                   )}
                                   {status === 'valid' && (
                                     <span className="bulk-import-status-badge status-valid">
-                                      <BiCheck /> Valid
+                                      <BiCheck /> {t('categoriesPage.valid')}
                                     </span>
                                   )}
                                 </td>
@@ -566,7 +566,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                                   <button
                                     className="bulk-import-remove-row"
                                     onClick={() => removeRow(idx)}
-                                    title="Remove row"
+                                    title={t('categoriesPage.removeRowTitle')}
                                   >
                                     <BiX />
                                   </button>
@@ -666,9 +666,9 @@ const Categories = () => {
       await api.delete(`/categories/${id}`);
       setDeleteConfirm(null);
       fetchCategories();
-      showToast.success('Category deleted successfully.');
+      showToast.success(t('categoriesPage.deleteSuccess'));
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to delete category';
+      const msg = err.response?.data?.message || t('categoriesPage.deleteFailed');
       showToast.error(msg);
       setDeleteConfirm(null);
     }
@@ -681,15 +681,15 @@ const Categories = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.categories')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage your product categories
+            {t('categoriesPage.subtitle')}
           </p>
         </div>
         <div className="d-flex gap-2">
           <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
-            <BiUpload /> Bulk Import
+            <BiUpload /> {t('categoriesPage.bulkImportButton')}
           </button>
           <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
-            <BiPlus /> Add Category
+            <BiPlus /> {t('categoriesPage.addCategory')}
           </button>
         </div>
       </div>
@@ -700,7 +700,7 @@ const Categories = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder={`${t('common.search')} categories...`}
+            placeholder={t('categoriesPage.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -722,14 +722,14 @@ const Categories = () => {
               {loading ? (
                 <tr>
                   <td colSpan={3} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> Loading...
+                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : categories.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
-                    No categories found
+                    {t('categoriesPage.noCategoriesFound')}
                   </td>
                 </tr>
               ) : categories.map((category) => (
@@ -740,10 +740,10 @@ const Categories = () => {
                   <td>{category.nameBn || '-'}</td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(category)}>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(category)}>
                         <BiEdit />
                       </button>
-                      <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(category._id)}>
+                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(category._id)}>
                         <BiTrash />
                       </button>
                     </div>
@@ -764,7 +764,7 @@ const Categories = () => {
         ) : categories.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
-            No categories found
+            {t('categoriesPage.noCategoriesFound')}
           </div>
         ) : categories.map((category) => (
           <ExpandableCard
@@ -773,15 +773,15 @@ const Categories = () => {
               <>
                 <div className="expandable-card__compact-row">
                   <span className="expandable-card__name">{category.name}</span>
-                  <span className="expandable-card__price">{category.productCount || 0} products</span>
+                  <span className="expandable-card__price">{t('categoriesPage.productsCount', { count: category.productCount || 0 })}</span>
                 </div>
                 <div className="expandable-card__meta">
                   <span className="expandable-card__meta-item">
                     <BiCategory />
-                    <span>{category.nameBn || 'No Bangla name'}</span>
+                    <span>{category.nameBn || t('categoriesPage.noBanglaName')}</span>
                   </span>
                   <span className="expandable-card__stock expandable-card__stock--ok">
-                    Active
+                    {t('common.active')}
                   </span>
                 </div>
               </>
@@ -789,35 +789,35 @@ const Categories = () => {
             expanded={
               <div className="expandable-card__rows">
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Description</span>
+                  <span className="expandable-card__row-label">{t('common.description')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{category.description || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Bangla Name</span>
+                  <span className="expandable-card__row-label">{t('categoriesPage.banglaName')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{category.nameBn || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-label">{t('categoriesPage.created')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{new Date(category.createdAt).toLocaleDateString()}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Status</span>
+                  <span className="expandable-card__row-label">{t('common.status')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">
-                    <span className="badge badge-success">Active</span>
+                    <span className="badge badge-success">{t('common.active')}</span>
                   </span>
                 </div>
               </div>
             }
             actions={
               <>
-                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(category)}>
+                <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(category)}>
                   <BiEdit />
                 </button>
-                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(category._id)}>
+                <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(category._id)}>
                   <BiTrash />
                 </button>
               </>
@@ -848,7 +848,7 @@ const Categories = () => {
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-premium-header">
-              <h5>Delete Category</h5>
+              <h5>{t('categoriesPage.deleteCategory')}</h5>
               <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
             </div>
             <div className="modal-premium-body text-center">
@@ -860,12 +860,12 @@ const Categories = () => {
                 <BiTrash />
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-                Are you sure you want to delete this category? This action cannot be undone.
+                {t('categoriesPage.deleteCategoryConfirm')}
               </p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
-              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
             </div>
           </div>
         </div>

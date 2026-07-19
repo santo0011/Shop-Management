@@ -11,17 +11,6 @@ import {
   BiHide, BiShow, BiChevronDown,
 } from 'react-icons/bi';
 
-const SECTIONS = [
-  { key: 'shop', label: 'Shop Information', icon: BiStore, description: 'Basic details shown on invoices and receipts' },
-  { key: 'tax', label: 'Tax & VAT', icon: BiTag, description: 'The tax rate applied to every POS sale' },
-  { key: 'invoice', label: 'Invoice & Print', icon: BiReceipt, description: 'Numbering and footer message for invoices' },
-  { key: 'barcode', label: 'Barcode Settings', icon: BiBarcode, description: 'Default format used when generating product barcodes' },
-  { key: 'backup', label: 'Backup & Restore', icon: BiCloudDownload, description: 'Export or import your shop data as a JSON file' },
-  { key: 'security', label: 'Security', icon: BiShieldQuarter, description: 'Account activity and active sessions' },
-  { key: 'profile', label: 'Profile', icon: BiUserCircle, description: 'Your personal name, phone, and avatar' },
-  { key: 'password', label: 'Change Password', icon: BiLockAlt, description: "Use a strong password that you don't use elsewhere" },
-];
-
 const SectionHeader = ({ icon: Icon, title, description }) => (
   <div className="settings-card-header">
     <div className="settings-card-icon"><Icon /></div>
@@ -44,6 +33,17 @@ const emptyAddress = { street: '', city: '', state: '', zipCode: '', country: ''
 const Settings = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch();
+
+  const SECTIONS = [
+    { key: 'shop', label: t('settingsPage.shopInformation'), icon: BiStore, description: t('settingsPage.shopInfoDesc') },
+    { key: 'tax', label: t('settingsPage.taxVat'), icon: BiTag, description: t('settingsPage.taxSectionDesc') },
+    { key: 'invoice', label: t('settingsPage.invoicePrint'), icon: BiReceipt, description: t('settingsPage.invoiceSectionDesc') },
+    { key: 'barcode', label: t('settingsPage.barcodeSettings'), icon: BiBarcode, description: t('settingsPage.barcodeSectionDesc') },
+    { key: 'backup', label: t('settingsPage.backupRestore'), icon: BiCloudDownload, description: t('settingsPage.backupSectionDesc') },
+    { key: 'security', label: t('settingsPage.security'), icon: BiShieldQuarter, description: t('settingsPage.securitySectionDesc') },
+    { key: 'profile', label: t('common.profile'), icon: BiUserCircle, description: t('settingsPage.profileSectionDesc') },
+    { key: 'password', label: t('settingsPage.changePassword'), icon: BiLockAlt, description: t('settingsPage.changePasswordDesc') },
+  ];
 
   const [activeSection, setActiveSection] = useState('shop');
   const [mobileExpanded, setMobileExpanded] = useState(null);
@@ -112,7 +112,7 @@ const Settings = () => {
       setShop(data);
       showToast.success(successMsg);
     } catch (err) {
-      showToast.error(err.response?.data?.message || 'Failed to save settings');
+      showToast.error(err.response?.data?.message || t('settingsPage.failedToSaveSettings'));
     } finally {
       setSaving(false);
     }
@@ -130,9 +130,9 @@ const Settings = () => {
         address: shopForm.address,
       });
       setShop(data);
-      showToast.success('Shop information saved');
+      showToast.success(t('settingsPage.shopInfoSaved'));
     } catch (err) {
-      showToast.error(err.response?.data?.message || 'Failed to save shop information');
+      showToast.error(err.response?.data?.message || t('settingsPage.failedToSaveShopInfo'));
     } finally {
       setSaving(false);
     }
@@ -140,17 +140,17 @@ const Settings = () => {
 
   const handleSaveTax = () => saveShopSettings(
     { taxRate: taxForm.taxRate, taxName: taxForm.taxName },
-    'Tax settings saved'
+    t('settingsPage.taxSettingsSaved')
   );
 
   const handleSaveInvoice = () => saveShopSettings(
     { invoicePrefix: invoiceForm.invoicePrefix, receiptFooter: invoiceForm.receiptFooter },
-    'Invoice settings saved'
+    t('settingsPage.invoiceSettingsSaved')
   );
 
   const handleSaveBarcode = () => saveShopSettings(
     { barcodePrefix: barcodeForm.barcodePrefix, barcodeSymbology: barcodeForm.barcodeSymbology, autoGenerateBarcode: barcodeForm.autoGenerateBarcode },
-    'Barcode settings saved'
+    t('settingsPage.barcodeSettingsSaved')
   );
 
   const handleSaveProfile = async () => {
@@ -163,9 +163,9 @@ const Settings = () => {
       });
       dispatch(updateProfile(data));
       setProfileData(prev => ({ ...prev, ...data }));
-      showToast.success('Profile saved');
+      showToast.success(t('settingsPage.profileSaved'));
     } catch (err) {
-      showToast.error('Failed to save profile');
+      showToast.error(t('settingsPage.failedToSaveProfile'));
     } finally {
       setSaving(false);
     }
@@ -173,15 +173,15 @@ const Settings = () => {
 
   const handleChangePassword = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword) {
-      showToast.error('Please fill in all password fields');
+      showToast.error(t('settingsPage.fillAllPasswordFields'));
       return;
     }
     if (passwordForm.newPassword.length < 6) {
-      showToast.error('New password must be at least 6 characters');
+      showToast.error(t('auth.passwordMinLength'));
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showToast.error('New password and confirmation do not match');
+      showToast.error(t('auth.passwordMismatch'));
       return;
     }
     setSaving(true);
@@ -190,10 +190,10 @@ const Settings = () => {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-      showToast.success('Password updated successfully');
+      showToast.success(t('toast.updateSuccess', { item: t('auth.password') }));
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      showToast.error(err.response?.data?.message || 'Failed to update password');
+      showToast.error(err.response?.data?.message || t('settingsPage.failedToUpdatePassword'));
     } finally {
       setSaving(false);
     }
@@ -213,9 +213,9 @@ const Settings = () => {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      showToast.success('Backup downloaded');
+      showToast.success(t('settingsPage.backupDownloaded'));
     } catch (err) {
-      showToast.error('Failed to generate backup');
+      showToast.error(t('settingsPage.failedToGenerateBackup'));
     } finally {
       setDownloadingBackup(false);
     }
@@ -231,7 +231,7 @@ const Settings = () => {
         const parsed = JSON.parse(evt.target.result);
         setRestoreFile({ name: file.name, data: parsed });
       } catch (err) {
-        showToast.error('Invalid backup file');
+        showToast.error(t('settingsPage.invalidBackupFile'));
         setRestoreFile(null);
       }
     };
@@ -241,14 +241,14 @@ const Settings = () => {
   const handleRestore = () => {
     if (!restoreFile) return;
     Swal.fire({
-      title: 'Restore from backup?',
-      text: `This will overwrite any existing products, categories, suppliers, and customers that match records in "${restoreFile.name}". This cannot be undone.`,
+      title: t('settingsPage.restoreConfirmTitle'),
+      text: t('settingsPage.restoreConfirmText', { fileName: restoreFile.name }),
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#FF6B6B',
       cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, restore',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('settingsPage.yesRestore'),
+      cancelButtonText: t('common.cancel'),
       background: 'var(--bg-card)',
       color: 'var(--text-primary)',
       reverseButtons: true,
@@ -259,11 +259,16 @@ const Settings = () => {
         const { products, categories, suppliers, customers } = restoreFile.data || {};
         const { data } = await api.post('/shops/restore', { products, categories, suppliers, customers });
         showToast.success(
-          `Restored ${data.products.restored} products, ${data.categories.restored} categories, ${data.suppliers.restored} suppliers, ${data.customers.restored} customers`
+          t('settingsPage.restoreSuccess', {
+            products: data.products.restored,
+            categories: data.categories.restored,
+            suppliers: data.suppliers.restored,
+            customers: data.customers.restored,
+          })
         );
         setRestoreFile(null);
       } catch (err) {
-        showToast.error('Restore failed');
+        showToast.error(t('settingsPage.restoreFailed'));
       } finally {
         setRestoring(false);
       }
@@ -273,14 +278,14 @@ const Settings = () => {
   // ─── Security ────────────────────────────────────────────────────────
   const handleSignOutAllDevices = () => {
     Swal.fire({
-      title: 'Sign out from all devices?',
-      text: 'You will be signed out here and on every other device. You will need to log in again.',
+      title: t('settingsPage.signOutConfirmTitle'),
+      text: t('settingsPage.signOutConfirmText'),
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#FF6B6B',
       cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, sign out everywhere',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('settingsPage.yesSignOutEverywhere'),
+      cancelButtonText: t('common.cancel'),
       background: 'var(--bg-card)',
       color: 'var(--text-primary)',
       reverseButtons: true,
@@ -303,12 +308,12 @@ const Settings = () => {
   };
 
   const SAVE_ACTIONS = {
-    shop: { label: 'Save Shop Information', onSave: handleSaveShop },
-    tax: { label: 'Save Tax Settings', onSave: handleSaveTax },
-    invoice: { label: 'Save Invoice Settings', onSave: handleSaveInvoice },
-    barcode: { label: 'Save Barcode Settings', onSave: handleSaveBarcode },
-    profile: { label: 'Save Profile', onSave: handleSaveProfile },
-    password: { label: 'Update Password', onSave: handleChangePassword },
+    shop: { label: t('settingsPage.saveShopInformation'), onSave: handleSaveShop },
+    tax: { label: t('settingsPage.saveTaxSettings'), onSave: handleSaveTax },
+    invoice: { label: t('settingsPage.saveInvoiceSettings'), onSave: handleSaveInvoice },
+    barcode: { label: t('settingsPage.saveBarcodeSettings'), onSave: handleSaveBarcode },
+    profile: { label: t('settingsPage.saveProfile'), onSave: handleSaveProfile },
+    password: { label: t('settingsPage.updatePassword'), onSave: handleChangePassword },
   };
 
   if (loading) {
@@ -324,48 +329,48 @@ const Settings = () => {
       case 'shop':
         return (
           <div className="settings-card">
-            <SectionHeader icon={BiStore} title="Shop Information" description="Basic details shown on invoices and receipts" />
+            <SectionHeader icon={BiStore} title={t('settingsPage.shopInformation')} description={t('settingsPage.shopInfoDesc')} />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
-                  <label className="form-label">Shop Name</label>
+                  <label className="form-label">{t('auth.shopName')}</label>
                   <input className="form-control" value={shopForm.name} onChange={e => setShopForm({ ...shopForm, name: e.target.value })} />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label"><BiEnvelope style={{ marginRight: 4 }} /> Email</label>
+                  <label className="form-label"><BiEnvelope style={{ marginRight: 4 }} /> {t('auth.email')}</label>
                   <input type="email" className="form-control" value={shopForm.email} onChange={e => setShopForm({ ...shopForm, email: e.target.value })} />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label"><BiPhone style={{ marginRight: 4 }} /> Phone</label>
+                  <label className="form-label"><BiPhone style={{ marginRight: 4 }} /> {t('auth.phone')}</label>
                   <input className="form-control" value={shopForm.phone} onChange={e => setShopForm({ ...shopForm, phone: e.target.value })} />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label"><BiImage style={{ marginRight: 4 }} /> Logo URL</label>
-                  <input className="form-control" value={shopForm.logo} onChange={e => setShopForm({ ...shopForm, logo: e.target.value })} placeholder="https://..." />
+                  <label className="form-label"><BiImage style={{ marginRight: 4 }} /> {t('settingsPage.logoUrl')}</label>
+                  <input className="form-control" value={shopForm.logo} onChange={e => setShopForm({ ...shopForm, logo: e.target.value })} placeholder={t('settingsPage.urlPlaceholder')} />
                 </div>
               </div>
               {shopForm.logo && (
                 <div className="mb-3">
-                  <img src={shopForm.logo} alt="Shop logo preview" style={{ height: 56, width: 56, objectFit: 'cover', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)' }} />
+                  <img src={shopForm.logo} alt={t('settingsPage.shopLogoPreview')} style={{ height: 56, width: 56, objectFit: 'cover', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)' }} />
                 </div>
               )}
               <hr style={{ borderColor: 'var(--border-color)' }} />
-              <label className="form-label">Address</label>
+              <label className="form-label">{t('settingsPage.address')}</label>
               <div className="settings-field-row">
                 <div className="mb-3">
-                  <input className="form-control" placeholder="Street" value={shopForm.address.street} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, street: e.target.value } })} />
+                  <input className="form-control" placeholder={t('settingsPage.street')} value={shopForm.address.street} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, street: e.target.value } })} />
                 </div>
                 <div className="mb-3">
-                  <input className="form-control" placeholder="City" value={shopForm.address.city} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, city: e.target.value } })} />
+                  <input className="form-control" placeholder={t('settingsPage.city')} value={shopForm.address.city} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, city: e.target.value } })} />
                 </div>
                 <div className="mb-3">
-                  <input className="form-control" placeholder="State" value={shopForm.address.state} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, state: e.target.value } })} />
+                  <input className="form-control" placeholder={t('settingsPage.state')} value={shopForm.address.state} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, state: e.target.value } })} />
                 </div>
                 <div className="mb-3">
-                  <input className="form-control" placeholder="ZIP / Postal Code" value={shopForm.address.zipCode} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, zipCode: e.target.value } })} />
+                  <input className="form-control" placeholder={t('settingsPage.zipCode')} value={shopForm.address.zipCode} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, zipCode: e.target.value } })} />
                 </div>
                 <div className="mb-3">
-                  <input className="form-control" placeholder="Country" value={shopForm.address.country} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, country: e.target.value } })} />
+                  <input className="form-control" placeholder={t('settingsPage.country')} value={shopForm.address.country} onChange={e => setShopForm({ ...shopForm, address: { ...shopForm.address, country: e.target.value } })} />
                 </div>
               </div>
             </div>
@@ -375,10 +380,10 @@ const Settings = () => {
       case 'tax':
         return (
           <div className="settings-card">
-            <SectionHeader icon={BiTag} title={t('settings.taxSettings')} description="The tax rate applied to every POS sale" />
+            <SectionHeader icon={BiTag} title={t('settings.taxSettings')} description={t('settingsPage.taxSectionDesc')} />
             <div className="p-4">
               <div className="mb-3">
-                <label className="form-label">Tax Rate (%)</label>
+                <label className="form-label">{t('settingsPage.taxRatePercent')}</label>
                 <div className="d-flex gap-2 align-items-center flex-wrap">
                   <input
                     type="number"
@@ -399,23 +404,23 @@ const Settings = () => {
                         className={`btn-premium btn-premium-sm ${taxForm.taxRate === val ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
                         onClick={() => setTaxForm({ ...taxForm, taxRate: val })}
                       >
-                        {val === 0 ? 'No Tax' : `${val}%`}
+                        {val === 0 ? t('settingsPage.noTax') : `${val}%`}
                       </button>
                     ))}
                   </div>
                 </div>
                 <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: 4, display: 'block' }}>
-                  Set 0% for no tax. This is applied on all POS invoices.
+                  {t('settingsPage.taxRateHint')}
                 </small>
               </div>
               <div className="mb-3">
-                <label className="form-label">Tax Name</label>
+                <label className="form-label">{t('settingsPage.taxName')}</label>
                 <input
                   className="form-control"
                   style={{ maxWidth: '220px' }}
                   value={taxForm.taxName}
                   onChange={e => setTaxForm({ ...taxForm, taxName: e.target.value })}
-                  placeholder="e.g. VAT, GST, Sales Tax"
+                  placeholder={t('settingsPage.taxNamePlaceholder')}
                 />
               </div>
             </div>
@@ -425,33 +430,33 @@ const Settings = () => {
       case 'invoice':
         return (
           <div className="settings-card">
-            <SectionHeader icon={BiReceipt} title={t('settings.invoiceSettings')} description="Numbering and footer message for invoices" />
+            <SectionHeader icon={BiReceipt} title={t('settings.invoiceSettings')} description={t('settingsPage.invoiceSectionDesc')} />
             <div className="p-4">
               <div className="mb-3">
-                <label className="form-label">Invoice Number Prefix</label>
+                <label className="form-label">{t('settingsPage.invoiceNumberPrefix')}</label>
                 <input
                   className="form-control"
                   style={{ maxWidth: '220px' }}
                   value={invoiceForm.invoicePrefix}
                   onChange={e => setInvoiceForm({ ...invoiceForm, invoicePrefix: e.target.value })}
-                  placeholder="e.g. INV-"
+                  placeholder={t('settingsPage.invoicePrefixPlaceholder')}
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label">Invoice Footer Message</label>
+                <label className="form-label">{t('settingsPage.invoiceFooterMessage')}</label>
                 <textarea
                   className="form-control"
                   rows="3"
                   value={invoiceForm.receiptFooter}
                   onChange={e => setInvoiceForm({ ...invoiceForm, receiptFooter: e.target.value })}
-                  placeholder="Thank you for shopping with us."
+                  placeholder={t('settingsPage.invoiceFooterPlaceholder')}
                 />
                 <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: 4, display: 'block' }}>
-                  This message appears at the bottom of every invoice and receipt.
+                  {t('settingsPage.invoiceFooterHint')}
                 </small>
               </div>
               <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>
-                Paper size and template (A4 / 58mm / 80mm) can be chosen from the Printer Settings button on the POS and Sales pages.
+                {t('settingsPage.printerSettingsHint')}
               </small>
             </div>
           </div>
@@ -460,18 +465,18 @@ const Settings = () => {
       case 'barcode':
         return (
           <div className="settings-card">
-            <SectionHeader icon={BiBarcode} title="Barcode Settings" description="Default format used when generating product barcodes" />
+            <SectionHeader icon={BiBarcode} title={t('settingsPage.barcodeSettings')} description={t('settingsPage.barcodeSectionDesc')} />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
-                  <label className="form-label">Barcode Format</label>
+                  <label className="form-label">{t('settingsPage.barcodeFormat')}</label>
                   <select className="form-select" value={barcodeForm.barcodeSymbology} onChange={e => setBarcodeForm({ ...barcodeForm, barcodeSymbology: e.target.value })}>
                     {BARCODE_FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                   </select>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label">Barcode Prefix</label>
-                  <input className="form-control" value={barcodeForm.barcodePrefix} onChange={e => setBarcodeForm({ ...barcodeForm, barcodePrefix: e.target.value })} placeholder="e.g. SHOP-" />
+                  <label className="form-label">{t('settingsPage.barcodePrefix')}</label>
+                  <input className="form-control" value={barcodeForm.barcodePrefix} onChange={e => setBarcodeForm({ ...barcodeForm, barcodePrefix: e.target.value })} placeholder={t('settingsPage.barcodePrefixPlaceholder')} />
                 </div>
               </div>
               <div className="mb-2">
@@ -481,11 +486,11 @@ const Settings = () => {
                     checked={barcodeForm.autoGenerateBarcode}
                     onChange={e => setBarcodeForm({ ...barcodeForm, autoGenerateBarcode: e.target.checked })}
                   />
-                  <span>Auto-generate barcodes for new products</span>
+                  <span>{t('settingsPage.autoGenerateBarcodes')}</span>
                 </label>
               </div>
               <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>
-                Used as the default format and prefix when generating barcodes for new products.
+                {t('settingsPage.barcodeHint')}
               </small>
             </div>
           </div>
@@ -495,30 +500,30 @@ const Settings = () => {
         return (
           <>
             <div className="settings-card mb-4">
-              <SectionHeader icon={BiCloudDownload} title="Download Backup" description="Export your shop data as a single JSON file" />
+              <SectionHeader icon={BiCloudDownload} title={t('settingsPage.downloadBackup')} description={t('settingsPage.downloadBackupDesc')} />
               <div className="p-4">
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                  Export your shop information, products, categories, suppliers, and customers as a single JSON file.
+                  {t('settingsPage.downloadBackupBody')}
                 </p>
                 <button type="button" className="btn-premium btn-premium-primary" onClick={handleDownloadBackup} disabled={downloadingBackup}>
-                  {downloadingBackup ? <><span className="spinner-border spinner-border-sm" /> Preparing...</> : <><BiCloudDownload /> Download Backup</>}
+                  {downloadingBackup ? <><span className="spinner-border spinner-border-sm" /> {t('settingsPage.preparing')}</> : <><BiCloudDownload /> {t('settingsPage.downloadBackup')}</>}
                 </button>
               </div>
             </div>
             <div className="settings-card">
-              <SectionHeader icon={BiCloudUpload} title="Restore from Backup" description="Import products, categories, suppliers, and customers" />
+              <SectionHeader icon={BiCloudUpload} title={t('settingsPage.restoreFromBackup')} description={t('settingsPage.restoreDesc')} />
               <div className="p-4">
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                  Upload a previously downloaded backup file to restore your products, categories, suppliers, and customers. Matching records are overwritten.
+                  {t('settingsPage.restoreBody')}
                 </p>
                 <div className="d-flex align-items-center gap-2 flex-wrap">
                   <label className="btn-premium btn-premium-secondary" style={{ cursor: 'pointer', margin: 0 }}>
-                    <BiCloudUpload /> Choose File
+                    <BiCloudUpload /> {t('settingsPage.chooseFile')}
                     <input type="file" accept="application/json" onChange={handleRestoreFileChange} style={{ display: 'none' }} />
                   </label>
                   {restoreFile && <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{restoreFile.name}</span>}
                   <button type="button" className="btn-premium btn-premium-primary" onClick={handleRestore} disabled={!restoreFile || restoring}>
-                    {restoring ? <><span className="spinner-border spinner-border-sm" /> Restoring...</> : 'Restore'}
+                    {restoring ? <><span className="spinner-border spinner-border-sm" /> {t('settingsPage.restoring')}</> : t('settingsPage.restore')}
                   </button>
                 </div>
               </div>
@@ -529,33 +534,33 @@ const Settings = () => {
       case 'security':
         return (
           <div className="settings-card">
-            <SectionHeader icon={BiShieldQuarter} title="Security" description="Account activity and active sessions" />
+            <SectionHeader icon={BiShieldQuarter} title={t('settingsPage.security')} description={t('settingsPage.securitySectionDesc')} />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
-                  <label className="form-label">Email</label>
+                  <label className="form-label">{t('auth.email')}</label>
                   <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{profileData?.email || '—'}</div>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label">Role</label>
+                  <label className="form-label">{t('settingsPage.role')}</label>
                   <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{profileData?.role || '—'}</div>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label">Last Login</label>
+                  <label className="form-label">{t('settingsPage.lastLogin')}</label>
                   <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{formatDateTime(profileData?.lastLogin)}</div>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label">Member Since</label>
+                  <label className="form-label">{t('settingsPage.memberSince')}</label>
                   <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{formatDateTime(profileData?.createdAt)}</div>
                 </div>
               </div>
               <hr style={{ borderColor: 'var(--border-color)' }} />
-              <label className="form-label">Sessions</label>
+              <label className="form-label">{t('settingsPage.sessions')}</label>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                If you suspect your account is signed in somewhere it shouldn't be, sign out everywhere and log back in.
+                {t('settingsPage.signOutHint')}
               </p>
               <button type="button" className="btn-premium" style={{ background: 'var(--danger)', color: '#fff' }} onClick={handleSignOutAllDevices}>
-                Sign Out From All Devices
+                {t('settingsPage.signOutAllDevices')}
               </button>
             </div>
           </div>
@@ -564,7 +569,7 @@ const Settings = () => {
       case 'profile':
         return (
           <div className="settings-card">
-            <SectionHeader icon={BiUserCircle} title="Profile" description="Your personal name, phone, and avatar" />
+            <SectionHeader icon={BiUserCircle} title={t('common.profile')} description={t('settingsPage.profileSectionDesc')} />
             <div className="p-4">
               <div className="settings-field-row">
                 <div className="mb-3">
@@ -576,12 +581,12 @@ const Settings = () => {
                   <input className="form-control" value={profileForm.phone} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} />
                 </div>
                 <div className="mb-3">
-                  <label className="form-label">Email</label>
+                  <label className="form-label">{t('auth.email')}</label>
                   <div className="form-control" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{profileData?.email || '—'}</div>
                 </div>
                 <div className="mb-3">
-                  <label className="form-label"><BiImage style={{ marginRight: 4 }} /> Avatar URL</label>
-                  <input className="form-control" value={profileForm.avatar} onChange={e => setProfileForm({ ...profileForm, avatar: e.target.value })} placeholder="https://..." />
+                  <label className="form-label"><BiImage style={{ marginRight: 4 }} /> {t('settingsPage.avatarUrl')}</label>
+                  <input className="form-control" value={profileForm.avatar} onChange={e => setProfileForm({ ...profileForm, avatar: e.target.value })} placeholder={t('settingsPage.urlPlaceholder')} />
                 </div>
               </div>
             </div>
@@ -591,14 +596,14 @@ const Settings = () => {
       case 'password':
         return (
           <div className="settings-card" style={{ maxWidth: '520px' }}>
-            <SectionHeader icon={BiLockAlt} title="Change Password" description="Use a strong password that you don't use elsewhere" />
+            <SectionHeader icon={BiLockAlt} title={t('settingsPage.changePassword')} description={t('settingsPage.changePasswordDesc')} />
 
             {/* ── Fields ── */}
             <div style={{ padding: '20px 24px 16px' }}>
               {[
-                { key: 'current', label: 'Current Password', field: 'currentPassword', autoComplete: 'current-password' },
-                { key: 'new', label: 'New Password', field: 'newPassword', autoComplete: 'new-password' },
-                { key: 'confirm', label: 'Confirm New Password', field: 'confirmPassword', autoComplete: 'new-password' },
+                { key: 'current', label: t('settingsPage.currentPassword'), field: 'currentPassword', autoComplete: 'current-password' },
+                { key: 'new', label: t('auth.newPassword'), field: 'newPassword', autoComplete: 'new-password' },
+                { key: 'confirm', label: t('auth.confirmNewPassword'), field: 'confirmPassword', autoComplete: 'new-password' },
               ].map(({ key, label, field, autoComplete }) => (
                 <div key={key} style={{ marginBottom: key === 'confirm' ? '12px' : '20px' }}>
                   <label
@@ -642,7 +647,7 @@ const Settings = () => {
                       value={passwordForm[field]}
                       onChange={e => setPasswordForm({ ...passwordForm, [field]: e.target.value })}
                       autoComplete={autoComplete}
-                      placeholder={key === 'current' ? 'Enter current password' : key === 'new' ? 'Enter new password' : 'Confirm new password'}
+                      placeholder={key === 'current' ? t('settingsPage.enterCurrentPassword') : key === 'new' ? t('settingsPage.enterNewPassword') : t('settingsPage.confirmNewPasswordPlaceholder')}
                       style={{
                         flex: 1,
                         border: 'none',
@@ -696,7 +701,7 @@ const Settings = () => {
                         <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
                         <path d="M12 6v6l4 2"/>
                       </svg>
-                      <span>Must be at least 6 characters.</span>
+                      <span>{t('auth.passwordMinLength')}</span>
                     </div>
                   )}
                 </div>
@@ -716,7 +721,7 @@ const Settings = () => {
     <div>
       <div className="mb-4">
         <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.settings')}</h4>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>Manage your shop, invoicing, security, and account preferences.</p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>{t('settingsPage.pageDescription')}</p>
       </div>
 
       <div className="settings-layout">
@@ -738,9 +743,9 @@ const Settings = () => {
 
           {saveAction && (
             <div className="settings-save-bar">
-              <span className="settings-save-hint">Changes are saved only when you click {saveAction.label}.</span>
+              <span className="settings-save-hint">{t('settingsPage.saveHint', { label: saveAction.label })}</span>
               <button type="button" className="btn-premium btn-premium-primary" onClick={saveAction.onSave} disabled={saving}>
-                {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiSave /> {saveAction.label}</>}
+                {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiSave /> {saveAction.label}</>}
               </button>
             </div>
           )}
@@ -768,7 +773,7 @@ const Settings = () => {
                   {sectionSaveAction && (
                     <div className="settings-accordion-save">
                       <button type="button" className="btn-premium btn-premium-primary" onClick={sectionSaveAction.onSave} disabled={saving}>
-                        {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiSave /> {sectionSaveAction.label}</>}
+                        {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiSave /> {sectionSaveAction.label}</>}
                       </button>
                     </div>
                   )}

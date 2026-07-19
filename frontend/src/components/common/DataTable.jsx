@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BiSearch, BiSortUp, BiSortDown, BiSortAlt2, BiChevronLeft, BiChevronRight } from 'react-icons/bi';
 
 // Generic client-side table: sticky header, search, column sorting, and
@@ -13,15 +14,16 @@ const DataTable = ({
   columns,
   data,
   rowKey,
-  searchPlaceholder = 'Search...',
+  searchPlaceholder,
   searchKeys,
   pageSize = 10,
-  emptyMessage = 'No data found',
+  emptyMessage,
   title,
   icon: Icon,
   headerExtra,
   maxHeight = 360,
 }) => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState({ key: null, direction: 'asc' });
   const [page, setPage] = useState(1);
@@ -85,7 +87,7 @@ const DataTable = ({
             {searchable && (
               <div className="search-box data-table-search">
                 <BiSearch className="search-icon" />
-                <input className="form-control" placeholder={searchPlaceholder} value={query} onChange={handleSearchChange} />
+                <input className="form-control" placeholder={searchPlaceholder || t('common.searchPlaceholder')} value={query} onChange={handleSearchChange} />
               </div>
             )}
           </div>
@@ -112,7 +114,7 @@ const DataTable = ({
             {paged.length === 0 ? (
               <tr>
                 <td colSpan={columns.length}>
-                  <div className="data-table-empty">{emptyMessage}</div>
+                  <div className="data-table-empty">{emptyMessage || t('empty.noData')}</div>
                 </td>
               </tr>
             ) : paged.map((row, idx) => (
@@ -131,7 +133,7 @@ const DataTable = ({
       {sorted.length > pageSize && (
         <div className="data-table-pagination">
           <span className="data-table-pagination-info">
-            Page {currentPage} of {totalPages} ({sorted.length} results)
+            {t('common.pageInfo', { current: currentPage, total: totalPages, count: sorted.length })}
           </span>
           <div className="d-flex gap-2">
             <button
@@ -140,7 +142,7 @@ const DataTable = ({
               disabled={currentPage <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
             >
-              <BiChevronLeft size={16} /> Prev
+              <BiChevronLeft size={16} /> {t('common.previous')}
             </button>
             <button
               type="button"
@@ -148,7 +150,7 @@ const DataTable = ({
               disabled={currentPage >= totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             >
-              Next <BiChevronRight size={16} />
+              {t('common.next')} <BiChevronRight size={16} />
             </button>
           </div>
         </div>

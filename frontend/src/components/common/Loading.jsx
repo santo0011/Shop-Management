@@ -1,10 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Inline loading spinner used by individual pages/components.
  * Uses the same modern CSS circular spinner as LoadingOverlay.
  */
-const Loading = ({ text = 'Loading...' }) => {
+const Loading = ({ text }) => {
+  const { t } = useTranslation();
   return (
     <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
       <div className="text-center">
@@ -20,7 +22,7 @@ const Loading = ({ text = 'Loading...' }) => {
           }}
         />
         <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem', fontWeight: 500 }}>
-          {text}
+          {text || t('common.loading')}
         </p>
       </div>
     </div>

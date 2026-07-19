@@ -16,10 +16,10 @@ const emptyForm = { name: '', nameBn: '', company: '', email: '', phone: '', add
 const REQUIRED_FIELDS = ['name', 'phone'];
 const IMPORT_TEMPLATE_COLS = ['name', 'phone', 'email', 'address', 'company', 'nameBn'];
 
-const validateField = (name, value) => {
+const validateField = (name, value, t) => {
   switch (name) {
-    case 'name': return String(value || '').trim() ? '' : 'Supplier name is required';
-    case 'phone': return String(value || '').trim() ? '' : 'Phone number is required';
+    case 'name': return String(value || '').trim() ? '' : t('suppliersPage.form.nameRequired');
+    case 'phone': return String(value || '').trim() ? '' : t('suppliersPage.form.phoneRequired');
     default: return '';
   }
 };
@@ -49,7 +49,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => {
       if (!(name in prev)) return prev;
-      const msg = validateField(name, value);
+      const msg = validateField(name, value, t);
       const next = { ...prev };
       if (msg) next[name] = msg; else delete next[name];
       return next;
@@ -61,7 +61,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
     e.preventDefault();
     const newErrors = {};
     REQUIRED_FIELDS.forEach((field) => {
-      const msg = validateField(field, form[field]);
+      const msg = validateField(field, form[field], t);
       if (msg) newErrors[field] = msg;
     });
     if (Object.keys(newErrors).length > 0) {
@@ -79,7 +79,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
       onSuccess();
       onClose();
     } catch (err) {
-      setSubmitError(err.response?.data?.message || 'Failed to save supplier');
+      setSubmitError(err.response?.data?.message || t('suppliersPage.form.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -101,7 +101,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header" style={{ padding: '0.85rem 1.25rem', minHeight: 'auto' }}>
-          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? 'Edit Supplier' : 'Add Supplier'}</h5>
+          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? t('suppliersPage.editSupplier') : t('suppliersPage.addSupplier')}</h5>
           <button className="btn-close-premium" onClick={onClose} style={{ width: '32px', height: '32px' }}><BiX /></button>
         </div>
         <div className="drawer-body supplier-drawer-body" style={{ padding: '0.85rem 1rem 0.4rem 1rem' }}>
@@ -122,38 +122,38 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {/* Supplier Name - full width */}
               <div>
-                <label className="form-label" style={labelStyle}>{t('auth.name')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <input {...field('name')} placeholder="Enter supplier name" />
+                <label className="form-label" style={labelStyle}>{t('auth.name')} ({t('suppliersPage.form.enSuffix')}) <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input {...field('name')} placeholder={t('suppliersPage.form.namePlaceholder')} />
                 {errors.name && <div className="invalid-feedback-premium" style={errorStyle}>{errors.name}</div>}
               </div>
               {/* 2-col row: Name (BN) + Phone */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
-                  <label className="form-label" style={labelStyle}>{t('auth.name')} (BN)</label>
-                  <input {...field('nameBn')} placeholder="সাপ্লায়ারের নাম লিখুন" />
+                  <label className="form-label" style={labelStyle}>{t('auth.name')} ({t('suppliersPage.form.bnSuffix')})</label>
+                  <input {...field('nameBn')} placeholder={t('suppliersPage.form.nameBnPlaceholder')} />
                 </div>
                 <div>
                   <label className="form-label" style={labelStyle}>{t('auth.phone')} <span style={{ color: 'var(--danger)' }}>*</span></label>
-                  <input {...field('phone')} placeholder="Enter phone number" />
+                  <input {...field('phone')} placeholder={t('suppliersPage.form.phonePlaceholder')} />
                   {errors.phone && <div className="invalid-feedback-premium" style={errorStyle}>{errors.phone}</div>}
                 </div>
               </div>
               {/* 2-col row: Email + Company */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
-                  <label className="form-label" style={labelStyle}>Email</label>
-                  <input type="email" {...field('email')} placeholder="Enter email address" />
+                  <label className="form-label" style={labelStyle}>{t('auth.email')}</label>
+                  <input type="email" {...field('email')} placeholder={t('suppliersPage.form.emailPlaceholder')} />
                 </div>
                 <div>
-                  <label className="form-label" style={labelStyle}>Company</label>
-                  <input {...field('company')} placeholder="Enter company name" />
+                  <label className="form-label" style={labelStyle}>{t('suppliersPage.form.company')}</label>
+                  <input {...field('company')} placeholder={t('suppliersPage.form.companyPlaceholder')} />
                 </div>
               </div>
               {/* 2-col row: Address (full width span) */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label" style={labelStyle}>Address</label>
-                  <input {...field('address')} placeholder="Enter address" />
+                  <label className="form-label" style={labelStyle}>{t('suppliersPage.form.address')}</label>
+                  <input {...field('address')} placeholder={t('suppliersPage.form.addressPlaceholder')} />
                 </div>
               </div>
             </div>
@@ -162,7 +162,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
         <div className="drawer-footer supplier-drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
           <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>{t('common.cancel')}</button>
           <button type="submit" form="supplier-form" className="btn-premium btn-premium-primary" disabled={saving} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
-            {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
+            {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('common.save')}</>}
           </button>
         </div>
       </div>
@@ -219,8 +219,8 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     rows.forEach((row, idx) => {
       const rowErrors = [];
       // Validate required fields
-      if (!row.name?.trim()) rowErrors.push('Name is required');
-      if (!row.phone?.trim()) rowErrors.push('Phone is required');
+      if (!row.name?.trim()) rowErrors.push(t('suppliersPage.bulkImport.nameRequired'));
+      if (!row.phone?.trim()) rowErrors.push(t('suppliersPage.bulkImport.phoneRequired'));
 
       // Check duplicates against existing
       const existing = existingSuppliers.find(s =>
@@ -253,7 +253,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
         if (jsonData.length === 0) {
-          Swal.fire({ icon: 'warning', title: 'Empty File', text: 'The file contains no data.', confirmButtonColor: '#6C63FF' });
+          Swal.fire({ icon: 'warning', title: t('suppliersPage.bulkImport.emptyFileTitle'), text: t('suppliersPage.bulkImport.emptyFileText'), confirmButtonColor: '#6C63FF' });
           return;
         }
 
@@ -279,7 +279,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         setShowPreview(true);
         detectDuplicates(mapped);
       } catch (err) {
-        Swal.fire({ icon: 'error', title: 'Parse Error', text: 'Failed to parse the file. Please check the format.', confirmButtonColor: '#6C63FF' });
+        Swal.fire({ icon: 'error', title: t('suppliersPage.bulkImport.parseErrorTitle'), text: t('suppliersPage.bulkImport.parseErrorText'), confirmButtonColor: '#6C63FF' });
       }
     };
     reader.readAsArrayBuffer(file);
@@ -299,7 +299,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   // ─── Paste Import ───────────────────────────────────────────────────────
   const handleParsePaste = () => {
     if (!pasteData.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Empty Data', text: 'Please paste supplier data first.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('suppliersPage.bulkImport.emptyDataTitle'), text: t('suppliersPage.bulkImport.emptyDataText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -322,7 +322,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     });
 
     if (parsed.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Data', text: 'Could not parse any rows from the pasted data.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('suppliersPage.bulkImport.noDataTitle'), text: t('suppliersPage.bulkImport.noDataText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -362,7 +362,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     });
 
     if (validRows.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'No Valid Rows', text: 'All rows have errors or are duplicates. Fix them or disable skip duplicates.', confirmButtonColor: '#6C63FF' });
+      Swal.fire({ icon: 'warning', title: t('suppliersPage.bulkImport.noValidRowsTitle'), text: t('suppliersPage.bulkImport.noValidRowsText'), confirmButtonColor: '#6C63FF' });
       return;
     }
 
@@ -428,7 +428,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`} style={{ width: '640px', maxWidth: '100vw' }}>
         <div className="drawer-header">
-          <h5><BiUpload className="me-2" />Bulk Import Suppliers</h5>
+          <h5><BiUpload className="me-2" />{t('suppliersPage.bulkImport.title')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
@@ -438,13 +438,13 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               className={`bulk-import-tab ${activeTab === 'excel' ? 'active' : ''}`}
               onClick={() => { setActiveTab('excel'); setShowPreview(false); setParsedRows([]); }}
             >
-              <BiFile /> Excel / CSV Import
+              <BiFile /> {t('suppliersPage.bulkImport.tabExcel')}
             </button>
             <button
               className={`bulk-import-tab ${activeTab === 'paste' ? 'active' : ''}`}
               onClick={() => { setActiveTab('paste'); setShowPreview(false); setParsedRows([]); }}
             >
-              <BiPaste /> Copy & Paste Import
+              <BiPaste /> {t('suppliersPage.bulkImport.tabPaste')}
             </button>
           </div>
 
@@ -454,20 +454,20 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               <div className="bulk-import-upload-area">
                 <div className="bulk-import-upload-box">
                   <BiUpload size={48} />
-                  <h6>Upload Excel or CSV File</h6>
-                  <p>Supports .xlsx, .xls, and .csv files</p>
+                  <h6>{t('suppliersPage.bulkImport.uploadTitle')}</h6>
+                  <p>{t('suppliersPage.bulkImport.uploadDesc')}</p>
                   <div className="d-flex gap-2 justify-content-center flex-wrap">
                     <button
                       className="btn-premium btn-premium-primary"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <BiUpload /> Select File
+                      <BiUpload /> {t('suppliersPage.bulkImport.selectFile')}
                     </button>
                     <button
                       className="btn-premium btn-premium-secondary"
                       onClick={handleDownloadTemplate}
                     >
-                      <BiDownload /> Download Template
+                      <BiDownload /> {t('suppliersPage.bulkImport.downloadTemplate')}
                     </button>
                   </div>
                   <input
@@ -479,7 +479,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   />
                   <div className="bulk-import-format-info">
                     <BiInfoCircle />
-                    <small>Expected columns: Name, Phone, Email, Address, Company, Name (Bangla)</small>
+                    <small>{t('suppliersPage.bulkImport.formatInfo')}</small>
                   </div>
                 </div>
               </div>
@@ -490,26 +490,26 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
               <div className="bulk-import-paste-area">
                 <div className="bulk-import-paste-header">
                   <BiPaste size={28} />
-                  <h6>Paste Supplier Data</h6>
+                  <h6>{t('suppliersPage.bulkImport.pasteTitle')}</h6>
                 </div>
                 <p className="bulk-import-paste-desc">
-                  Paste comma-separated values. One supplier per line.
+                  {t('suppliersPage.bulkImport.pasteDesc')}
                 </p>
                 <div className="bulk-import-format-example">
-                  <strong>Format:</strong> Supplier Name, Phone, Email, Address, Previous Due
+                  <strong>{t('suppliersPage.bulkImport.formatLabel')}</strong> {t('suppliersPage.bulkImport.formatExample')}
                 </div>
                 <textarea
                   className="bulk-import-textarea"
                   rows={8}
                   value={pasteData}
                   onChange={(e) => setPasteData(e.target.value)}
-                  placeholder={`ABC Traders,01711111111,abc@gmail.com,Dhaka,5000\nXYZ Foods,01822222222,xyz@gmail.com,Kolkata,0`}
+                  placeholder={t('suppliersPage.bulkImport.pasteExample')}
                 />
                 <button
                   className="btn-premium btn-premium-primary w-100 mt-2"
                   onClick={handleParsePaste}
                 >
-                  <BiTable /> Parse & Preview
+                  <BiTable /> {t('suppliersPage.bulkImport.parsePreview')}
                 </button>
               </div>
             )}
@@ -521,19 +521,19 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                 <div className="bulk-import-summary">
                   <div className="bulk-import-stat">
                     <span className="bulk-import-stat-value">{parsedRows.length}</span>
-                    <span className="bulk-import-stat-label">Total Rows</span>
+                    <span className="bulk-import-stat-label">{t('suppliersPage.bulkImport.totalRows')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-valid">
                     <span className="bulk-import-stat-value">{validCount}</span>
-                    <span className="bulk-import-stat-label">Valid</span>
+                    <span className="bulk-import-stat-label">{t('suppliersPage.bulkImport.valid')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-error">
                     <span className="bulk-import-stat-value">{errorCount}</span>
-                    <span className="bulk-import-stat-label">Errors</span>
+                    <span className="bulk-import-stat-label">{t('suppliersPage.bulkImport.errors')}</span>
                   </div>
                   <div className="bulk-import-stat bulk-import-stat-dup">
                     <span className="bulk-import-stat-value">{duplicateCount}</span>
-                    <span className="bulk-import-stat-label">Duplicates</span>
+                    <span className="bulk-import-stat-label">{t('suppliersPage.bulkImport.duplicates')}</span>
                   </div>
                 </div>
 
@@ -546,10 +546,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         checked={skipDuplicates}
                         onChange={(e) => setSkipDuplicates(e.target.checked)}
                       />
-                      <span>Skip duplicate suppliers ({duplicateCount} found)</span>
+                      <span>{t('suppliersPage.bulkImport.skipDuplicates', { count: duplicateCount })}</span>
                     </label>
                     <span className="bulk-import-toggle-hint">
-                      Uncheck to update existing records instead
+                      {t('suppliersPage.bulkImport.skipDuplicatesHint')}
                     </span>
                   </div>
                 )}
@@ -560,15 +560,15 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     <div className="bulk-import-result-icon">
                       <BiCheck size={32} />
                     </div>
-                    <h6>Import Complete</h6>
+                    <h6>{t('suppliersPage.bulkImport.importComplete')}</h6>
                     <div className="bulk-import-result-stats">
-                      <span>Imported: <strong>{importResult.imported}</strong></span>
-                      <span>Updated: <strong>{importResult.updated}</strong></span>
-                      <span>Failed: <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
+                      <span>{t('suppliersPage.bulkImport.imported')} <strong>{importResult.imported}</strong></span>
+                      <span>{t('suppliersPage.bulkImport.updated')} <strong>{importResult.updated}</strong></span>
+                      <span>{t('suppliersPage.bulkImport.failed')} <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
                     </div>
                     {importResult.failedDetails.length > 0 && (
                       <div className="bulk-import-result-failures">
-                        <small>Failed rows:</small>
+                        <small>{t('suppliersPage.bulkImport.failedRows')}</small>
                         {importResult.failedDetails.map((detail, i) => (
                           <div key={i} className="bulk-import-failure-item">{detail}</div>
                         ))}
@@ -578,7 +578,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                       className="btn-premium btn-premium-primary mt-3"
                       onClick={() => { setShowPreview(false); setImportResult(null); setParsedRows([]); }}
                     >
-                      <BiRefresh /> Import More
+                      <BiRefresh /> {t('suppliersPage.bulkImport.importMore')}
                     </button>
                   </div>
                 )}
@@ -591,12 +591,12 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         <thead>
                           <tr>
                             <th style={{ width: '40px' }}>#</th>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Email</th>
-                            <th>Address</th>
-                            <th>Company</th>
-                            <th style={{ width: '80px' }}>Status</th>
+                            <th>{t('common.name')}</th>
+                            <th>{t('auth.phone')}</th>
+                            <th>{t('auth.email')}</th>
+                            <th>{t('suppliersPage.form.address')}</th>
+                            <th>{t('suppliersPage.form.company')}</th>
+                            <th style={{ width: '80px' }}>{t('common.status')}</th>
                             <th style={{ width: '40px' }}></th>
                           </tr>
                         </thead>
@@ -617,22 +617,22 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                                 <td>
                                   {status === 'error' && (
                                     <span className="bulk-import-status-badge status-error" title={errors[idx]?.join(', ')}>
-                                      <BiError /> Error
+                                      <BiError /> {t('suppliersPage.bulkImport.statusError')}
                                     </span>
                                   )}
                                   {status === 'duplicate-skip' && (
-                                    <span className="bulk-import-status-badge status-dup-skip" title={`Duplicate of ${duplicates[idx]?.name}`}>
-                                      <BiX /> Skip
+                                    <span className="bulk-import-status-badge status-dup-skip" title={t('suppliersPage.bulkImport.duplicateOf', { name: duplicates[idx]?.name })}>
+                                      <BiX /> {t('suppliersPage.bulkImport.statusSkip')}
                                     </span>
                                   )}
                                   {status === 'duplicate-update' && (
-                                    <span className="bulk-import-status-badge status-dup-update" title={`Will update ${duplicates[idx]?.name}`}>
-                                      <BiRefresh /> Update
+                                    <span className="bulk-import-status-badge status-dup-update" title={t('suppliersPage.bulkImport.willUpdate', { name: duplicates[idx]?.name })}>
+                                      <BiRefresh /> {t('suppliersPage.bulkImport.statusUpdate')}
                                     </span>
                                   )}
                                   {status === 'valid' && (
                                     <span className="bulk-import-status-badge status-valid">
-                                      <BiCheck /> Valid
+                                      <BiCheck /> {t('suppliersPage.bulkImport.statusValid')}
                                     </span>
                                   )}
                                 </td>
@@ -640,7 +640,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                                   <button
                                     className="bulk-import-remove-row"
                                     onClick={() => removeRow(idx)}
-                                    title="Remove row"
+                                    title={t('suppliersPage.bulkImport.removeRow')}
                                   >
                                     <BiX />
                                   </button>
@@ -655,10 +655,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     {/* Error Details */}
                     {errorCount > 0 && (
                       <div className="bulk-import-errors-section">
-                        <h6><BiError /> Row Errors</h6>
+                        <h6><BiError /> {t('suppliersPage.bulkImport.rowErrors')}</h6>
                         {Object.entries(errors).map(([idx, errs]) => (
                           <div key={idx} className="bulk-import-error-item">
-                            <strong>Row {parseInt(idx) + 1}:</strong> {parsedRows[parseInt(idx)]?.name} — {errs.join(', ')}
+                            <strong>{t('suppliersPage.bulkImport.rowLabel', { num: parseInt(idx) + 1 })}</strong> {parsedRows[parseInt(idx)]?.name} — {errs.join(', ')}
                           </div>
                         ))}
                       </div>
@@ -670,7 +670,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         className="btn-premium btn-premium-secondary"
                         onClick={() => { setShowPreview(false); setImportResult(null); }}
                       >
-                        <BiX /> Cancel
+                        <BiX /> {t('common.cancel')}
                       </button>
                       <button
                         className="btn-premium btn-premium-primary"
@@ -678,9 +678,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                         disabled={importing || validCount === 0}
                       >
                         {importing ? (
-                          <><span className="spinner-border spinner-border-sm" /> Importing...</>
+                          <><span className="spinner-border spinner-border-sm" /> {t('suppliersPage.bulkImport.importing')}</>
                         ) : (
-                          <><BiUpload /> Import {validCount} Supplier{validCount !== 1 ? 's' : ''}</>
+                          <><BiUpload /> {t('suppliersPage.bulkImport.importSupplier', { count: validCount })}</>
                         )}
                       </button>
                     </div>
@@ -752,15 +752,15 @@ const Suppliers = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.suppliers')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage your suppliers
+            {t('suppliersPage.subtitle')}
           </p>
         </div>
         <div className="d-flex gap-2">
           <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
-            <BiUpload /> Bulk Import
+            <BiUpload /> {t('suppliersPage.bulkImportButton')}
           </button>
           <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setDrawerOpen(true); }}>
-            <BiPlus /> Add Supplier
+            <BiPlus /> {t('suppliersPage.addSupplier')}
           </button>
         </div>
       </div>
@@ -771,7 +771,7 @@ const Suppliers = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder={`${t('common.search')} suppliers...`}
+            placeholder={t('suppliersPage.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -786,8 +786,8 @@ const Suppliers = () => {
               <tr>
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
-                <th>Email</th>
-                <th>Due</th>
+                <th>{t('auth.email')}</th>
+                <th>{t('common.due')}</th>
                 <th style={{ width: '120px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
@@ -795,14 +795,14 @@ const Suppliers = () => {
               {loading ? (
                 <tr>
                   <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> Loading...
+                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
-                    No suppliers found
+                    {t('empty.noSuppliers')}
                   </td>
                 </tr>
               ) : suppliers.map((supplier) => (
@@ -820,10 +820,10 @@ const Suppliers = () => {
                   </td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(supplier)}>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(supplier)}>
                         <BiEdit />
                       </button>
-                      <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(supplier._id)}>
+                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(supplier._id)}>
                         <BiTrash />
                       </button>
                     </div>
@@ -839,12 +839,12 @@ const Suppliers = () => {
       <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
         {loading ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : suppliers.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
-            No suppliers found
+            {t('empty.noSuppliers')}
           </div>
         ) : suppliers.map((supplier) => (
           <ExpandableCard
@@ -872,32 +872,32 @@ const Suppliers = () => {
             expanded={
               <div className="expandable-card__rows">
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Phone</span>
+                  <span className="expandable-card__row-label">{t('auth.phone')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{supplier.phone}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Email</span>
+                  <span className="expandable-card__row-label">{t('auth.email')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{supplier.email || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Company</span>
+                  <span className="expandable-card__row-label">{t('suppliersPage.form.company')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{supplier.company || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Address</span>
+                  <span className="expandable-card__row-label">{t('suppliersPage.form.address')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{supplier.address || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Due Amount</span>
+                  <span className="expandable-card__row-label">{t('suppliersPage.dueAmount')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value" style={supplier.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{supplier.dueAmount || 0}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-label">{t('suppliersPage.created')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{new Date(supplier.createdAt).toLocaleDateString()}</span>
                 </div>
@@ -905,10 +905,10 @@ const Suppliers = () => {
             }
             actions={
               <>
-                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(supplier)}>
+                <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(supplier)}>
                   <BiEdit />
                 </button>
-                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(supplier._id)}>
+                <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(supplier._id)}>
                   <BiTrash />
                 </button>
               </>
@@ -939,7 +939,7 @@ const Suppliers = () => {
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-premium-header">
-              <h5>Delete Supplier</h5>
+              <h5>{t('suppliersPage.delete.title')}</h5>
               <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
             </div>
             <div className="modal-premium-body text-center">
@@ -951,12 +951,12 @@ const Suppliers = () => {
                 <BiTrash />
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-                Are you sure you want to delete this supplier? This action cannot be undone.
+                {t('suppliersPage.delete.message')}
               </p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
-              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
             </div>
           </div>
         </div>

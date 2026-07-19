@@ -5,18 +5,18 @@ import { BiPlus, BiEdit, BiTrash, BiStore, BiX, BiCheck, BiDollar, BiUser, BiPac
 
 const REQUIRED_PLAN_FIELDS = ['name', 'price', 'duration'];
 
-const validatePlanField = (name, value) => {
+const validatePlanField = (t, name, value) => {
   switch (name) {
     case 'name':
-      return String(value || '').trim() ? '' : 'Plan name is required';
+      return String(value || '').trim() ? '' : t('managePlansPage.nameRequired');
     case 'price':
-      return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid price';
+      return value !== '' && value !== null && Number(value) >= 0 ? '' : t('managePlansPage.invalidPrice');
     case 'duration':
-      return value ? '' : 'Duration is required';
+      return value ? '' : t('managePlansPage.durationRequired');
     case 'maxUsers':
-      return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid number';
+      return value !== '' && value !== null && Number(value) >= 0 ? '' : t('validation.invalidNumber');
     case 'maxProducts':
-      return value !== '' && value !== null && Number(value) >= 0 ? '' : 'Enter a valid number';
+      return value !== '' && value !== null && Number(value) >= 0 ? '' : t('validation.invalidNumber');
     default:
       return '';
   }
@@ -70,7 +70,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => {
       if (!(name in prev)) return prev;
-      const msg = validatePlanField(name, value);
+      const msg = validatePlanField(t, name, value);
       const next = { ...prev };
       if (msg) next[name] = msg; else delete next[name];
       return next;
@@ -82,7 +82,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
     e.preventDefault();
     const newErrors = {};
     REQUIRED_PLAN_FIELDS.forEach((field) => {
-      const msg = validatePlanField(field, form[field]);
+      const msg = validatePlanField(t, field, form[field]);
       if (msg) newErrors[field] = msg;
     });
     if (Object.keys(newErrors).length > 0) {
@@ -102,7 +102,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save plan');
+      setError(err.response?.data?.message || t('managePlansPage.saveFailed'));
     } finally {
       setLoading(false);
     }
@@ -119,7 +119,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />{editing ? 'Edit' : 'Create'} Plan</h5>
+          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />{editing ? t('managePlansPage.editPlan') : t('managePlansPage.createPlan')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
@@ -130,49 +130,49 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
             <div className="row g-3">
               <div className="col-6">
                 <div className="form-group">
-                  <label className="form-label">Plan Name <span style={{color: 'var(--danger)'}}>*</span></label>
-                  <input {...field('name')} placeholder="e.g. Starter" />
+                  <label className="form-label">{t('managePlansPage.planName')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input {...field('name')} placeholder={t('managePlansPage.planNamePlaceholder')} />
                   {errors.name && <div className="invalid-feedback-premium">{errors.name}</div>}
                 </div>
               </div>
               <div className="col-6">
                 <div className="form-group">
-                  <label className="form-label">Name (Bengali)</label>
-                  <input {...field('nameBn')} placeholder="বাংলা নাম" />
+                  <label className="form-label">{t('managePlansPage.nameBengali')}</label>
+                  <input {...field('nameBn')} placeholder={t('managePlansPage.nameBengaliPlaceholder')} />
                 </div>
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label className="form-label">Duration <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <label className="form-label">{t('managePlansPage.duration')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <select
                     className={`form-select ${errors.duration ? 'is-invalid' : ''}`}
                     value={form.duration}
                     onChange={(e) => handleChange('duration', e.target.value)}
                   >
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="yearly">Yearly</option>
+                    <option value="monthly">{t('subscription.monthly')}</option>
+                    <option value="quarterly">{t('subscription.quarterly')}</option>
+                    <option value="yearly">{t('subscription.yearly')}</option>
                   </select>
                   {errors.duration && <div className="invalid-feedback-premium">{errors.duration}</div>}
                 </div>
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label className="form-label"><BiDollar style={{ marginRight: '4px' }} />Price <span style={{color: 'var(--danger)'}}>*</span></label>
-                  <input type="number" {...field('price')} placeholder="Enter price" />
+                  <label className="form-label"><BiDollar style={{ marginRight: '4px' }} />{t('common.price')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input type="number" {...field('price')} placeholder={t('managePlansPage.pricePlaceholder')} />
                   {errors.price && <div className="invalid-feedback-premium">{errors.price}</div>}
                 </div>
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label className="form-label"><BiUser style={{ marginRight: '4px' }} />Max Users</label>
+                  <label className="form-label"><BiUser style={{ marginRight: '4px' }} />{t('managePlansPage.maxUsers')}</label>
                   <input type="number" {...field('maxUsers')} />
                   {errors.maxUsers && <div className="invalid-feedback-premium">{errors.maxUsers}</div>}
                 </div>
               </div>
               <div className="col-6">
                 <div className="form-group">
-                  <label className="form-label"><BiPackage style={{ marginRight: '4px' }} />Max Products</label>
+                  <label className="form-label"><BiPackage style={{ marginRight: '4px' }} />{t('managePlansPage.maxProducts')}</label>
                   <input type="number" {...field('maxProducts')} />
                   {errors.maxProducts && <div className="invalid-feedback-premium">{errors.maxProducts}</div>}
                 </div>
@@ -180,20 +180,20 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
               <div className="col-6 d-flex align-items-end">
                 <div className="form-check mb-3">
                   <input type="checkbox" className="form-check-input" id="isPopular" checked={form.isPopular} onChange={e => handleChange('isPopular', e.target.checked)} />
-                  <label className="form-check-label" htmlFor="isPopular"><BiStar style={{ marginRight: '4px', color: 'var(--warning)' }} />Popular Plan</label>
+                  <label className="form-check-label" htmlFor="isPopular"><BiStar style={{ marginRight: '4px', color: 'var(--warning)' }} />{t('managePlansPage.popularPlan')}</label>
                 </div>
               </div>
               <div className="col-12">
                 <div className="form-group">
-                  <label className="form-label">Description</label>
-                  <textarea className="form-control" value={form.description} onChange={e => handleChange('description', e.target.value)} rows={2} placeholder="Plan description" />
+                  <label className="form-label">{t('common.description')}</label>
+                  <textarea className="form-control" value={form.description} onChange={e => handleChange('description', e.target.value)} rows={2} placeholder={t('managePlansPage.descriptionPlaceholder')} />
                 </div>
               </div>
               <div className="col-12">
-                <label className="form-label">Features</label>
+                <label className="form-label">{t('managePlansPage.features')}</label>
                 <div className="d-flex gap-2 mb-2">
-                  <input className="form-control" value={featureInput} onChange={e => setFeatureInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addFeature(); }}} placeholder="Add a feature and press Enter" />
-                  <button type="button" className="btn-premium btn-premium-primary btn-premium-sm" onClick={addFeature}>Add</button>
+                  <input className="form-control" value={featureInput} onChange={e => setFeatureInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addFeature(); }}} placeholder={t('managePlansPage.addFeaturePlaceholder')} />
+                  <button type="button" className="btn-premium btn-premium-primary btn-premium-sm" onClick={addFeature}>{t('common.add')}</button>
                 </div>
                 <div className="d-flex flex-wrap gap-2">
                   {form.features.map((feature, idx) => (
@@ -208,9 +208,9 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
           </form>
         </div>
         <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" form="plan-form" className="btn-premium btn-premium-primary" disabled={loading}>
-            {loading ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {editing ? 'Update Plan' : 'Create Plan'}</>}
+            {loading ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {editing ? t('managePlansPage.updatePlan') : t('managePlansPage.createPlan')}</>}
           </button>
         </div>
       </div>
@@ -268,13 +268,13 @@ const ManagePlans = () => {
       {/* Page Header */}
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
-          <h4 className="mb-1" style={{ fontWeight: 800 }}>Subscription Plans</h4>
+          <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('managePlansPage.title')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage subscription plans and pricing
+            {t('managePlansPage.subtitle')}
           </p>
         </div>
         <button className="btn-premium btn-premium-primary" onClick={openCreateDrawer}>
-          <BiPlus /> Create Plan
+          <BiPlus /> {t('managePlansPage.createPlan')}
         </button>
       </div>
 
@@ -282,12 +282,12 @@ const ManagePlans = () => {
       <div className="row g-3">
         {loading ? (
           <div className="col-12 text-center py-5">
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : plans.length === 0 ? (
           <div className="col-12 text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📋</div>
-            No plans found
+            {t('managePlansPage.noPlansFound')}
           </div>
         ) : plans.map((plan) => (
           <div key={plan._id} className="col-md-4">
@@ -298,7 +298,7 @@ const ManagePlans = () => {
                     <h5 className="mb-0" style={{ fontWeight: 700 }}>{plan.name}</h5>
                     {plan.nameBn && <small style={{ color: 'var(--text-muted)' }}>{plan.nameBn}</small>}
                   </div>
-                  {plan.isPopular && <span className="badge badge-primary">Popular</span>}
+                  {plan.isPopular && <span className="badge badge-primary">{t('managePlansPage.popular')}</span>}
                 </div>
                 <div className="mb-3">
                   <span style={{ fontSize: '2rem', fontWeight: 800 }}>₹{plan.price}</span>
@@ -306,15 +306,15 @@ const ManagePlans = () => {
                 </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{plan.description}</p>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  <div><BiUser style={{ marginRight: '4px' }} />{plan.maxUsers} Users</div>
-                  <div><BiPackage style={{ marginRight: '4px' }} />{plan.maxProducts} Products</div>
+                  <div><BiUser style={{ marginRight: '4px' }} />{plan.maxUsers} {t('managePlansPage.users')}</div>
+                  <div><BiPackage style={{ marginRight: '4px' }} />{plan.maxProducts} {t('managePlansPage.products')}</div>
                 </div>
                 <div className="d-flex gap-2 mt-3">
                   <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => openEditDrawer(plan)}>
-                    <BiEdit /> Edit
+                    <BiEdit /> {t('common.edit')}
                   </button>
                   <button className="btn-premium btn-premium-danger btn-premium-sm" onClick={() => setDeleteConfirm(plan._id)}>
-                    <BiTrash /> Delete
+                    <BiTrash /> {t('common.delete')}
                   </button>
                 </div>
               </div>
@@ -337,16 +337,16 @@ const ManagePlans = () => {
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-premium-header">
-              <h5>Delete Plan</h5>
+              <h5>{t('managePlansPage.deletePlan')}</h5>
               <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
             </div>
             <div className="modal-premium-body text-center">
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--glow-danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 1.25rem' }}><BiTrash /></div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>Are you sure you want to delete this plan? This action cannot be undone.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>{t('managePlansPage.deletePlanConfirm')}</p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
-              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
             </div>
           </div>
         </div>

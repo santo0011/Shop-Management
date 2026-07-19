@@ -18,9 +18,9 @@ const SuperDashboard = () => {
       const { data: result } = await api.get('/super-admin/dashboard', { _skipLoading: true });
       setData(result);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load dashboard data');
+      setError(err.response?.data?.message || t('dashboard.failedToLoadData'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -56,9 +56,9 @@ const SuperDashboard = () => {
   }), [data?.monthlyRevenue, theme]);
 
   const revenueChartSeries = useMemo(() => [{
-    name: 'Revenue',
+    name: t('dashboard.revenue'),
     data: data?.monthlyRevenue?.map(r => r.total) || [],
-  }], [data?.monthlyRevenue]);
+  }], [data?.monthlyRevenue, t]);
 
   // Shop Growth Chart
   const shopGrowthOptions = useMemo(() => ({
@@ -73,17 +73,17 @@ const SuperDashboard = () => {
   }), [data?.shopGrowth, theme]);
 
   const shopGrowthSeries = useMemo(() => [{
-    name: 'New Shops',
+    name: t('saDashboardPage.newShops'),
     data: data?.shopGrowth?.map(r => r.count) || [],
-  }], [data?.shopGrowth]);
+  }], [data?.shopGrowth, t]);
 
   const statCards = [
-    { icon: BiStore, label: 'Total Shops', value: data?.totalShops || 0, color: 'primary' },
-    { icon: BiCheckCircle, label: 'Active Shops', value: data?.activeShops || 0, color: 'success' },
-    { icon: BiTime, label: 'Trial Shops', value: data?.trialShops || 0, color: 'warning' },
-    { icon: BiDollar, label: 'Total Revenue', value: data?.totalRevenue || 0, color: 'primary', prefix: '₹' },
-    { icon: BiCreditCard, label: 'Active Subscriptions', value: data?.activeSubscriptions || 0, color: 'success' },
-    { icon: BiCalendar, label: 'Expiring Soon', value: data?.expiringSoon || 0, color: 'warning' },
+    { icon: BiStore, key: 'totalShops', label: t('saDashboardPage.totalShops'), value: data?.totalShops || 0, color: 'primary' },
+    { icon: BiCheckCircle, key: 'activeShops', label: t('saDashboardPage.activeShops'), value: data?.activeShops || 0, color: 'success' },
+    { icon: BiTime, key: 'trialShops', label: t('saDashboardPage.trialShops'), value: data?.trialShops || 0, color: 'warning' },
+    { icon: BiDollar, key: 'totalRevenue', label: t('saDashboardPage.totalRevenue'), value: data?.totalRevenue || 0, color: 'primary', prefix: '₹' },
+    { icon: BiCreditCard, key: 'activeSubscriptions', label: t('saDashboardPage.activeSubscriptions'), value: data?.activeSubscriptions || 0, color: 'success' },
+    { icon: BiCalendar, key: 'expiringSoon', label: t('saDashboardPage.expiringSoon'), value: data?.expiringSoon || 0, color: 'warning' },
   ];
 
   // Count-up animated values — only animate when data changes
@@ -101,13 +101,13 @@ const SuperDashboard = () => {
       {/* Page Header */}
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
-          <h4 className="mb-1" style={{ fontWeight: 800 }}>Dashboard</h4>
+          <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.dashboard')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Business overview at a glance
+            {t('saDashboardPage.subtitle')}
           </p>
         </div>
         <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={fetchData}>
-          <BiRefresh /> Refresh
+          <BiRefresh /> {t('common.refresh')}
         </button>
       </div>
 
@@ -116,7 +116,7 @@ const SuperDashboard = () => {
         <div className="d-flex align-items-center gap-2 mb-4 p-3" style={{ background: 'var(--glow-danger)', borderRadius: 'var(--border-radius-md)', color: 'var(--danger)', fontSize: '0.85rem' }}>
           <BiError style={{ fontSize: '1.2rem', flexShrink: 0 }} />
           <span style={{ flex: 1 }}>{error}</span>
-          <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={fetchData}><BiRefresh /> Retry</button>
+          <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={fetchData}><BiRefresh /> {t('common.retry')}</button>
         </div>
       )}
 
@@ -132,15 +132,7 @@ const SuperDashboard = () => {
                 <div>
                   <div className="stat-value" style={{ fontSize: '1.4rem', marginBottom: 0 }}>
                     {card.prefix || ''}
-                    {(() => {
-                      const key = card.label === 'Total Shops' ? 'totalShops'
-                        : card.label === 'Active Shops' ? 'activeShops'
-                        : card.label === 'Trial Shops' ? 'trialShops'
-                        : card.label === 'Total Revenue' ? 'totalRevenue'
-                        : card.label === 'Active Subscriptions' ? 'activeSubscriptions'
-                        : 'expiringSoon';
-                      return Number(animatedValues[key]).toLocaleString('en-IN');
-                    })()}
+                    {Number(animatedValues[card.key]).toLocaleString('en-IN')}
                   </div>
                   <div className="stat-label" style={{ fontSize: '0.78rem' }}>{card.label}</div>
                 </div>
@@ -155,8 +147,8 @@ const SuperDashboard = () => {
         <div className="col-lg-6">
           <div className="premium-card">
             <div className="premium-card-header">
-              <h6 className="mb-0" style={{ fontWeight: 600 }}>Monthly Revenue</h6>
-              <span className="badge badge-primary">Revenue</span>
+              <h6 className="mb-0" style={{ fontWeight: 600 }}>{t('saDashboardPage.monthlyRevenue')}</h6>
+              <span className="badge badge-primary">{t('dashboard.revenue')}</span>
             </div>
             <div className="premium-card-body">
               <Chart options={revenueChartOptions} series={revenueChartSeries} type="area" height={320} />
@@ -166,8 +158,8 @@ const SuperDashboard = () => {
         <div className="col-lg-6">
           <div className="premium-card">
             <div className="premium-card-header">
-              <h6 className="mb-0" style={{ fontWeight: 600 }}>Shop Growth</h6>
-              <span className="badge badge-success">Monthly</span>
+              <h6 className="mb-0" style={{ fontWeight: 600 }}>{t('saDashboardPage.shopGrowth')}</h6>
+              <span className="badge badge-success">{t('subscription.monthly')}</span>
             </div>
             <div className="premium-card-body">
               <Chart options={shopGrowthOptions} series={shopGrowthSeries} type="bar" height={320} />

@@ -1,7 +1,9 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { BiX, BiLogOut, BiTrash } from 'react-icons/bi';
 
-const ConfirmModal = ({ open, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'primary' }) => {
+const ConfirmModal = ({ open, onClose, onConfirm, title, message, confirmText, cancelText, variant = 'primary' }) => {
+  const { t } = useTranslation();
   if (!open) return null;
 
   return (
@@ -32,13 +34,13 @@ const ConfirmModal = ({ open, onClose, onConfirm, title, message, confirmText = 
         </div>
         <div className="modal-premium-footer" style={{ justifyContent: 'center', gap: '0.75rem' }}>
           <button className="btn-premium btn-premium-secondary" onClick={onClose}>
-            {cancelText}
+            {cancelText || t('common.cancel')}
           </button>
           <button
             className={`btn-premium ${variant === 'danger' ? 'btn-premium-danger' : 'btn-premium-primary'}`}
             onClick={onConfirm}
           >
-            {confirmText}
+            {confirmText || t('common.confirm')}
           </button>
         </div>
       </div>

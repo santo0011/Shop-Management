@@ -10,12 +10,12 @@ const emptyForm = { name: '', nameBn: '', phone: '', email: '', address: '' };
 
 const REQUIRED_FIELDS = ['name', 'phone'];
 
-const validateField = (name, value) => {
+const validateField = (t, name, value) => {
   switch (name) {
     case 'name':
-      return String(value || '').trim() ? '' : 'Customer name is required';
+      return String(value || '').trim() ? '' : t('customersPage.nameRequired');
     case 'phone':
-      return String(value || '').trim() ? '' : 'Phone number is required';
+      return String(value || '').trim() ? '' : t('customersPage.phoneRequired');
     default:
       return '';
   }
@@ -45,7 +45,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => {
       if (!(name in prev)) return prev;
-      const msg = validateField(name, value);
+      const msg = validateField(t, name, value);
       const next = { ...prev };
       if (msg) next[name] = msg; else delete next[name];
       return next;
@@ -57,7 +57,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
     e.preventDefault();
     const newErrors = {};
     REQUIRED_FIELDS.forEach((field) => {
-      const msg = validateField(field, form[field]);
+      const msg = validateField(t, field, form[field]);
       if (msg) newErrors[field] = msg;
     });
     if (Object.keys(newErrors).length > 0) {
@@ -76,7 +76,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
       onSuccess();
       onClose();
     } catch (err) {
-      setSubmitError(err.response?.data?.message || 'Failed to save customer');
+      setSubmitError(err.response?.data?.message || t('customersPage.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -104,7 +104,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
         <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
         <div className={`drawer ${open ? 'open' : ''}`}>
           <div className="drawer-header">
-            <h5>Customer Details</h5>
+            <h5>{t('customersPage.customerDetails')}</h5>
             <button className="btn-close-premium" onClick={onClose}><BiX /></button>
           </div>
           <div className="drawer-body">
@@ -163,7 +163,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-light)',
               }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Email</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('auth.email')}</span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{data.email || '—'}</span>
               </div>
               <div style={{
@@ -175,7 +175,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-light)',
               }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Address</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('customersPage.address')}</span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '60%' }}>
                   {typeof data.address === 'object' ? Object.values(data.address).filter(Boolean).join(', ') : (data.address || '—')}
                 </span>
@@ -189,7 +189,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-light)',
               }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Total Purchases</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('customersPage.totalPurchases')}</span>
                 <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)' }}>₹{data.totalPurchases || 0}</span>
               </div>
               <div style={{
@@ -201,7 +201,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-light)',
               }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Due Amount</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('common.due')}</span>
                 <span style={{
                   fontSize: '0.95rem',
                   fontWeight: 700,
@@ -219,7 +219,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-light)',
               }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Loyalty Points</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('customersPage.loyaltyPoints')}</span>
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -231,7 +231,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                   borderRadius: '20px',
                   background: 'rgba(108, 99, 255, 0.1)',
                 }}>
-                  ⭐ {data.loyaltyPoints || 0} pts
+                  ⭐ {data.loyaltyPoints || 0} {t('customersPage.pts')}
                 </span>
               </div>
               <div style={{
@@ -243,7 +243,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-light)',
               }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>Customer Since</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('customersPage.customerSince')}</span>
                 <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                   {data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                 </span>
@@ -252,10 +252,10 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
           </div>
           <div className="drawer-footer">
             <button type="button" className="btn-premium btn-premium-primary" onClick={onClose}>
-              <BiCheck /> Close
+              <BiCheck /> {t('common.close')}
             </button>
             <button type="button" className="btn-premium btn-premium-secondary" onClick={() => onEditFromView?.(data)}>
-              <BiEdit /> Edit
+              <BiEdit /> {t('common.edit')}
             </button>
           </div>
         </div>
@@ -268,7 +268,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header" style={{ padding: '0.85rem 1.25rem', minHeight: 'auto' }}>
-          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? 'Edit Customer' : 'Add Customer'}</h5>
+          <h5 style={{ fontSize: '1rem', margin: 0 }}>{editing ? t('customersPage.editCustomer') : t('customersPage.addCustomer')}</h5>
           <button className="btn-close-premium" onClick={onClose} style={{ width: '32px', height: '32px' }}><BiX /></button>
         </div>
         <div className="drawer-body customer-drawer-body" style={{ padding: '0.85rem 1rem 0.4rem 1rem' }}>
@@ -289,31 +289,31 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {/* Customer Name - full width */}
               <div>
-                <label className="form-label" style={labelStyle}>{t('auth.name')} (EN) <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <input {...field('name')} placeholder="Enter customer name" />
+                <label className="form-label" style={labelStyle}>{t('customersPage.nameEn')} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input {...field('name')} placeholder={t('customersPage.namePlaceholder')} />
                 {errors.name && <div className="invalid-feedback-premium" style={errorStyle}>{errors.name}</div>}
               </div>
               {/* 2-col row: Name (BN) + Phone */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
-                  <label className="form-label" style={labelStyle}>{t('auth.name')} (BN)</label>
-                  <input {...field('nameBn')} placeholder="গ্রাহকের নাম লিখুন" />
+                  <label className="form-label" style={labelStyle}>{t('customersPage.nameBn')}</label>
+                  <input {...field('nameBn')} placeholder={t('customersPage.nameBnPlaceholder')} />
                 </div>
                 <div>
                   <label className="form-label" style={labelStyle}>{t('auth.phone')} <span style={{ color: 'var(--danger)' }}>*</span></label>
-                  <input {...field('phone')} placeholder="Enter phone number" />
+                  <input {...field('phone')} placeholder={t('customersPage.phonePlaceholder')} />
                   {errors.phone && <div className="invalid-feedback-premium" style={errorStyle}>{errors.phone}</div>}
                 </div>
               </div>
               {/* 2-col row: Email + Address */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
-                  <label className="form-label" style={labelStyle}>Email</label>
-                  <input type="email" {...field('email')} placeholder="Enter email address" />
+                  <label className="form-label" style={labelStyle}>{t('auth.email')}</label>
+                  <input type="email" {...field('email')} placeholder={t('customersPage.emailPlaceholder')} />
                 </div>
                 <div>
-                  <label className="form-label" style={labelStyle}>Address</label>
-                  <input {...field('address')} placeholder="Enter address" />
+                  <label className="form-label" style={labelStyle}>{t('customersPage.address')}</label>
+                  <input {...field('address')} placeholder={t('customersPage.addressPlaceholder')} />
                 </div>
               </div>
             </div>
@@ -322,7 +322,7 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
         <div className="drawer-footer customer-drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
           <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>{t('common.cancel')}</button>
           <button type="submit" form="customer-form" className="btn-premium btn-premium-primary" disabled={saving} style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
-            {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><BiCheck /> {t('common.save')}</>}
+            {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('common.save')}</>}
           </button>
         </div>
       </div>
@@ -399,14 +399,14 @@ const Customers = () => {
 
   const confirmDelete = (customer) => {
     Swal.fire({
-      title: 'Delete Customer?',
-      text: `Are you sure you want to delete "${customer.name}"? This action cannot be undone.`,
+      title: t('customersPage.deleteCustomerTitle'),
+      text: t('customersPage.deleteCustomerConfirm', { name: customer.name }),
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#FF6B6B',
       cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('customersPage.yesDeleteIt'),
+      cancelButtonText: t('common.cancel'),
       background: 'var(--bg-card)',
       color: 'var(--text-primary)',
       reverseButtons: true,
@@ -414,8 +414,8 @@ const Customers = () => {
       if (result.isConfirmed) {
         handleDelete(customer._id);
         Swal.fire({
-          title: 'Deleted!',
-          text: 'Customer has been deleted.',
+          title: t('customersPage.deletedTitle'),
+          text: t('customersPage.deletedText'),
           icon: 'success',
           timer: 1500,
           showConfirmButton: false,
@@ -433,11 +433,11 @@ const Customers = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.customers')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage your customers
+            {t('customersPage.subtitle')}
           </p>
         </div>
         <button className="btn-premium btn-premium-primary" onClick={() => { setEditing(null); setViewing(null); setDrawerOpen(true); }}>
-          <BiPlus /> Add Customer
+          <BiPlus /> {t('customersPage.addCustomer')}
         </button>
       </div>
 
@@ -447,7 +447,7 @@ const Customers = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder={`${t('common.search')} customers...`}
+            placeholder={t('customersPage.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -462,9 +462,9 @@ const Customers = () => {
               <tr>
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
-                <th>{t('sale.total')} Purchase</th>
+                <th>{t('customersPage.totalPurchase')}</th>
                 <th>{t('common.due')}</th>
-                <th>Loyalty</th>
+                <th>{t('customersPage.loyalty')}</th>
                 <th style={{ width: '140px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
@@ -472,14 +472,14 @@ const Customers = () => {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> Loading...
+                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>👥</div>
-                    No customers found
+                    {t('customersPage.noCustomersFound')}
                   </td>
                 </tr>
               ) : customers.map((customer) => (
@@ -504,18 +504,18 @@ const Customers = () => {
                       fontSize: '0.8rem',
                       fontWeight: 600,
                     }}>
-                      {customer.loyaltyPoints || 0} pts
+                      {customer.loyaltyPoints || 0} {t('customersPage.pts')}
                     </span>
                   </td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(customer)}>
+                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(customer)}>
                         <BiShow />
                       </button>
-                      <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(customer)}>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(customer)}>
                         <BiEdit />
                       </button>
-                      <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => confirmDelete(customer)}>
+                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(customer)}>
                         <BiTrash />
                       </button>
                     </div>
@@ -531,12 +531,12 @@ const Customers = () => {
       <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
         {loading ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : customers.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>👥</div>
-            No customers found
+            {t('customersPage.noCustomersFound')}
           </div>
         ) : customers.map((customer) => (
           <ExpandableCard
@@ -562,37 +562,37 @@ const Customers = () => {
             expanded={
               <div className="expandable-card__rows">
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Phone</span>
+                  <span className="expandable-card__row-label">{t('auth.phone')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{customer.phone}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Email</span>
+                  <span className="expandable-card__row-label">{t('auth.email')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{customer.email || '-'}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Address</span>
+                  <span className="expandable-card__row-label">{t('customersPage.address')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{typeof customer.address === 'object' ? Object.values(customer.address).filter(Boolean).join(', ') : (customer.address || '-')}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Total Purchases</span>
+                  <span className="expandable-card__row-label">{t('customersPage.totalPurchases')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">₹{customer.totalPurchases || 0}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Due Amount</span>
+                  <span className="expandable-card__row-label">{t('common.due')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value" style={customer.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{customer.dueAmount || 0}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Loyalty Points</span>
+                  <span className="expandable-card__row-label">{t('customersPage.loyaltyPoints')}</span>
                   <span className="expandable-card__row-dots" />
-                  <span className="expandable-card__row-value">{customer.loyaltyPoints || 0} pts</span>
+                  <span className="expandable-card__row-value">{customer.loyaltyPoints || 0} {t('customersPage.pts')}</span>
                 </div>
                 <div className="expandable-card__row">
-                  <span className="expandable-card__row-label">Created</span>
+                  <span className="expandable-card__row-label">{t('customersPage.customerSince')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{new Date(customer.createdAt).toLocaleDateString()}</span>
                 </div>
@@ -600,13 +600,13 @@ const Customers = () => {
             }
             actions={
               <>
-                <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => handleView(customer)}>
+                <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(customer)}>
                   <BiShow />
                 </button>
-                <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => handleEdit(customer)}>
+                <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(customer)}>
                   <BiEdit />
                 </button>
-                <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => confirmDelete(customer)}>
+                <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(customer)}>
                   <BiTrash />
                 </button>
               </>

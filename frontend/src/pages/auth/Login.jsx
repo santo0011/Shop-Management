@@ -40,7 +40,7 @@ const Login = () => {
       }
 
       dispatch(loginSuccess(data));
-      showToast.success('Welcome back! Login successful.');
+      showToast.success(t('auth.loginSuccess'));
 
       if (data.role === 'super_admin') {
         navigate('/super-admin');
@@ -48,16 +48,16 @@ const Login = () => {
         navigate('/');
       }
     } catch (err) {
-      dispatch(loginFailure(err.response?.data?.message || 'Login failed'));
+      dispatch(loginFailure(err.response?.data?.message || t('auth.loginFailed')));
     }
   };
 
   const previewBars = [42, 68, 50, 85, 62, 96, 74];
 
   const trustStats = [
-    { value: '500+', label: 'Shops Trust Us' },
-    { value: '50K+', label: 'Orders Processed' },
-    { value: '24/7', label: 'Support' },
+    { value: '500+', label: t('auth.trustShops') },
+    { value: '50K+', label: t('auth.trustOrders') },
+    { value: '24/7', label: t('auth.trustSupport') },
   ];
 
   const DeveloperBadge = () => (
@@ -66,8 +66,8 @@ const Login = () => {
         <BiCodeAlt />
       </div>
       <div className="dev-badge-text">
-        <span className="dev-badge-name">Created by Santo Biswas</span>
-        <span className="dev-badge-role">Software Developer</span>
+        <span className="dev-badge-name">{t('auth.createdBy')}</span>
+        <span className="dev-badge-role">{t('auth.softwareDeveloper')}</span>
       </div>
     </div>
   );
@@ -93,9 +93,9 @@ const Login = () => {
           </div>
 
           {/* Welcome */}
-          <h1 className="login-brand-title">Run your store<br />like a pro.</h1>
+          <h1 className="login-brand-title">{t('auth.heroTitleLine1')}<br />{t('auth.heroTitleLine2')}</h1>
           <p className="login-brand-subtitle">
-            Billing, inventory, and sales — all in one place, built for busy grocery shops.
+            {t('auth.heroSubtitle')}
           </p>
 
           {/* Live-looking dashboard preview mockup */}
@@ -104,19 +104,19 @@ const Login = () => {
               <span className="login-brand-preview-dot login-brand-preview-dot--red" />
               <span className="login-brand-preview-dot login-brand-preview-dot--yellow" />
               <span className="login-brand-preview-dot login-brand-preview-dot--green" />
-              <span className="login-brand-preview-title">Today's Overview</span>
+              <span className="login-brand-preview-title">{t('auth.previewOverview')}</span>
             </div>
             <div className="login-brand-preview-stats">
               <div className="login-brand-preview-stat">
-                <span className="login-brand-preview-stat-label">Sales</span>
+                <span className="login-brand-preview-stat-label">{t('nav.sales')}</span>
                 <span className="login-brand-preview-stat-value">₹48,320</span>
               </div>
               <div className="login-brand-preview-stat">
-                <span className="login-brand-preview-stat-label">Orders</span>
+                <span className="login-brand-preview-stat-label">{t('auth.previewOrders')}</span>
                 <span className="login-brand-preview-stat-value">186</span>
               </div>
               <div className="login-brand-preview-stat">
-                <span className="login-brand-preview-stat-label">Profit</span>
+                <span className="login-brand-preview-stat-label">{t('product.profit')}</span>
                 <span className="login-brand-preview-stat-value">₹12,940</span>
               </div>
             </div>
@@ -163,8 +163,8 @@ const Login = () => {
           </div>
 
           {/* Heading */}
-          <h2 className="login-form-heading">Sign In</h2>
-          <p className="login-form-subheading">Welcome back! Please enter your credentials.</p>
+          <h2 className="login-form-heading">{t('auth.signIn')}</h2>
+          <p className="login-form-subheading">{t('auth.welcomeBackSub')}</p>
 
           {/* Error */}
           {error && (
@@ -177,7 +177,7 @@ const Login = () => {
           <form onSubmit={handleSubmit} className="login-form">
             {/* Email */}
             <div className="login-form-group">
-              <label className="login-form-label">Email Address</label>
+              <label className="login-form-label">{t('auth.emailAddress')}</label>
               <div className="login-input-wrapper">
                 <span className="login-input-icon">
                   <BiEnvelope />
@@ -197,7 +197,7 @@ const Login = () => {
 
             {/* Password */}
             <div className="login-form-group">
-              <label className="login-form-label">Password</label>
+              <label className="login-form-label">{t('auth.password')}</label>
               <div className="login-input-wrapper">
                 <span className="login-input-icon">
                   <BiLockAlt />
@@ -232,10 +232,10 @@ const Login = () => {
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
                 <span className="login-checkbox-mark" />
-                <span className="login-checkbox-label">Remember Me</span>
+                <span className="login-checkbox-label">{t('auth.rememberMe')}</span>
               </label>
               <Link to="/forgot-password" className="login-forgot-link">
-                Forgot Password?
+                {t('auth.forgotPassword')}
               </Link>
             </div>
 
@@ -252,10 +252,10 @@ const Login = () => {
                     <span className="login-spinner__dot" />
                     <span className="login-spinner__dot" />
                   </span>
-                  <span className="login-submit-btn__text">Signing in</span>
+                  <span className="login-submit-btn__text">{t('auth.signingIn')}</span>
                 </span>
               ) : (
-                <span className="login-btn-content">Sign In</span>
+                <span className="login-btn-content">{t('auth.signIn')}</span>
               )}
             </button>
           </form>
@@ -265,7 +265,7 @@ const Login = () => {
             <span className="login-lang-icon" aria-hidden="true">
               <BiGlobe />
             </span>
-            <div className="login-lang-toggle" role="group" aria-label="Select language">
+            <div className="login-lang-toggle" role="group" aria-label={t('auth.selectLanguage')}>
               <button
                 type="button"
                 className={`login-lang-btn ${i18n.language === 'en' ? 'active' : ''}`}

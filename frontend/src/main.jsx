@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { store } from './redux/store';
 import App from './App';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import './utils/i18n';
+import i18n from './utils/i18n';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import '@fortawesome/fontawesome-free/css/all.min.css';
@@ -76,7 +76,7 @@ const AppLoader = () => {
             fontWeight: 500,
           }}
         >
-          Loading application...
+          {i18n.t('common.loadingApplication')}
         </p>
       </div>
     </div>

@@ -14,7 +14,7 @@ const ForgotPassword = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Please enter a valid email address');
+      setError(t('auth.invalidEmail'));
       return;
     }
 
@@ -24,7 +24,7 @@ const ForgotPassword = () => {
       await api.post('/auth/forgot-password', { email }, { _skipLoading: true });
       setSent(true);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send reset email. Please try again.');
+      setError(err.response?.data?.message || t('auth.resetEmailFailed'));
     } finally {
       setLoading(false);
     }
@@ -41,9 +41,9 @@ const ForgotPassword = () => {
           <div className="login-brand-logo">
             <div className="login-brand-logo-icon">GS</div>
           </div>
-          <h1 className="login-brand-title">Forgot Password?</h1>
+          <h1 className="login-brand-title">{t('auth.forgotPasswordTitle')}</h1>
           <p className="login-brand-subtitle">
-            No worries! Enter your email and we'll send you a reset link.
+            {t('auth.forgotPasswordSub')}
           </p>
         </div>
       </div>
@@ -68,10 +68,10 @@ const ForgotPassword = () => {
                 <BiCheckCircle />
               </div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 8px' }}>
-                Check Your Email
+                {t('auth.resetEmailSent')}
               </h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: '0 0 1.5rem' }}>
-                If an account exists for <strong>{email}</strong>, we've sent a password reset link. Please check your inbox and spam folder.
+                {t('auth.resetEmailSentDetail', { email })}
               </p>
               <Link
                 to="/login"
@@ -81,14 +81,14 @@ const ForgotPassword = () => {
                   textDecoration: 'none',
                 }}
               >
-                <BiArrowBack /> Back to Login
+                <BiArrowBack /> {t('auth.backToLogin')}
               </Link>
             </div>
           ) : (
             /* ─── Form State ─── */
             <>
-              <h2 className="login-form-heading">Reset Password</h2>
-              <p className="login-form-subheading">Enter your email address and we'll send you a reset link.</p>
+              <h2 className="login-form-heading">{t('auth.resetPassword')}</h2>
+              <p className="login-form-subheading">{t('auth.forgotPasswordSub')}</p>
 
               {error && (
                 <div className="login-form-error">
@@ -98,7 +98,7 @@ const ForgotPassword = () => {
 
               <form onSubmit={handleSubmit} className="login-form">
                 <div className="login-form-group">
-                  <label className="login-form-label">Email Address</label>
+                  <label className="login-form-label">{t('auth.emailAddress')}</label>
                   <div className="login-input-wrapper">
                     <span className="login-input-icon"><BiEnvelope /></span>
                     <input
@@ -115,9 +115,9 @@ const ForgotPassword = () => {
 
                 <button type="submit" className="login-submit-btn" disabled={loading}>
                   {loading ? (
-                    <><span className="login-spinner" /> Sending...</>
+                    <><span className="login-spinner" /> {t('auth.sending')}...</>
                   ) : (
-                    'Send Reset Link'
+                    t('auth.sendResetLink')
                   )}
                 </button>
               </form>
@@ -131,13 +131,13 @@ const ForgotPassword = () => {
                     textDecoration: 'none',
                   }}
                 >
-                  <BiArrowBack /> Back to Login
+                  <BiArrowBack /> {t('auth.backToLogin')}
                 </Link>
               </div>
 
               <div className="login-lang-switcher">
                 <span className="login-lang-icon" aria-hidden="true"><BiGlobe /></span>
-                <div className="login-lang-toggle" role="group" aria-label="Select language">
+                <div className="login-lang-toggle" role="group" aria-label={t('auth.selectLanguage')}>
                   <button type="button" className={`login-lang-btn ${i18n.language === 'en' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('en')}>English</button>
                   <button type="button" className={`login-lang-btn ${i18n.language === 'bn' ? 'active' : ''}`} onClick={() => i18n.changeLanguage('bn')}>বাংলা</button>
                 </div>

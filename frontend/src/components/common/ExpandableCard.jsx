@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BiChevronDown } from 'react-icons/bi';
 
 /**
@@ -13,6 +14,7 @@ import { BiChevronDown } from 'react-icons/bi';
  * The card auto-collapses on window resize > mobile breakpoint.
  */
 const ExpandableCard = ({ compact, expanded, actions }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const contentRef = useRef(null);
   const [contentHeight, setContentHeight] = useState(0);
@@ -44,7 +46,7 @@ const ExpandableCard = ({ compact, expanded, actions }) => {
         <button
           className={`expandable-card__toggle ${open ? 'expandable-card__toggle--active' : ''}`}
           onClick={(e) => { e.stopPropagation(); setOpen((prev) => !prev); }}
-          aria-label={open ? 'Show less' : 'Show more'}
+          aria-label={open ? t('common.showLess') : t('common.showMore')}
         >
           <BiChevronDown />
         </button>
