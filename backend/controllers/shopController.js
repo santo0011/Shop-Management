@@ -127,7 +127,7 @@ const updateShop = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    const { name, email, phone, address, logo, currency, timezone, settings } = req.body;
+    const { name, ownerName, email, phone, address, logo, currency, timezone, settings } = req.body;
 
     if (name) shop.name = name;
     if (email) shop.email = email;
@@ -135,8 +135,28 @@ const updateShop = async (req, res) => {
     if (logo) shop.logo = logo;
     if (currency) shop.currency = currency;
     if (timezone) shop.timezone = timezone;
-    if (address) shop.address = { ...shop.address, ...address };
     if (settings) shop.settings = { ...shop.settings, ...settings };
+
+    // Handle address: if it's a string (comma-separated from frontend), parse it into an object
+    if (address !== undefined) {
+      if (typeof address === 'string') {
+        const parts = address.split(',').map(s => s.trim()).filter(Boolean);
+        shop.address = {
+          street: parts[0] || '',
+          city: parts[1] || '',
+          state: parts[2] || '',
+          zipCode: parts[3] || '',
+          country: parts[4] || 'India',
+        };
+      } else if (typeof address === 'object' && address !== null) {
+        shop.address = { ...shop.address, ...address };
+      }
+    }
+
+    // Handle ownerName: update the associated User document's name
+    if (ownerName && shop.owner) {
+      await User.findByIdAndUpdate(shop.owner, { name: ownerName });
+    }
 
     shop = await shop.save();
     res.json(shop);
@@ -212,7 +232,7 @@ const getShopStats = async (req, res) => {
   }
 };
 
-// @desc    Update my shop settings (tax, footer, etc.)
+// @desc    Update my shop settings (tax, footer, print, etc.)
 // @route   PUT /api/shops/settings
 const updateMyShopSettings = async (req, res) => {
   try {
@@ -221,7 +241,14 @@ const updateMyShopSettings = async (req, res) => {
       return res.status(404).json({ message: 'Shop not found' });
     }
 
-    const { taxRate, taxName, receiptFooter, invoicePrefix, barcodePrefix, barcodeSymbology, autoGenerateBarcode } = req.body;
+    const {
+      taxRate, taxName, receiptFooter, invoicePrefix,
+      barcodePrefix, barcodeSymbology, autoGenerateBarcode,
+      // Printer settings
+      paperSize, invoiceTemplate, printMode, autoPrint,
+      printCopies, marginTop, marginBottom, marginLeft, marginRight,
+      showLogo, showQR, showBarcode, showHeader, showFooter,
+    } = req.body;
 
     if (taxRate !== undefined) shop.settings.taxRate = Math.max(0, Math.min(100, Number(taxRate)));
     if (taxName !== undefined) shop.settings.taxName = taxName;
@@ -230,6 +257,22 @@ const updateMyShopSettings = async (req, res) => {
     if (barcodePrefix !== undefined) shop.settings.barcodePrefix = barcodePrefix;
     if (barcodeSymbology !== undefined) shop.settings.barcodeSymbology = barcodeSymbology;
     if (autoGenerateBarcode !== undefined) shop.settings.autoGenerateBarcode = !!autoGenerateBarcode;
+
+    // Printer settings
+    if (paperSize !== undefined) shop.settings.paperSize = paperSize;
+    if (invoiceTemplate !== undefined) shop.settings.invoiceTemplate = invoiceTemplate;
+    if (printMode !== undefined) shop.settings.printMode = printMode;
+    if (autoPrint !== undefined) shop.settings.autoPrint = !!autoPrint;
+    if (printCopies !== undefined) shop.settings.printCopies = Math.max(1, Number(printCopies));
+    if (marginTop !== undefined) shop.settings.marginTop = Number(marginTop);
+    if (marginBottom !== undefined) shop.settings.marginBottom = Number(marginBottom);
+    if (marginLeft !== undefined) shop.settings.marginLeft = Number(marginLeft);
+    if (marginRight !== undefined) shop.settings.marginRight = Number(marginRight);
+    if (showLogo !== undefined) shop.settings.showLogo = !!showLogo;
+    if (showQR !== undefined) shop.settings.showQR = !!showQR;
+    if (showBarcode !== undefined) shop.settings.showBarcode = !!showBarcode;
+    if (showHeader !== undefined) shop.settings.showHeader = !!showHeader;
+    if (showFooter !== undefined) shop.settings.showFooter = !!showFooter;
 
     await shop.save();
     res.json(shop);

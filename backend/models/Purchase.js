@@ -119,6 +119,8 @@ const purchaseSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// ─── Indexes for performance ──────────────────────────────────
+purchaseSchema.index({ shop: 1, purchaseDate: -1 });
 purchaseSchema.index({ shop: 1, purchaseNo: 1 }, { unique: true });
 // A supplier invoice number only needs to be unique per supplier, and is
 // optional — the partial filter excludes purchases that left it blank so

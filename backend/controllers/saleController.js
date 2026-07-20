@@ -14,8 +14,16 @@ const getSales = async (req, res) => {
 
     if (startDate || endDate) {
       query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        query.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
     }
     if (customer) query.customer = customer;
     if (paymentMethod) query.paymentMethod = paymentMethod;
@@ -145,11 +153,17 @@ const getTopSellingProducts = async (req, res) => {
         $group: {
           _id: '$items.product',
           totalQuantity: { $sum: '$items.quantity' },
+          totalReturned: { $sum: { $ifNull: ['$items.returnedQty', 0] } },
           totalAmount: { $sum: '$items.total' },
           lastSold: { $max: '$createdAt' },
         },
       },
-      { $sort: { totalQuantity: -1 } },
+      {
+        $addFields: {
+          netQuantity: { $subtract: ['$totalQuantity', '$totalReturned'] },
+        },
+      },
+      { $sort: { netQuantity: -1 } },
       { $limit: parseInt(limit) },
       {
         $lookup: {
@@ -170,7 +184,7 @@ const getTopSellingProducts = async (req, res) => {
           unit: '$product.unit',
           barcode: '$product.barcode',
           category: '$product.category',
-          totalSold: '$totalQuantity',
+          totalSold: '$netQuantity',
           totalRevenue: '$totalAmount',
           lastSold: 1,
         },
@@ -217,9 +231,15 @@ const getSalesStats = async (req, res) => {
     const todayDue = todaySales.reduce((sum, s) => sum + (s.dueAmount || 0), 0);
     const todayTotal = todaySales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
 
+    // Calculate net revenue excluding refunds
+    const todayRefunds = todaySales.reduce((sum, s) => {
+      const saleRefunds = (s.returns || []).reduce((rSum, r) => rSum + (r.totalRefund || 0), 0);
+      return sum + saleRefunds;
+    }, 0);
+
     res.json({
       todaySales: totalTransactions,
-      todayRevenue,
+      todayRevenue: Math.max(0, todayRevenue - todayRefunds),
       todayDue,
       totalAmount: todayTotal,
       count: totalTransactions,

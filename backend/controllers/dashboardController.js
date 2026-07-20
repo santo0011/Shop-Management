@@ -12,69 +12,64 @@ const getDashboardStats = async (req, res) => {
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // Today's sales
-    const todaySales = await Sale.aggregate([
-      { $match: { shop: shopId, saleDate: { $gte: today } } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
-    ]);
-
-    // Monthly sales
-    const monthlySales = await Sale.aggregate([
-      { $match: { shop: shopId, saleDate: { $gte: startOfMonth } } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
-    ]);
-
-    // Monthly purchases
-    const monthlyPurchases = await Purchase.aggregate([
-      { $match: { shop: shopId, purchaseDate: { $gte: startOfMonth } } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-    ]);
-
-    // Profit = (monthly sales - monthly purchases)
-    const totalSales = monthlySales[0]?.total || 0;
-    const totalPurchases = monthlyPurchases[0]?.total || 0;
-    const profit = totalSales - totalPurchases;
-
-    // Low stock products
-    const lowStockProducts = await Product.countDocuments({
-      shop: shopId,
-      $expr: { $lte: ['$stock', '$minStock'] },
-    });
-
-    // Total products
-    const totalProducts = await Product.countDocuments({ shop: shopId });
-
-    // Total customers
-    const totalCustomers = await Customer.countDocuments({ shop: shopId });
-
-    // Total suppliers
-    const totalSuppliers = await Supplier.countDocuments({ shop: shopId });
-
-    // Customer due
-    const customerDue = await Customer.aggregate([
-      { $match: { shop: shopId } },
-      { $group: { _id: null, total: { $sum: '$dueAmount' } } },
-    ]);
-
-    // Supplier due
-    const supplierDue = await Supplier.aggregate([
-      { $match: { shop: shopId } },
-      { $group: { _id: null, total: { $sum: '$dueAmount' } } },
-    ]);
-
-    res.json({
-      todaySales: todaySales[0]?.total || 0,
-      todaySalesCount: todaySales[0]?.count || 0,
-      monthlySales: totalSales,
-      monthlySalesCount: monthlySales[0]?.count || 0,
-      monthlyPurchases: totalPurchases,
-      profit,
-      lowStockProducts,
+    // Run all independent queries in parallel
+    const [
+      todaySalesAgg,
+      monthlySalesAgg,
+      monthlyPurchasesAgg,
+      lowStockCount,
       totalProducts,
       totalCustomers,
       totalSuppliers,
-      customerDue: customerDue[0]?.total || 0,
-      supplierDue: supplierDue[0]?.total || 0,
+      customerDueAgg,
+      supplierDueAgg,
+    ] = await Promise.all([
+      Sale.aggregate([
+        { $match: { shop: shopId, saleDate: { $gte: today } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+      ]),
+      Sale.aggregate([
+        { $match: { shop: shopId, saleDate: { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+      ]),
+      Purchase.aggregate([
+        { $match: { shop: shopId, purchaseDate: { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+      Product.countDocuments({
+        shop: shopId,
+        $expr: { $lte: ['$stock', '$minStock'] },
+      }),
+      Product.countDocuments({ shop: shopId }),
+      Customer.countDocuments({ shop: shopId }),
+      Supplier.countDocuments({ shop: shopId }),
+      Customer.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
+      ]),
+      Supplier.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
+      ]),
+    ]);
+
+    const totalSales = monthlySalesAgg[0]?.total || 0;
+    const totalPurchases = monthlyPurchasesAgg[0]?.total || 0;
+    const profit = totalSales - totalPurchases;
+
+    res.json({
+      todaySales: todaySalesAgg[0]?.total || 0,
+      todaySalesCount: todaySalesAgg[0]?.count || 0,
+      monthlySales: totalSales,
+      monthlySalesCount: monthlySalesAgg[0]?.count || 0,
+      monthlyPurchases: totalPurchases,
+      profit,
+      lowStockProducts: lowStockCount,
+      totalProducts,
+      totalCustomers,
+      totalSuppliers,
+      customerDue: customerDueAgg[0]?.total || 0,
+      supplierDue: supplierDueAgg[0]?.total || 0,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -179,26 +174,38 @@ const getProfitExpense = async (req, res) => {
   try {
     const shopId = req.user.shop;
     const months = 6;
-    const result = [];
 
+    // Build all month queries upfront and run in parallel
+    const monthQueries = [];
     for (let i = months - 1; i >= 0; i--) {
       const d = new Date();
       d.setMonth(d.getMonth() - i);
       const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
       const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 
-      const [salesAgg] = await Sale.aggregate([
-        { $match: { shop: shopId, saleDate: { $gte: monthStart, $lte: monthEnd } } },
-        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-      ]);
+      monthQueries.push(
+        Sale.aggregate([
+          { $match: { shop: shopId, saleDate: { $gte: monthStart, $lte: monthEnd } } },
+          { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+        ]),
+        Purchase.aggregate([
+          { $match: { shop: shopId, purchaseDate: { $gte: monthStart, $lte: monthEnd } } },
+          { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+        ])
+      );
+    }
 
-      const [purchasesAgg] = await Purchase.aggregate([
-        { $match: { shop: shopId, purchaseDate: { $gte: monthStart, $lte: monthEnd } } },
-        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-      ]);
+    const allResults = await Promise.all(monthQueries);
+    const result = [];
 
-      const sales = salesAgg?.total || 0;
-      const expenses = purchasesAgg?.total || 0;
+    for (let i = 0; i < months; i++) {
+      const salesAgg = allResults[i * 2];
+      const purchasesAgg = allResults[i * 2 + 1];
+
+      const d = new Date();
+      d.setMonth(d.getMonth() - (months - 1 - i));
+      const sales = salesAgg[0]?.total || 0;
+      const expenses = purchasesAgg[0]?.total || 0;
       const profit = sales - expenses;
 
       result.push({

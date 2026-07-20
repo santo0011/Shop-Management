@@ -166,6 +166,12 @@ const saleSchema = new mongoose.Schema({
   toObject: { virtuals: true },
 });
 
+// ─── Indexes for performance ──────────────────────────────────
+saleSchema.index({ shop: 1, saleDate: -1 });
+saleSchema.index({ shop: 1, createdAt: -1 });
+saleSchema.index({ shop: 1, paymentMethod: 1 });
+saleSchema.index({ shop: 1, invoiceNo: 1 });
+
 // Virtual: return status
 saleSchema.virtual('returnStatus').get(function() {
   if (!this.returns || this.returns.length === 0) return 'none';

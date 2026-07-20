@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Chart from 'react-apexcharts';
 import * as XLSX from 'xlsx';
@@ -117,6 +117,33 @@ const drawPdfTable = (doc, startY, headers, rows, colWidths) => {
   return y + 4;
 };
 
+// ─── Static/persistent data (fetched once, cached) ─────────────────────
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let cachedPersistentData = null;
+let persistentCacheTime = 0;
+
+const getPersistentData = async (forceRefresh) => {
+  const now = Date.now();
+  if (!forceRefresh && cachedPersistentData && (now - persistentCacheTime) < CACHE_DURATION) {
+    return cachedPersistentData;
+  }
+  const [lowStockRes, customerDueRes, supplierDueRes] = await Promise.all([
+    api.get('/reports/stock?lowStock=true', { _skipLoading: true }),
+    api.get('/reports/customer-due', { _skipLoading: true }),
+    api.get('/reports/supplier-due', { _skipLoading: true }),
+  ]);
+  const data = {
+    lowStockProducts: lowStockRes.data.products || [],
+    totalCustomerDue: customerDueRes.data.totalDue || 0,
+    totalSupplierDue: supplierDueRes.data.totalDue || 0,
+  };
+  cachedPersistentData = data;
+  persistentCacheTime = now;
+  return data;
+};
+
+const clearPersistentCache = () => { cachedPersistentData = null; persistentCacheTime = 0; };
+
 const Reports = () => {
   const { t } = useTranslation();
   const PRESETS = getPresets(t);
@@ -126,49 +153,35 @@ const Reports = () => {
 
   const [filters, setFilters] = useState({ preset: '30d', customStart: '', customEnd: '', paymentMethod: 'all' });
   const [analytics, setAnalytics] = useState(EMPTY_ANALYTICS);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true); // Full-page loading only for initial load
+  const [refreshing, setRefreshing] = useState(false); // Subsequent loads show spinner on buttons only
   const [error, setError] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [persistentData, setPersistentData] = useState(null);
+  const initialLoadDone = useRef(false);
 
   const range = useMemo(
     () => computeRange(filters.preset, filters.customStart, filters.customEnd),
     [filters.preset, filters.customStart, filters.customEnd]
   );
 
-  const fetchAnalytics = useCallback(async (isFirstLoad) => {
-    if (!range) return;
-    if (isFirstLoad) setLoading(true); else setRefreshing(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
-      if (filters.paymentMethod !== 'all') params.append('paymentMethod', filters.paymentMethod);
-      const { data } = await api.get(`/reports/analytics?${params.toString()}`, { _skipLoading: true });
-      setAnalytics(data);
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || t('reportsPage.failedToLoadData'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [range, filters.paymentMethod]);
-
+  // Load persistent (non-date-dependent) data once and cache it.
+  // Also merge low stock products into analytics so exports still work.
   useEffect(() => {
-    fetchAnalytics(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    getPersistentData(false).then((data) => {
+      setPersistentData(data);
+      setAnalytics((prev) => ({
+        ...prev,
+        lowStockProducts: data.lowStockProducts || [],
+      }));
+    }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (loading) return;
-    fetchAnalytics(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range, filters.paymentMethod]);
-
-  // ─── Theme-aware chart config (mirrors Dashboard.jsx) ─────────────────
-  const getTheme = () => {
+  // Theme detection — only depends on DOM, not analytics data
+  const theme = useMemo(() => {
     try { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
-  };
-  const theme = useMemo(() => getTheme(), [analytics]);
+  }, []);
+
   const chartColors = {
     primary: '#6C63FF',
     secondary: '#00D9A6',
@@ -176,6 +189,48 @@ const Reports = () => {
     gridColor: theme === 'dark' ? '#2a2a4e' : '#e8e8f0',
   };
 
+  const fetchAnalytics = useCallback(async (showFullLoader) => {
+    if (!range) return;
+    if (showFullLoader) setLoading(true); else setRefreshing(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
+      if (filters.paymentMethod !== 'all') params.append('paymentMethod', filters.paymentMethod);
+      const { data } = await api.get(`/reports/analytics?${params.toString()}`, { _skipLoading: true });
+      setAnalytics((prev) => ({
+        ...prev,
+        summary: data.summary || prev.summary,
+        daily: data.daily || [],
+        topProducts: data.topProducts || [],
+        paymentMethods: data.paymentMethods || [],
+        recentTransactions: data.recentTransactions || [],
+        lowStockProducts: data.lowStockProducts || prev.lowStockProducts,
+      }));
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || t('reportsPage.failedToLoadData'));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [range, filters.paymentMethod, t]);
+
+  // Initial load — single fetch, no duplicate
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      fetchAnalytics(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Subsequent loads when filters change (only after initial load)
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    fetchAnalytics(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range, filters.paymentMethod]);
+
+  // ─── Theme-aware chart config (mirrors Dashboard.jsx) ─────────────────
   const trendOptions = useMemo(() => ({
     chart: { type: 'area', height: 320, toolbar: { show: false }, foreColor: chartColors.textSecondary },
     dataLabels: { enabled: false },
@@ -188,12 +243,12 @@ const Reports = () => {
     grid: { borderColor: chartColors.gridColor },
     theme: { mode: theme },
     colors: [chartColors.primary, chartColors.secondary],
-  }), [analytics, theme]);
+  }), [analytics.daily, theme, chartColors]);
 
   const trendSeries = useMemo(() => [
     { name: t('nav.sales'), data: analytics.daily.map(d => Number((d.sales || 0).toFixed(2))) },
     { name: t('product.profit'), data: analytics.daily.map(d => Number((d.profit || 0).toFixed(2))) },
-  ], [analytics, t]);
+  ], [analytics.daily, t]);
 
   const topProductsChartOptions = useMemo(() => ({
     chart: { type: 'bar', height: 320, toolbar: { show: false }, foreColor: chartColors.textSecondary },
@@ -206,21 +261,25 @@ const Reports = () => {
     grid: { borderColor: chartColors.gridColor },
     theme: { mode: theme },
     colors: TOP_PRODUCTS_COLORS,
-  }), [analytics, theme, t]);
+  }), [analytics.topProducts, theme, t, chartColors]);
 
   const topProductsChartSeries = useMemo(() => [
     { name: t('dashboard.quantitySold'), data: analytics.topProducts.map(p => p.quantity) },
-  ], [analytics, t]);
+  ], [analytics.topProducts, t]);
 
-  // ─── Summary cards (reuses the shared StatCard component) ─────────────
-  const summaryCards = [
-    { icon: BiCart, label: t('dashboard.totalSales'), value: money(analytics.summary.totalSales), color: 'primary', rawValue: analytics.summary.totalSales, isCurrency: true },
-    { icon: BiDollar, label: t('reportsPage.totalRevenue'), value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
-    { icon: BiTrendingUp, label: t('dashboard.totalProfit'), value: money(analytics.summary.totalProfit), color: 'info', rawValue: analytics.summary.totalProfit, isCurrency: true },
-    { icon: BiReceipt, label: t('dashboard.totalOrders'), value: count(analytics.summary.totalOrders), color: 'warning', rawValue: analytics.summary.totalOrders, isCurrency: false },
-    { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), value: money(analytics.summary.totalDue), color: 'warning', rawValue: analytics.summary.totalDue, isCurrency: true },
-    { icon: BiError, label: t('dashboard.lowStockProducts'), value: count(analytics.summary.lowStockProducts), color: 'danger', rawValue: analytics.summary.lowStockProducts, isCurrency: false },
-  ];
+  // Merge low stock and totals from persistent cache + analytics
+  const summaryCards = useMemo(() => {
+    const lowStockCount = persistentData?.lowStockProducts?.length ?? analytics.lowStockProducts?.length ?? 0;
+    const totalDue = (persistentData?.totalCustomerDue ?? 0) + (persistentData?.totalSupplierDue ?? 0);
+    return [
+      { icon: BiCart, label: t('dashboard.totalSales'), value: money(analytics.summary.totalSales), color: 'primary', rawValue: analytics.summary.totalSales, isCurrency: true },
+      { icon: BiDollar, label: t('reportsPage.totalRevenue'), value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
+      { icon: BiTrendingUp, label: t('dashboard.totalProfit'), value: money(analytics.summary.totalProfit), color: 'info', rawValue: analytics.summary.totalProfit, isCurrency: true },
+      { icon: BiReceipt, label: t('dashboard.totalOrders'), value: count(analytics.summary.totalOrders), color: 'warning', rawValue: analytics.summary.totalOrders, isCurrency: false },
+      { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), value: money(totalDue), color: 'warning', rawValue: totalDue, isCurrency: true },
+      { icon: BiError, label: t('dashboard.lowStockProducts'), value: count(lowStockCount), color: 'danger', rawValue: lowStockCount, isCurrency: false },
+    ];
+  }, [analytics.summary, persistentData, t]);
 
   // ─── Export ─────────────────────────────────────────────────────────
   const downloadBlob = (content, mime, filename) => {
@@ -314,8 +373,7 @@ const Reports = () => {
     }
   };
 
-  if (loading) return null;
-
+  // Show inline spinners instead of blocking the entire page — like Sales page
   if (error) {
     return (
       <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
@@ -339,9 +397,12 @@ const Reports = () => {
             {t('reportsPage.subtitle')}
           </p>
         </div>
-        <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false)} disabled={refreshing}>
-          {refreshing ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('common.refresh')}
-        </button>
+        <div className="d-flex gap-2">
+          {loading && <div className="spinner-border spinner-border-sm" style={{ color: 'var(--primary)', alignSelf: 'center' }} />}
+          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false)} disabled={refreshing}>
+            {refreshing ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('common.refresh')}
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards - 3 per row desktop, 2 per row mobile */}
@@ -425,7 +486,11 @@ const Reports = () => {
               <span className="badge badge-primary">{PRESETS.find(p => p.key === filters.preset)?.label || t('common.custom')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
-              {analytics.daily.length > 0 ? (
+              {refreshing || loading ? (
+                <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+                </div>
+              ) : analytics.daily.length > 0 ? (
                 <Chart options={trendOptions} series={trendSeries} type="area" height={320} />
               ) : (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
@@ -446,7 +511,11 @@ const Reports = () => {
               <span className="badge badge-success">{t('report.byQuantity')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
-              {analytics.topProducts.length > 0 ? (
+              {refreshing || loading ? (
+                <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+                </div>
+              ) : analytics.topProducts.length > 0 ? (
                 <Chart options={topProductsChartOptions} series={topProductsChartSeries} type="bar" height={320} />
               ) : (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
@@ -461,22 +530,30 @@ const Reports = () => {
 
       {/* Top 10 Best Selling Products */}
       <div className="desktop-table mb-3">
-        <DataTable
-          title={t('reportsPage.top10Products')}
-          icon={BiStar}
-          data={analytics.topProducts}
-          rowKey={(row) => row.productId}
-          searchKeys={['name', 'category']}
-          searchPlaceholder={t('product.searchProductsPlaceholder')}
-          emptyMessage={t('reportsPage.noSalesPeriod')}
-          pageSize={10}
-          columns={[
-            { key: 'name', label: t('reportsPage.product'), sortable: true },
-            { key: 'category', label: t('product.category'), sortable: true },
-            { key: 'quantity', label: t('dashboard.quantitySold'), sortable: true, align: 'right' },
-            { key: 'revenue', label: t('dashboard.revenue'), sortable: true, align: 'right', render: (row) => money(row.revenue) },
-          ]}
-        />
+        {loading ? (
+          <div className="premium-card">
+            <div className="premium-card-body text-center py-4" style={{ color: 'var(--text-muted)' }}>
+              <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+            </div>
+          </div>
+        ) : (
+          <DataTable
+            title={t('reportsPage.top10Products')}
+            icon={BiStar}
+            data={analytics.topProducts}
+            rowKey={(row) => row.productId}
+            searchKeys={['name', 'category']}
+            searchPlaceholder={t('product.searchProductsPlaceholder')}
+            emptyMessage={t('reportsPage.noSalesPeriod')}
+            pageSize={10}
+            columns={[
+              { key: 'name', label: t('reportsPage.product'), sortable: true },
+              { key: 'category', label: t('product.category'), sortable: true },
+              { key: 'quantity', label: t('dashboard.quantitySold'), sortable: true, align: 'right' },
+              { key: 'revenue', label: t('dashboard.revenue'), sortable: true, align: 'right', render: (row) => money(row.revenue) },
+            ]}
+          />
+        )}
       </div>
 
       {/* ─── Mobile: Top Products Cards ────────────────────────────────── */}
@@ -485,7 +562,11 @@ const Reports = () => {
           <BiStar size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
           {t('reportsPage.top10Products')}
         </h5>
-        {analytics.topProducts.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+          </div>
+        ) : analytics.topProducts.length === 0 ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
             {t('reportsPage.noSalesPeriod')}
@@ -548,36 +629,44 @@ const Reports = () => {
 
       {/* Recent Sales */}
       <div className="desktop-table">
-        <DataTable
-          title={t('sale.recentSales')}
-          icon={BiReceipt}
-          data={analytics.recentTransactions}
-          rowKey={(row) => row._id}
-          searchKeys={['invoiceNo']}
-          searchPlaceholder={t('sale.searchInvoicePlaceholder')}
-          emptyMessage={t('empty.noTransactions')}
-          pageSize={10}
-          columns={[
-            { key: 'invoiceNo', label: t('sale.invoice'), sortable: true },
-            { key: 'createdAt', label: t('common.date'), sortable: true, render: (row) => formatDateTime(row.createdAt) },
-            {
-              key: 'customer', label: t('sale.customer'), sortable: false,
-              render: (row) => row.customer?.name || t('dashboard.walkInCustomer'),
-            },
-            { key: 'totalAmount', label: t('common.amount'), sortable: true, align: 'right', render: (row) => money(row.totalAmount) },
-            {
-              key: 'paymentMethod', label: t('sale.paymentMethod'), sortable: true,
-              render: (row) => `${PAYMENT_METHOD_ICONS[row.paymentMethod] || '💵'} ${PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod}`,
-            },
-            {
-              key: 'paymentStatus', label: t('common.status'), sortable: true,
-              render: (row) => {
-                const st = STATUS_STYLES[row.paymentStatus] || STATUS_STYLES.paid;
-                return <span className="reports-status-pill" style={{ background: st.bg, color: st.color }}>{st.label}</span>;
+        {loading ? (
+          <div className="premium-card">
+            <div className="premium-card-body text-center py-4" style={{ color: 'var(--text-muted)' }}>
+              <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+            </div>
+          </div>
+        ) : (
+          <DataTable
+            title={t('sale.recentSales')}
+            icon={BiReceipt}
+            data={analytics.recentTransactions}
+            rowKey={(row) => row._id}
+            searchKeys={['invoiceNo']}
+            searchPlaceholder={t('sale.searchInvoicePlaceholder')}
+            emptyMessage={t('empty.noTransactions')}
+            pageSize={10}
+            columns={[
+              { key: 'invoiceNo', label: t('sale.invoice'), sortable: true },
+              { key: 'createdAt', label: t('common.date'), sortable: true, render: (row) => formatDateTime(row.createdAt) },
+              {
+                key: 'customer', label: t('sale.customer'), sortable: false,
+                render: (row) => row.customer?.name || t('dashboard.walkInCustomer'),
               },
-            },
-          ]}
-        />
+              { key: 'totalAmount', label: t('common.amount'), sortable: true, align: 'right', render: (row) => money(row.totalAmount) },
+              {
+                key: 'paymentMethod', label: t('sale.paymentMethod'), sortable: true,
+                render: (row) => `${PAYMENT_METHOD_ICONS[row.paymentMethod] || '💵'} ${PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod}`,
+              },
+              {
+                key: 'paymentStatus', label: t('common.status'), sortable: true,
+                render: (row) => {
+                  const st = STATUS_STYLES[row.paymentStatus] || STATUS_STYLES.paid;
+                  return <span className="reports-status-pill" style={{ background: st.bg, color: st.color }}>{st.label}</span>;
+                },
+              },
+            ]}
+          />
+        )}
       </div>
 
       {/* ─── Mobile: Recent Sales Cards ────────────────────────────────── */}
@@ -586,7 +675,11 @@ const Reports = () => {
           <BiReceipt size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
           {t('sale.recentSales')}
         </h5>
-        {analytics.recentTransactions.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+          </div>
+        ) : analytics.recentTransactions.length === 0 ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🧾</div>
             {t('empty.noTransactions')}

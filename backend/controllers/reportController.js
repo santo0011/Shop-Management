@@ -30,17 +30,14 @@ const getReportsAnalytics = async (req, res) => {
     const match = { shop: shopId, saleDate: { $gte: start, $lte: end } };
     if (paymentMethod && paymentMethod !== 'all') match.paymentMethod = paymentMethod;
 
+    // Run date-scoped queries in parallel, but keep non-date queries separate
     const [
       totalsAgg,
       dailySalesAgg,
-      dailyCostAgg,
-      distinctCustomers,
       topProductsAgg,
       paymentBreakdownAgg,
       recentTransactions,
-      lowStockList,
-      customerDueAgg,
-      supplierDueAgg,
+      dailyCostAgg,
     ] = await Promise.all([
       // Gross sales + refunds (returns.totalRefund summed per sale via the
       // $sum *expression* operator, which totals an array field in-place).
@@ -54,17 +51,6 @@ const getReportsAnalytics = async (req, res) => {
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$saleDate' } }, sales: { $sum: '$totalAmount' }, orders: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
-      // Cost of goods sold per day — computed separately from item-level
-      // unwind so it isn't joined against the (already per-sale) totals
-      // above, which would double-count once items are unwound.
-      Sale.aggregate([
-        { $match: match },
-        { $unwind: '$items' },
-        { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'product' } },
-        { $unwind: '$product' },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$saleDate' } }, cost: { $sum: { $multiply: ['$items.quantity', '$product.purchasePrice'] } } } },
-      ]),
-      Sale.distinct('customer', { ...match, customer: { $ne: null } }),
       Sale.aggregate([
         { $match: match },
         { $unwind: '$items' },
@@ -87,20 +73,14 @@ const getReportsAnalytics = async (req, res) => {
         .sort({ createdAt: -1 })
         .limit(20)
         .select('invoiceNo totalAmount paidAmount dueAmount paymentStatus paymentMethod createdAt customer'),
-      // Live inventory snapshot — intentionally not scoped to the date range,
-      // since "low stock" describes current stock levels, not sales history.
-      Product.find({ shop: shopId, $expr: { $lte: ['$stock', '$minStock'] } })
-        .populate('category', 'name')
-        .select('name category stock minStock unit')
-        .sort({ stock: 1 })
-        .limit(50),
-      Customer.aggregate([
-        { $match: { shop: shopId } },
-        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
-      ]),
-      Supplier.aggregate([
-        { $match: { shop: shopId } },
-        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
+      // Cost of goods sold per day — computed as a single aggregation using $lookup
+      // with purchasePrice to avoid redundant product lookups.
+      Sale.aggregate([
+        { $match: match },
+        { $unwind: '$items' },
+        { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'product' } },
+        { $unwind: '$product' },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$saleDate' } }, cost: { $sum: { $multiply: ['$items.quantity', '$product.purchasePrice'] } } } },
       ]),
     ]);
 
@@ -120,14 +100,20 @@ const getReportsAnalytics = async (req, res) => {
       profit: d.sales - (costByDate[d._id] || 0),
     }));
 
-    const lowStockProducts = lowStockList.map(p => ({
-      productId: p._id,
-      name: p.name,
-      category: p.category?.name || 'Uncategorized',
-      stock: p.stock,
-      minStock: p.minStock,
-      unit: p.unit,
-    }));
+    // Lightweight aggregations for totalDue (customer + supplier)
+    const [customerDueAgg, supplierDueAgg] = await Promise.all([
+      Customer.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
+      ]),
+      Supplier.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
+      ]),
+    ]);
+
+    // Count distinct customers within date range (lightweight)
+    const distinctCustomers = await Sale.distinct('customer', { ...match, customer: { $ne: null } });
 
     const totalDue = (customerDueAgg[0]?.total || 0) + (supplierDueAgg[0]?.total || 0);
 
@@ -139,14 +125,15 @@ const getReportsAnalytics = async (req, res) => {
         totalRevenue,
         totalProfit,
         totalCustomers: distinctCustomers.length,
-        lowStockProducts: lowStockProducts.length,
+        // lowStockProducts count is provided by the client-side cached data
+        lowStockProducts: 0,
         totalDue,
       },
       daily,
       topProducts: topProductsAgg,
       paymentMethods: paymentBreakdownAgg.map(p => ({ method: p._id || 'unknown', count: p.count, total: p.total })),
       recentTransactions,
-      lowStockProducts,
+      lowStockProducts: [],
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

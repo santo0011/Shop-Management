@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import api from '../../services/api';
@@ -205,23 +205,15 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [salesPeriod, setSalesPeriod] = useState(7);
   const [theme, setTheme] = useState('light');
+  const initialLoadDone = useRef(false);
 
+  // Simple theme detection — read once on mount, no MutationObserver
   useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-      setTheme(currentTheme);
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
-    return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [salesPeriod]);
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = useCallback(async (isInitial) => {
+    if (isInitial) setLoading(true);
     setError(null);
     try {
       const [statsRes, chartRes, topRes, profitRes, paymentRes, categoryRes, recentRes] = await Promise.all([
@@ -246,7 +238,23 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [salesPeriod, t]);
+
+  // Initial load
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      fetchDashboardData(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fetch when sales period changes (after initial load)
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    fetchDashboardData(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesPeriod]);
 
   const isDark = theme === 'dark';
   const textColor = isDark ? '#9a9ab8' : '#5a5a7a';
@@ -329,7 +337,7 @@ const Dashboard = () => {
           <div style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--danger)' }}><BiError /></div>
           <h5 className="mb-2" style={{ fontWeight: 700 }}>{t('dashboard.failedToLoad')}</h5>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{error}</p>
-          <button className="btn-premium btn-premium-primary" onClick={() => { setSalesPeriod(7); fetchDashboardData(); }}><BiRefresh /> {t('common.retry')}</button>
+          <button className="btn-premium btn-premium-primary" onClick={() => { setSalesPeriod(7); }}><BiRefresh /> {t('common.retry')}</button>
         </div>
       </div>
     );
@@ -361,9 +369,12 @@ const Dashboard = () => {
             {t('dashboard.welcomeMessage', { name: user?.name || t('common.user') })}
           </p>
         </div>
-        <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => { setSalesPeriod(7); fetchDashboardData(); }}>
-          <BiRefresh /> {t('common.refresh')}
-        </button>
+        <div className="d-flex gap-2">
+          {loading && <div className="spinner-border spinner-border-sm" style={{ color: 'var(--primary)', alignSelf: 'center' }} />}
+          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => setSalesPeriod(7)} disabled={loading}>
+            {loading ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('common.refresh')}
+          </button>
+        </div>
       </div>
 
       {/* Stat Cards - 3 per row desktop, 2 per row mobile */}
@@ -398,7 +409,11 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="premium-card-body">
-              {salesChartData.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+                </div>
+              ) : salesChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart data={salesChartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
@@ -465,7 +480,11 @@ const Dashboard = () => {
               </h6>
             </div>
             <div className="premium-card-body">
-              {profitExpense.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+                </div>
+              ) : profitExpense.length > 0 ? (
                 <ResponsiveContainer width="100%" height={320}>
                   <AreaChart data={profitExpense} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                     <defs>
@@ -541,7 +560,11 @@ const Dashboard = () => {
               <span className="badge badge-success">{t('common.thisMonth')}</span>
             </div>
             <div className="premium-card-body">
-              {topProductsData.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+                </div>
+              ) : topProductsData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart
                     data={topProductsData}
@@ -613,7 +636,11 @@ const Dashboard = () => {
               </h6>
             </div>
             <div className="premium-card-body">
-              {paymentData.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+                </div>
+              ) : paymentData.length > 0 ? (
                 <div className="dashboard-donut-container">
                   <div className="dashboard-donut-chart-wrap">
                     <ResponsiveContainer width="100%" height="100%">
@@ -674,7 +701,11 @@ const Dashboard = () => {
               <span className="badge badge-primary">{t('common.thisMonth')}</span>
             </div>
             <div className="premium-card-body">
-              {categoryData.length > 0 ? (
+              {loading ? (
+                <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+                </div>
+              ) : categoryData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={categoryData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }} barSize={40}>
                     <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
@@ -745,7 +776,11 @@ const Dashboard = () => {
         </div>
 
         <div className="rp-body">
-          {filteredPayments.length === 0 ? (
+          {loading ? (
+            <div className="rp-empty">
+              <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+            </div>
+          ) : filteredPayments.length === 0 ? (
             <div className="rp-empty">
               <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
               <p style={{ fontSize: '0.85rem', margin: 0 }}>{t('dashboard.noPaymentsFound')}</p>

@@ -8,7 +8,8 @@ import { showToast } from '../../utils/toast';
 import {
   BiSave, BiTag, BiReceipt, BiStore, BiBarcode, BiCloudDownload, BiCloudUpload,
   BiShieldQuarter, BiUserCircle, BiLockAlt, BiEnvelope, BiPhone, BiImage,
-  BiHide, BiShow, BiChevronDown,
+  BiHide, BiShow, BiChevronDown, BiPrinter, BiFile, BiGridSmall, BiLayout,
+  BiCheck, BiNote, BiCopyright, BiBook, BiCodeAlt, BiExpandVertical, BiQr, BiCode, BiBookContent,
 } from 'react-icons/bi';
 
 const SectionHeader = ({ icon: Icon, title, description }) => (
@@ -28,6 +29,24 @@ const BARCODE_FORMATS = [
   { value: 'CODE39', label: 'CODE39' },
 ];
 
+const PAPER_SIZES = [
+  { value: '58mm', label: '58mm (Thermal)', icon: <BiGridSmall size={18} /> },
+  { value: '80mm', label: '80mm (Thermal)', icon: <BiGridSmall size={18} /> },
+  { value: 'a4', label: 'A4 (Laser/Inkjet)', icon: <BiFile size={18} /> },
+];
+
+const INVOICE_TEMPLATES = [
+  { value: 'classic', label: 'Classic', icon: <BiLayout size={18} /> },
+  { value: 'modern', label: 'Modern', icon: <BiFile size={18} /> },
+  { value: 'minimal', label: 'Minimal', icon: <BiGridSmall size={18} /> },
+  { value: 'grocery', label: 'Grocery', icon: <BiStore size={18} /> },
+];
+
+const PRINT_MODES = [
+  { value: 'thermal', label: 'Thermal (Receipt Printer)' },
+  { value: 'normal', label: 'Normal (Standard Printer)' },
+];
+
 const emptyAddress = { street: '', city: '', state: '', zipCode: '', country: '' };
 
 const Settings = () => {
@@ -37,7 +56,7 @@ const Settings = () => {
   const SECTIONS = [
     { key: 'shop', label: t('settingsPage.shopInformation'), icon: BiStore, description: t('settingsPage.shopInfoDesc') },
     { key: 'tax', label: t('settingsPage.taxVat'), icon: BiTag, description: t('settingsPage.taxSectionDesc') },
-    { key: 'invoice', label: t('settingsPage.invoicePrint'), icon: BiReceipt, description: t('settingsPage.invoiceSectionDesc') },
+    { key: 'invoice', label: t('settingsPage.invoicePrint'), icon: BiReceipt, description: 'Configure invoice prefix, receipt footer, paper size, design, and print preferences' },
     { key: 'barcode', label: t('settingsPage.barcodeSettings'), icon: BiBarcode, description: t('settingsPage.barcodeSectionDesc') },
     { key: 'backup', label: t('settingsPage.backupRestore'), icon: BiCloudDownload, description: t('settingsPage.backupSectionDesc') },
     { key: 'security', label: t('settingsPage.security'), icon: BiShieldQuarter, description: t('settingsPage.securitySectionDesc') },
@@ -47,6 +66,7 @@ const Settings = () => {
 
   const [activeSection, setActiveSection] = useState('shop');
   const [mobileExpanded, setMobileExpanded] = useState(null);
+  const [mobileInvoiceSub, setMobileInvoiceSub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +74,22 @@ const Settings = () => {
   const [shopForm, setShopForm] = useState({ name: '', email: '', phone: '', logo: '', address: emptyAddress });
   const [taxForm, setTaxForm] = useState({ taxRate: 0, taxName: 'VAT' });
   const [invoiceForm, setInvoiceForm] = useState({ invoicePrefix: '', receiptFooter: '' });
+  const [printForm, setPrintForm] = useState({
+    paperSize: '80mm',
+    invoiceTemplate: 'modern',
+    printMode: 'thermal',
+    autoPrint: true,
+    printCopies: 1,
+    marginTop: 0,
+    marginBottom: 0,
+    marginLeft: 0,
+    marginRight: 0,
+    showLogo: true,
+    showQR: true,
+    showBarcode: false,
+    showHeader: true,
+    showFooter: true,
+  });
   const [barcodeForm, setBarcodeForm] = useState({ barcodePrefix: '', barcodeSymbology: 'CODE128', autoGenerateBarcode: false });
 
   const [profileData, setProfileData] = useState(null);
@@ -90,6 +126,22 @@ const Settings = () => {
       });
       setTaxForm({ taxRate: s.settings?.taxRate ?? 0, taxName: s.settings?.taxName || 'VAT' });
       setInvoiceForm({ invoicePrefix: s.settings?.invoicePrefix || 'INV-', receiptFooter: s.settings?.receiptFooter || '' });
+      setPrintForm({
+        paperSize: s.settings?.paperSize || '80mm',
+        invoiceTemplate: s.settings?.invoiceTemplate || 'modern',
+        printMode: s.settings?.printMode || 'thermal',
+        autoPrint: s.settings?.autoPrint !== undefined ? s.settings.autoPrint : true,
+        printCopies: s.settings?.printCopies || 1,
+        marginTop: s.settings?.marginTop || 0,
+        marginBottom: s.settings?.marginBottom || 0,
+        marginLeft: s.settings?.marginLeft || 0,
+        marginRight: s.settings?.marginRight || 0,
+        showLogo: s.settings?.showLogo !== undefined ? s.settings.showLogo : true,
+        showQR: s.settings?.showQR !== undefined ? s.settings.showQR : true,
+        showBarcode: s.settings?.showBarcode || false,
+        showHeader: s.settings?.showHeader !== undefined ? s.settings.showHeader : true,
+        showFooter: s.settings?.showFooter !== undefined ? s.settings.showFooter : true,
+      });
       setBarcodeForm({
         barcodePrefix: s.settings?.barcodePrefix || '',
         barcodeSymbology: s.settings?.barcodeSymbology || 'CODE128',
@@ -104,7 +156,7 @@ const Settings = () => {
     }
   };
 
-  // ─── Shop-level settings (tax / invoice / barcode) share one endpoint ────
+  // ─── Shop-level settings (tax / invoice / barcode / print) share one endpoint ────
   const saveShopSettings = async (fields, successMsg) => {
     setSaving(true);
     try {
@@ -144,8 +196,46 @@ const Settings = () => {
   );
 
   const handleSaveInvoice = () => saveShopSettings(
-    { invoicePrefix: invoiceForm.invoicePrefix, receiptFooter: invoiceForm.receiptFooter },
+    {
+      invoicePrefix: invoiceForm.invoicePrefix,
+      receiptFooter: invoiceForm.receiptFooter,
+      // Also save print settings together since they're on the same page
+      paperSize: printForm.paperSize,
+      invoiceTemplate: printForm.invoiceTemplate,
+      printMode: printForm.printMode,
+      autoPrint: printForm.autoPrint,
+      printCopies: printForm.printCopies,
+      marginTop: printForm.marginTop,
+      marginBottom: printForm.marginBottom,
+      marginLeft: printForm.marginLeft,
+      marginRight: printForm.marginRight,
+      showLogo: printForm.showLogo,
+      showQR: printForm.showQR,
+      showBarcode: printForm.showBarcode,
+      showHeader: printForm.showHeader,
+      showFooter: printForm.showFooter,
+    },
     t('settingsPage.invoiceSettingsSaved')
+  );
+
+  const handleSavePrint = () => saveShopSettings(
+    {
+      paperSize: printForm.paperSize,
+      invoiceTemplate: printForm.invoiceTemplate,
+      printMode: printForm.printMode,
+      autoPrint: printForm.autoPrint,
+      printCopies: printForm.printCopies,
+      marginTop: printForm.marginTop,
+      marginBottom: printForm.marginBottom,
+      marginLeft: printForm.marginLeft,
+      marginRight: printForm.marginRight,
+      showLogo: printForm.showLogo,
+      showQR: printForm.showQR,
+      showBarcode: printForm.showBarcode,
+      showHeader: printForm.showHeader,
+      showFooter: printForm.showFooter,
+    },
+    'Print settings saved successfully'
   );
 
   const handleSaveBarcode = () => saveShopSettings(
@@ -324,6 +414,201 @@ const Settings = () => {
     );
   }
 
+  // ─── Mobile Invoice Sub-Section Accordion ─────────────────────────────
+  const INVOICE_SUB_SECTIONS = [
+    {
+      key: 'invoice',
+      icon: BiReceipt,
+      title: 'Invoice',
+      render: () => (
+        <div className="mob-inv-field">
+          <label className="mob-inv-label">Invoice Prefix</label>
+          <input
+            className="mob-inv-input"
+            value={invoiceForm.invoicePrefix}
+            onChange={e => setInvoiceForm({ ...invoiceForm, invoicePrefix: e.target.value })}
+            placeholder="e.g. INV-"
+          />
+        </div>
+      ),
+      render2: () => (
+        <div className="mob-inv-field">
+          <label className="mob-inv-label">Footer Message</label>
+          <textarea
+            className="mob-inv-textarea"
+            rows="2"
+            value={invoiceForm.receiptFooter}
+            onChange={e => setInvoiceForm({ ...invoiceForm, receiptFooter: e.target.value })}
+            placeholder="Thank you for your business!"
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'printer',
+      icon: BiPrinter,
+      title: 'Printer',
+      render: () => (
+        <>
+          <div className="mob-inv-field">
+            <label className="mob-inv-label">Paper Size</label>
+            <div className="mob-inv-chip-group">
+              {PAPER_SIZES.map(ps => (
+                <button
+                  key={ps.value}
+                  type="button"
+                  className={`mob-inv-chip ${printForm.paperSize === ps.value ? 'active' : ''}`}
+                  onClick={() => setPrintForm({ ...printForm, paperSize: ps.value })}
+                >
+                  {ps.icon} {ps.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mob-inv-field">
+            <label className="mob-inv-label">Invoice Design</label>
+            <div className="mob-inv-chip-group">
+              {INVOICE_TEMPLATES.map(tpl => (
+                <button
+                  key={tpl.value}
+                  type="button"
+                  className={`mob-inv-chip ${printForm.invoiceTemplate === tpl.value ? 'active' : ''}`}
+                  onClick={() => setPrintForm({ ...printForm, invoiceTemplate: tpl.value })}
+                >
+                  {tpl.icon} {tpl.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mob-inv-field">
+            <label className="mob-inv-label">Print Mode</label>
+            <div className="mob-inv-chip-group">
+              {PRINT_MODES.map(mode => (
+                <button
+                  key={mode.value}
+                  type="button"
+                  className={`mob-inv-chip ${printForm.printMode === mode.value ? 'active' : ''}`}
+                  onClick={() => setPrintForm({ ...printForm, printMode: mode.value })}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mob-inv-row-2col">
+            <div className="mob-inv-field">
+              <label className="mob-inv-label">Auto Print</label>
+              <label className="mob-inv-switch">
+                <input
+                  type="checkbox"
+                  checked={printForm.autoPrint}
+                  onChange={e => setPrintForm({ ...printForm, autoPrint: e.target.checked })}
+                />
+                <span className="mob-inv-switch-slider" />
+              </label>
+            </div>
+            <div className="mob-inv-field">
+              <label className="mob-inv-label">Print Copies</label>
+              <input
+                type="number"
+                className="mob-inv-input"
+                min="1"
+                max="10"
+                value={printForm.printCopies}
+                onChange={e => setPrintForm({ ...printForm, printCopies: Math.max(1, Number(e.target.value)) })}
+              />
+            </div>
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'margins',
+      icon: BiExpandVertical,
+      title: 'Margins',
+      render: () => (
+        <div className="mob-inv-margin-grid">
+          <div className="mob-inv-field">
+            <label className="mob-inv-label">Top</label>
+            <input type="number" className="mob-inv-input" min="0" max="50" value={printForm.marginTop} onChange={e => setPrintForm({ ...printForm, marginTop: Number(e.target.value) })} />
+          </div>
+          <div className="mob-inv-field">
+            <label className="mob-inv-label">Bottom</label>
+            <input type="number" className="mob-inv-input" min="0" max="50" value={printForm.marginBottom} onChange={e => setPrintForm({ ...printForm, marginBottom: Number(e.target.value) })} />
+          </div>
+          <div className="mob-inv-field">
+            <label className="mob-inv-label">Left</label>
+            <input type="number" className="mob-inv-input" min="0" max="50" value={printForm.marginLeft} onChange={e => setPrintForm({ ...printForm, marginLeft: Number(e.target.value) })} />
+          </div>
+          <div className="mob-inv-field">
+            <label className="mob-inv-label">Right</label>
+            <input type="number" className="mob-inv-input" min="0" max="50" value={printForm.marginRight} onChange={e => setPrintForm({ ...printForm, marginRight: Number(e.target.value) })} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'visibility',
+      icon: BiBookContent,
+      title: 'Visibility',
+      render: () => (
+        <div className="mob-inv-vis-grid">
+          {[
+            { key: 'showLogo', label: 'Logo', icon: BiImage },
+            { key: 'showQR', label: 'QR Code', icon: BiQr },
+            { key: 'showBarcode', label: 'Barcode', icon: BiCode },
+            { key: 'showHeader', label: 'Header', icon: BiLayout },
+            { key: 'showFooter', label: 'Footer', icon: BiBookContent },
+          ].map(item => (
+            <div key={item.key} className="mob-inv-vis-card">
+              <div className="mob-inv-vis-left">
+                <item.icon size={18} />
+                <span>{item.label}</span>
+              </div>
+              <label className="mob-inv-switch">
+                <input
+                  type="checkbox"
+                  checked={printForm[item.key]}
+                  onChange={e => setPrintForm({ ...printForm, [item.key]: e.target.checked })}
+                />
+                <span className="mob-inv-switch-slider" />
+              </label>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
+  const renderMobileInvoiceSection = () => (
+    <div className="mob-inv-container">
+      {INVOICE_SUB_SECTIONS.map(sub => {
+        const isOpen = mobileInvoiceSub === sub.key;
+        return (
+          <div key={sub.key} className={`mob-inv-accordion ${isOpen ? 'open' : ''}`}>
+            <button
+              type="button"
+              className="mob-inv-accordion-header"
+              onClick={() => setMobileInvoiceSub(isOpen ? null : sub.key)}
+            >
+              <span className="mob-inv-accordion-header-left">
+                <sub.icon size={18} />
+                <span>{sub.title}</span>
+              </span>
+              <BiChevronDown size={20} className="mob-inv-accordion-chevron" />
+            </button>
+            {isOpen && (
+              <div className="mob-inv-accordion-body">
+                {sub.render()}
+                {sub.render2 && sub.render2()}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const renderSection = (key) => {
     switch (key) {
       case 'shop':
@@ -430,8 +715,10 @@ const Settings = () => {
       case 'invoice':
         return (
           <div className="settings-card">
-            <SectionHeader icon={BiReceipt} title={t('settings.invoiceSettings')} description={t('settingsPage.invoiceSectionDesc')} />
+            <SectionHeader icon={BiReceipt} title={t('settings.invoiceSettings')} description="Configure invoice prefix, receipt footer, paper size, design, and print preferences" />
             <div className="p-4">
+              {/* Invoice Settings */}
+              <h6 className="fw-semibold mb-3" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Invoice Settings</h6>
               <div className="mb-3">
                 <label className="form-label">{t('settingsPage.invoiceNumberPrefix')}</label>
                 <input
@@ -455,8 +742,144 @@ const Settings = () => {
                   {t('settingsPage.invoiceFooterHint')}
                 </small>
               </div>
+
+              <hr style={{ borderColor: 'var(--border-color)', margin: '1.5rem 0' }} />
+
+              {/* Print Settings */}
+              <h6 className="fw-semibold mb-3" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Print Settings</h6>
+
+              {/* Paper Size */}
+              <div className="mb-4">
+                <label className="form-label fw-semibold mb-2">Paper Size</label>
+                <div className="d-flex gap-2 flex-wrap">
+                  {PAPER_SIZES.map(ps => (
+                    <button
+                      key={ps.value}
+                      type="button"
+                      className={`btn-premium btn-premium-sm d-flex align-items-center gap-1 ${printForm.paperSize === ps.value ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
+                      onClick={() => setPrintForm({ ...printForm, paperSize: ps.value })}
+                    >
+                      {ps.icon} {ps.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Invoice/Receipt Design */}
+              <div className="mb-4">
+                <label className="form-label fw-semibold mb-2">Invoice / Receipt Design</label>
+                <div className="d-flex gap-2 flex-wrap">
+                  {INVOICE_TEMPLATES.map(tpl => (
+                    <button
+                      key={tpl.value}
+                      type="button"
+                      className={`btn-premium btn-premium-sm d-flex align-items-center gap-1 ${printForm.invoiceTemplate === tpl.value ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
+                      onClick={() => setPrintForm({ ...printForm, invoiceTemplate: tpl.value })}
+                    >
+                      {tpl.icon} {tpl.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Print Mode */}
+              <div className="mb-4">
+                <label className="form-label fw-semibold mb-2">Print Mode</label>
+                <div className="d-flex gap-2 flex-wrap">
+                  {PRINT_MODES.map(mode => (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      className={`btn-premium btn-premium-sm ${printForm.printMode === mode.value ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
+                      onClick={() => setPrintForm({ ...printForm, printMode: mode.value })}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Auto Print & Print Copies */}
+              <div className="row g-3 mb-4">
+                <div className="col-6">
+                  <label className="printer-settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={printForm.autoPrint}
+                      onChange={e => setPrintForm({ ...printForm, autoPrint: e.target.checked })}
+                    />
+                    <span>Auto Print</span>
+                  </label>
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block', marginTop: 2 }}>
+                    Automatically open print dialog after sale
+                  </small>
+                </div>
+                <div className="col-6">
+                  <label className="form-label">Print Copies</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    style={{ maxWidth: '100px' }}
+                    min="1"
+                    max="10"
+                    value={printForm.printCopies}
+                    onChange={e => setPrintForm({ ...printForm, printCopies: Math.max(1, Number(e.target.value)) })}
+                  />
+                </div>
+              </div>
+
+              {/* Margins/Padding */}
+              <div className="mb-4">
+                <label className="form-label fw-semibold mb-2">Margins (mm)</label>
+                <div className="row g-2">
+                  <div className="col-3">
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>Top</label>
+                    <input type="number" className="form-control" min="0" max="50" value={printForm.marginTop} onChange={e => setPrintForm({ ...printForm, marginTop: Number(e.target.value) })} />
+                  </div>
+                  <div className="col-3">
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>Bottom</label>
+                    <input type="number" className="form-control" min="0" max="50" value={printForm.marginBottom} onChange={e => setPrintForm({ ...printForm, marginBottom: Number(e.target.value) })} />
+                  </div>
+                  <div className="col-3">
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>Left</label>
+                    <input type="number" className="form-control" min="0" max="50" value={printForm.marginLeft} onChange={e => setPrintForm({ ...printForm, marginLeft: Number(e.target.value) })} />
+                  </div>
+                  <div className="col-3">
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>Right</label>
+                    <input type="number" className="form-control" min="0" max="50" value={printForm.marginRight} onChange={e => setPrintForm({ ...printForm, marginRight: Number(e.target.value) })} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Visibility Options */}
+              <div className="mb-3">
+                <label className="form-label fw-semibold mb-2">Visibility Options</label>
+                <div className="d-flex flex-wrap gap-3">
+                  <label className="printer-settings-checkbox">
+                    <input type="checkbox" checked={printForm.showLogo} onChange={e => setPrintForm({ ...printForm, showLogo: e.target.checked })} />
+                    <span><BiImage size={14} style={{ marginRight: 3 }} /> Show Logo</span>
+                  </label>
+                  <label className="printer-settings-checkbox">
+                    <input type="checkbox" checked={printForm.showQR} onChange={e => setPrintForm({ ...printForm, showQR: e.target.checked })} />
+                    <span><BiCheck size={14} style={{ marginRight: 3 }} /> Show QR Code</span>
+                  </label>
+                  <label className="printer-settings-checkbox">
+                    <input type="checkbox" checked={printForm.showBarcode} onChange={e => setPrintForm({ ...printForm, showBarcode: e.target.checked })} />
+                    <span><BiBarcode size={14} style={{ marginRight: 3 }} /> Show Barcode</span>
+                  </label>
+                  <label className="printer-settings-checkbox">
+                    <input type="checkbox" checked={printForm.showHeader} onChange={e => setPrintForm({ ...printForm, showHeader: e.target.checked })} />
+                    <span><BiImage size={14} style={{ marginRight: 3 }} /> Show Header</span>
+                  </label>
+                  <label className="printer-settings-checkbox">
+                    <input type="checkbox" checked={printForm.showFooter} onChange={e => setPrintForm({ ...printForm, showFooter: e.target.checked })} />
+                    <span><BiNote size={14} style={{ marginRight: 3 }} /> Show Footer</span>
+                  </label>
+                </div>
+              </div>
+
               <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>
-                {t('settingsPage.printerSettingsHint')}
+                <BiCopyright size={12} style={{ marginRight: 2 }} /> These settings apply globally to all print actions (POS, Sales, Invoice Preview, Reprint).
               </small>
             </div>
           </div>
@@ -762,20 +1185,36 @@ const Settings = () => {
               <button
                 type="button"
                 className="settings-accordion-header"
-                onClick={() => setMobileExpanded(isOpen ? null : section.key)}
+                onClick={() => {
+                  setMobileExpanded(isOpen ? null : section.key);
+                  if (section.key !== 'invoice') setMobileInvoiceSub(null);
+                }}
               >
                 <span className="settings-accordion-header-left"><section.icon /> {section.label}</span>
                 <BiChevronDown className="settings-accordion-chevron" />
               </button>
               {isOpen && (
                 <div className="settings-accordion-body">
-                  {renderSection(section.key)}
-                  {sectionSaveAction && (
-                    <div className="settings-accordion-save">
-                      <button type="button" className="btn-premium btn-premium-primary" onClick={sectionSaveAction.onSave} disabled={saving}>
-                        {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiSave /> {sectionSaveAction.label}</>}
-                      </button>
-                    </div>
+                  {section.key === 'invoice' ? (
+                    <>
+                      {renderMobileInvoiceSection()}
+                      <div className="settings-accordion-save">
+                        <button type="button" className="btn-premium btn-premium-primary" onClick={handleSavePrint} disabled={saving}>
+                          {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiSave /> Save Print Settings</>}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {renderSection(section.key)}
+                      {sectionSaveAction && (
+                        <div className="settings-accordion-save">
+                          <button type="button" className="btn-premium btn-premium-primary" onClick={sectionSaveAction.onSave} disabled={saving}>
+                            {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiSave /> {sectionSaveAction.label}</>}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

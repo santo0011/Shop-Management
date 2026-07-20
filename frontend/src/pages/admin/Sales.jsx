@@ -15,34 +15,7 @@ import {
   BiFile, BiGridSmall, BiLayout, BiDownload,
   BiQr, BiIdCard,
 } from 'react-icons/bi';
-
-// ─── Printer helpers ─────────────────────────────────────────
-const getPrinterSizes = (t) => [
-  { key: 'a4', label: t('salesPage.printModal.printerSizes.a4'), icon: <BiFile size={18} />, width: '210mm' },
-  { key: '80mm', label: t('salesPage.printModal.printerSizes.thermal80'), icon: <BiGridSmall size={18} />, width: '80mm' },
-  { key: '58mm', label: t('salesPage.printModal.printerSizes.thermal58'), icon: <BiGridSmall size={18} />, width: '58mm' },
-];
-
-const getInvoiceTemplates = (t) => [
-  { key: 'classic', label: t('salesPage.printModal.templates.classic'), icon: <BiLayout size={18} /> },
-  { key: 'modern', label: t('salesPage.printModal.templates.modern'), icon: <BiFile size={18} /> },
-  { key: 'minimal', label: t('salesPage.printModal.templates.minimal'), icon: <BiGridSmall size={18} /> },
-  { key: 'grocery', label: t('salesPage.printModal.templates.grocery'), icon: <BiStore size={18} /> },
-];
-
-const getSalesPrinterSettings = () => {
-  try {
-    const saved = localStorage.getItem('sales_printer_settings');
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  return { size: '80mm', template: 'modern', quickPrint: false };
-};
-
-const saveSalesPrinterSettings = (settings) => {
-  try {
-    localStorage.setItem('sales_printer_settings', JSON.stringify(settings));
-  } catch {}
-};
+import PrintPreview from '../../components/common/PrintPreview';
 
 // ─── Format helpers ─────────────────────────────────────────
 const formatDate = (dateStr) => {
@@ -126,319 +99,6 @@ const SalesInvoiceQR = ({ invoiceNo, size = 60 }) => {
   );
 };
 
-// ─── Print Settings Modal ────────────────────────────────────
-const PrintSettingsModal = ({ currentSettings, sale, shopInfo, onPrint, onDownload, onClose }) => {
-  const { t } = useTranslation();
-  const printerSizesList = getPrinterSizes(t);
-  const invoiceTemplatesList = getInvoiceTemplates(t);
-  const [size, setSize] = useState(currentSettings.size);
-  const [template, setTemplate] = useState(currentSettings.template);
-  const [quickPrint, setQuickPrint] = useState(currentSettings.quickPrint || false);
-  const invoiceRef = useRef(null);
-
-  const handleApplyAndPrint = () => {
-    const settings = { size, template, quickPrint };
-    saveSalesPrinterSettings(settings);
-    onPrint(sale, settings);
-    onClose();
-  };
-
-  const handleDownload = async () => {
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const jsPDF = (await import('jspdf')).default;
-      const element = invoiceRef.current;
-      if (!element) return;
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const isA4 = size === 'a4';
-      const imgWidth = isA4 ? 190 : 80;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const pdf = new jsPDF('p', 'mm', isA4 ? 'a4' : [imgWidth, Math.max(imgHeight + 10, 50)]);
-      pdf.addImage(imgData, 'PNG', isA4 ? 10 : 0, isA4 ? 10 : 5, imgWidth, imgHeight);
-      pdf.save(`Invoice-${sale?.invoiceNo || 'sale'}.pdf`);
-      showToast.success(t('salesPage.printModal.pdfDownloaded'));
-    } catch (err) {
-      showToast.error(t('salesPage.printModal.pdfFailed'));
-    }
-  };
-
-  const isThermal = size === '58mm' || size === '80mm';
-  const isA4 = size === 'a4';
-  const cashierName = shopInfo?.cashierName || t('salesPage.invoice.cashier');
-  const footerMsg = shopInfo?.settings?.receiptFooter || t('salesPage.invoice.thankYou');
-  const taxName = shopInfo?.settings?.taxName || t('salesPage.invoice.vat');
-
-  const renderPreview = () => {
-    if (!sale) return null;
-    const itemLabel = t('salesPage.invoice.item');
-    const qtyLabel = t('salesPage.invoice.qty');
-    const priceLabel = t('common.price');
-    const totalLabel = t('common.total');
-    const subtotalLabel = t('sale.subtotal');
-    const discountLabel = t('sale.discount');
-    const grandTotalLabel = t('salesPage.invoice.grandTotal');
-    const paidLabel = t('common.paid');
-    const dueLabel = t('common.due');
-    const paymentLabel = t('salesPage.invoice.payment');
-    const invoiceColonLabel = t('salesPage.invoice.invoiceLabel');
-    const dateColonLabel = t('salesPage.invoice.dateLabel');
-    const customerColonLabel = t('salesPage.invoice.customerLabel');
-    const walkInCustomerLabel = t('dashboard.walkInCustomer');
-    const shopNamePlaceholder = t('salesPage.invoice.shopNamePlaceholder');
-    const groceryStorePlaceholder = t('salesPage.invoice.groceryStorePlaceholder');
-    const telLabel = t('salesPage.invoice.tel');
-    const visitAgainLabel = t('salesPage.invoice.visitAgain');
-    const visitAgainGroceryLabel = t('salesPage.invoice.visitAgainGrocery');
-    const paymentText = sale.paymentMethod ? sale.paymentMethod.toUpperCase() : t('sale.cash').toUpperCase();
-
-    const itemsHtml = sale.items?.map((item, idx) => {
-      if (template === 'grocery') {
-        return `<div class="receipt-grocery-item"><span class="receipt-grocery-item-name">${item.product?.name || item.name || itemLabel}</span><span class="receipt-grocery-item-qty">${item.quantity}${item.unit || ''}</span><span class="receipt-grocery-item-price">₹${Number(item.price).toFixed(2)}</span><span class="receipt-grocery-item-total">₹${Number(item.total).toFixed(2)}</span></div>`;
-      }
-      if (template === 'minimal') {
-        return `<div class="receipt-minimal-item"><div class="receipt-minimal-item-name">${item.product?.name || item.name || itemLabel}</div><div class="receipt-minimal-item-line"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span class="receipt-minimal-item-total">₹${Number(item.total).toFixed(2)}</span></div></div>`;
-      }
-      return `<tr><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px">${item.product?.name || item.name || itemLabel}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:center">${item.quantity} ${item.unit || ''}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.price).toFixed(2)}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.total).toFixed(2)}</td></tr>`;
-    }).join('') || '';
-
-    const discountHtml = Number(sale.discount || 0) > 0 ? `<div class="${template === 'modern' ? 'receipt-modern-discount' : template === 'minimal' ? 'receipt-minimal-discount' : template === 'grocery' ? 'receipt-grocery-discount' : ''} total-row"><span>${discountLabel}</span><span>-₹${Number(sale.discount).toFixed(2)}</span></div>` : '';
-    const taxHtml = Number(sale.tax || 0) > 0 ? `<div class="total-row"><span>${taxName}</span><span>₹${Number(sale.tax).toFixed(2)}</span></div>` : '';
-    const dueHtml = Number(sale.dueAmount || 0) > 0 ? `<div class="total-row"><span>${dueLabel}</span><span style="color:#e74c3c;font-weight:700">₹${Number(sale.dueAmount).toFixed(2)}</span></div>` : '';
-
-    if (template === 'classic') {
-      return `
-        <div class="receipt receipt-classic" style="max-width:${isA4 ? '100%' : isThermal ? '72mm' : '100%'};${isA4 ? 'padding:10mm' : ''}">
-          <div class="receipt-header" style="text-align:center;margin-bottom:8px">
-            <div class="receipt-logo" style="margin-bottom:4px">
-              ${shopInfo?.logo ? `<img src="${shopInfo.logo}" style="max-width:60px;max-height:60px;border-radius:50%" />` : `<div style="width:50px;height:50px;margin:0 auto;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D9A6);display:flex;align-items:center;justify-content:center;color:#fff">🛒</div>`}
-            </div>
-            <h2 style="font-size:${isThermal?'13px':'18px'};font-weight:800;margin-bottom:2px">${shopInfo?.shopName || shopNamePlaceholder}</h2>
-            <p style="font-size:${isThermal?'9px':'11px'};color:#666">${formatAddress(shopInfo?.address)}</p>
-            ${shopInfo?.phone ? `<p style="font-size:9px;color:#555">${telLabel} ${shopInfo.phone}</p>` : ''}
-            <div style="border-top:1px dashed #999;margin:6px 0"></div>
-          </div>
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">${invoiceColonLabel}</span><span style="font-weight:700">${sale.invoiceNo || t('common.notAvailable')}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">${dateColonLabel}</span><span style="font-weight:700">${formatDate(sale.createdAt)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span style="color:#888">${customerColonLabel}</span><span style="font-weight:700">${sale.customer?.name || walkInCustomerLabel}</span></div>
-            <div style="border-top:1px dashed #999;margin:6px 0"></div>
-          </div>
-          <table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:${isThermal?'10px':'12px'}">
-            <tr><th style="text-align:left;border-bottom:1px solid #333;padding:4px 6px">${itemLabel}</th><th style="text-align:center;border-bottom:1px solid #333;padding:4px 6px">${qtyLabel}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${priceLabel}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${totalLabel}</th></tr>
-            ${itemsHtml}
-          </table>
-          <div style="border-top:1px dashed #999;margin:6px 0"></div>
-          <div style="font-size:${isThermal?'11px':'13px'}">
-            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
-            ${discountHtml}${taxHtml}
-            <div class="total-row grand-total" style="display:flex;justify-content:space-between;font-size:${isThermal?'12px':'16px'};font-weight:800;border-top:1px dashed #999;padding-top:4px;margin-top:4px"><span>${grandTotalLabel}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>${paidLabel}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
-            ${dueHtml}
-            <div class="total-row" style="display:flex;justify-content:space-between;margin-bottom:2px"><span>${paymentLabel}</span><span style="color:#2ecc71;font-weight:800">${paymentText}</span></div>
-          </div>
-          <div style="border-top:1px dashed #999;margin:6px 0"></div>
-          <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#888;margin-top:6px">
-            <p>${footerMsg}</p>
-            <p style="font-size:${isThermal?'8px':'9px'}">${visitAgainLabel}</p>
-            ${!isThermal ? `<div style="display:flex;justify-content:center;margin-top:8px"><SalesInvoiceQR invoiceNo="${sale.invoiceNo}" size="${isA4 ? 70 : 50}" /></div>` : ''}
-          </div>
-        </div>`;
-    }
-
-    if (template === 'modern') {
-      return `
-        <div class="receipt receipt-modern" style="max-width:${isA4 ? '100%' : isThermal ? '72mm' : '100%'};${isA4 ? 'padding:10mm' : ''}">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px">
-              ${shopInfo?.logo ? `<img src="${shopInfo.logo}" style="max-width:40px;max-height:40px;border-radius:8px" />` : `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D9A6);display:flex;align-items:center;justify-content:center;color:#fff">🛒</div>`}
-              <div><h2 style="font-size:${isThermal?'12px':'16px'};font-weight:800;margin:0">${shopInfo?.shopName || shopNamePlaceholder}</h2><p style="font-size:${isThermal?'8px':'10px'};color:#666;margin:0">${formatAddress(shopInfo?.address)}</p></div>
-            </div>
-            <span style="background:#6C63FF;color:#fff;padding:2px 8px;border-radius:4px;font-size:${isThermal?'8px':'11px'};font-weight:700">#${sale.invoiceNo || t('common.notAvailable')}</span>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:6px">
-            <span>📅 ${formatDate(sale.createdAt)}</span>
-            <span>👤 ${cashierName}</span>
-            <span>👥 ${sale.customer?.name || walkInCustomerLabel}</span>
-          </div>
-          <div style="border-top:2px solid #6C63FF;margin:6px 0"></div>
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-weight:700;font-size:${isThermal?'9px':'11px'};padding:4px 0;border-bottom:1px solid #ddd"><span>${itemLabel}</span><span>${qtyLabel}</span><span>${priceLabel}</span><span>${totalLabel}</span></div>
-            ${sale.items?.map(item => `
-              <div style="padding:4px 0;border-bottom:1px dotted #eee">
-                <div style="font-weight:600;font-size:${isThermal?'9px':'11px'}">${item.product?.name || item.name || itemLabel}</div>
-                <div style="display:flex;justify-content:space-between;font-size:${isThermal?'8px':'10px'};color:#555"><span>${item.quantity} ${item.unit || ''}</span><span>₹${Number(item.price).toFixed(2)}</span><span style="font-weight:700;color:#333">₹${Number(item.total).toFixed(2)}</span></div>
-                ${item.discount > 0 ? `<div style="font-size:8px;color:#e74c3c">-${item.discount}% ${t('salesPage.invoice.off')}</div>` : ''}
-              </div>
-            `).join('')}
-          </div>
-          <div style="border-top:2px solid #6C63FF;margin:6px 0"></div>
-          <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
-            ${discountHtml}${taxHtml}
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'18px'};font-weight:800;border-top:2px solid #6C63FF;padding-top:4px;margin-top:4px"><span>${grandTotalLabel}</span><span style="color:#6C63FF">₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>${paidLabel}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
-            ${dueHtml}
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};margin-bottom:2px"><span>${paymentLabel}</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${paymentText}</span></div>
-          </div>
-          <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#888;margin-top:6px">
-            <p>${footerMsg}</p>
-            ${!isThermal ? `<div style="display:flex;justify-content:center;margin-top:8px"><SalesInvoiceQR invoiceNo="${sale.invoiceNo}" size="${isA4 ? 70 : 50}" /></div>` : ''}
-          </div>
-        </div>`;
-    }
-
-    if (template === 'minimal') {
-      return `
-        <div class="receipt receipt-minimal" style="max-width:${isA4 ? '100%' : isThermal ? '72mm' : '100%'};${isA4 ? 'padding:10mm' : ''}">
-          <div style="text-align:center;margin-bottom:6px">
-            <h2 style="font-size:${isThermal?'14px':'20px'};font-weight:300;letter-spacing:1px;text-transform:uppercase;margin:0">${shopInfo?.shopName || shopNamePlaceholder}</h2>
-            <p style="font-size:${isThermal?'8px':'10px'};color:#999;margin:0">${formatAddress(shopInfo?.address)}</p>
-            ${shopInfo?.phone ? `<p style="font-size:8px;color:#999">${shopInfo.phone}</p>` : ''}
-          </div>
-          <div style="border-top:1px solid #333;margin:4px 0"></div>
-          <div style="margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>${t('sale.invoice')}</span><span>${sale.invoiceNo || t('common.notAvailable')}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>${t('common.date')}</span><span>${formatDate(sale.createdAt)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px"><span>${t('sale.customer')}</span><span>${sale.customer?.name || t('salesPage.invoice.walkIn')}</span></div>
-          </div>
-          <div style="border-top:1px solid #333;margin:4px 0"></div>
-          <div style="margin-bottom:4px">${sale.items?.map(item => `
-            <div style="padding:3px 0;border-bottom:1px dotted #eee">
-              <div style="font-size:${isThermal?'9px':'11px'};font-weight:500">${item.product?.name || item.name || itemLabel}</div>
-              <div style="display:flex;justify-content:space-between;font-size:${isThermal?'8px':'10px'};color:#666"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span style="font-weight:600;color:#333">₹${Number(item.total).toFixed(2)}</span></div>
-            </div>
-          `).join('')}</div>
-          <div style="border-top:1px solid #333;margin:4px 0"></div>
-          <div style="margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
-            ${discountHtml}${taxHtml}
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'16px'};font-weight:800;border-top:1px solid #333;padding-top:4px;margin-top:4px"><span>${totalLabel}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${paidLabel}</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
-            ${dueHtml}
-          </div>
-          <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#999;margin-top:6px;font-style:italic"><p>${footerMsg}</p></div>
-        </div>`;
-    }
-
-    // Grocery
-    return `
-      <div class="receipt receipt-grocery" style="max-width:${isA4 ? '100%' : isThermal ? '72mm' : '100%'};${isA4 ? 'padding:10mm' : ''}">
-        <div style="text-align:center;margin-bottom:6px">
-          ${shopInfo?.logo ? `<img src="${shopInfo.logo}" style="max-width:40px;max-height:40px;border-radius:50%;margin-bottom:4px" />` : `<div style="width:40px;height:40px;margin:0 auto 4px;border-radius:50%;background:linear-gradient(135deg,#2ecc71,#00D9A6);display:flex;align-items:center;justify-content:center;color:#fff">🛒</div>`}
-          <h2 style="font-size:${isThermal?'13px':'18px'};font-weight:800;color:#2ecc71;margin:0">${shopInfo?.shopName || groceryStorePlaceholder}</h2>
-          <p style="font-size:${isThermal?'8px':'10px'};color:#666;margin:0">${formatAddress(shopInfo?.address)}</p>
-          ${shopInfo?.phone ? `<p style="font-size:9px;color:#333">📞 ${shopInfo.phone}</p>` : ''}
-        </div>
-        <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-        <div style="margin-bottom:4px">
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:2px"><span>🧾 ${sale.invoiceNo || t('common.notAvailable')}</span><span>📅 ${formatDate(sale.createdAt)}</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:2px"><span>👤 ${sale.customer?.name || walkInCustomerLabel}</span><span>👨‍💼 ${cashierName}</span></div>
-        </div>
-        <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-        <div style="margin-bottom:4px">
-          <div style="display:flex;font-weight:700;font-size:${isThermal?'9px':'11px'};border-bottom:1px solid #2ecc71;padding-bottom:3px;margin-bottom:3px;color:#2ecc71"><span style="flex:2">${itemLabel}</span><span style="flex:0.6;text-align:center">${qtyLabel}</span><span style="flex:0.7;text-align:right">₹</span><span style="flex:0.7;text-align:right">${totalLabel}</span></div>
-          ${itemsHtml}
-        </div>
-        <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-        <div style="margin-bottom:4px">
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${subtotalLabel}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
-          ${discountHtml}${taxHtml}
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'13px':'16px'};font-weight:800;color:#2ecc71;border-top:1px solid #2ecc71;padding-top:4px;margin-top:4px"><span>${totalLabel}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${paidLabel}</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
-          ${dueHtml}
-          <div style="display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px"><span>${paymentLabel}</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${paymentText}</span></div>
-        </div>
-        <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-        <div style="text-align:center;font-size:${isThermal?'9px':'11px'};color:#2ecc71;margin-top:6px">
-          <p>🛒 ${footerMsg}</p>
-          <p style="font-size:8px;color:#888">${visitAgainGroceryLabel}</p>
-          ${!isThermal ? `<div style="display:flex;justify-content:center;margin-top:8px"><SalesInvoiceQR invoiceNo="${sale.invoiceNo}" size="${isA4 ? 70 : 50}" /></div>` : ''}
-        </div>
-      </div>`;
-  };
-
-  if (!sale) return null;
-
-  return (
-    <div className="printer-settings-overlay" onClick={onClose}>
-      <div className="printer-settings-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680 }}>
-        <div className="printer-settings-header">
-          <div className="printer-settings-header-left">
-            <div className="printer-settings-icon"><BiPrinter size={22} /></div>
-            <h3>{t('salesPage.printModal.title')}</h3>
-          </div>
-          <button className="printer-settings-close" onClick={onClose}><BiX size={20} /></button>
-        </div>
-        <div className="printer-settings-body">
-          <div className="row g-3">
-            <div className="col-md-4">
-              {/* Settings */}
-              <div className="printer-settings-group">
-                <label className="printer-settings-label">{t('salesPage.printModal.paperSize')}</label>
-                <div className="printer-settings-options" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
-                  {printerSizesList.map(s => (
-                    <button key={s.key} className={`printer-settings-option ${size === s.key ? 'active' : ''}`} onClick={() => setSize(s.key)}>
-                      {s.icon}<span>{s.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="printer-settings-group">
-                <label className="printer-settings-label">{t('salesPage.printModal.invoiceDesign')}</label>
-                <div className="printer-settings-options" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
-                  {invoiceTemplatesList.map(tpl => (
-                    <button key={tpl.key} className={`printer-settings-option ${template === tpl.key ? 'active' : ''}`} onClick={() => setTemplate(tpl.key)}>
-                      {tpl.icon}<span>{tpl.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="printer-settings-group">
-                <label className="printer-settings-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={quickPrint}
-                    onChange={(e) => setQuickPrint(e.target.checked)}
-                  />
-                  <span>{t('salesPage.printModal.useSavedSettings')}</span>
-                </label>
-              </div>
-            </div>
-            <div className="col-md-8">
-              <label className="printer-settings-label">{t('salesPage.printModal.preview')}</label>
-              <div
-                className="sales-print-preview invoice-theme"
-                style={{
-                  background: '#fff',
-                  borderRadius: 'var(--border-radius-md)',
-                  border: '1px solid #e0e0e0',
-                  overflow: 'auto',
-                  maxHeight: 420,
-                  padding: isA4 ? '5mm' : isThermal ? '2mm' : '0',
-                  fontFamily: isThermal ? "'Courier New', monospace" : "'Inter', sans-serif",
-                  fontSize: isThermal ? '10px' : '13px',
-                  color: '#222',
-                  lineHeight: 1.4,
-                }}
-              >
-                <div ref={invoiceRef} style={{ margin: '0 auto', maxWidth: isA4 ? '190mm' : isThermal ? '72mm' : '100%' }}>
-                  <div dangerouslySetInnerHTML={{ __html: renderPreview() }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="printer-settings-footer">
-          <button className="printer-settings-btn printer-settings-btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleDownload}><BiDownload size={16} /> {t('common.pdf')}</button>
-          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleApplyAndPrint}><BiPrinter size={16} /> {t('common.print')}</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ─── View Drawer (uses standard drawer classes with smooth animation) ─────────
 const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice }) => {
   const { t } = useTranslation();
@@ -507,7 +167,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                     <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(0,217,166,0.1)', color: '#00D9A6' }}><BiStore size={18} /></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
                       <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.shop')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.name || shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</span>
                       {shopInfo?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {shopInfo.phone}</span>}
                     </div>
                   </div>
@@ -973,9 +633,17 @@ const Sales = () => {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [datePreset, setDatePreset] = useState('');
+  // Default to last 30 days on initial load
+  const getDefaultDateRange = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+    return { start: toDateInputValue(start), end: toDateInputValue(end) };
+  };
+  const defaultRange = getDefaultDateRange();
+  const [startDate, setStartDate] = useState(defaultRange.start);
+  const [endDate, setEndDate] = useState(defaultRange.end);
+  const [datePreset, setDatePreset] = useState('30d');
   const [paymentStatus, setPaymentStatus] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -985,8 +653,7 @@ const Sales = () => {
   const [returningSale, setReturningSale] = useState(null);
   const [returnDrawerOpen, setReturnDrawerOpen] = useState(false);
   const [printingSale, setPrintingSale] = useState(null);
-  const [showPrintSettings, setShowPrintSettings] = useState(false);
-  const [printerSettings, setPrinterSettings] = useState(getSalesPrinterSettings);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [shopInfo, setShopInfo] = useState(null);
   const [stats, setStats] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -1093,144 +760,8 @@ const Sales = () => {
   };
 
   const handlePrintClick = (sale) => {
-    const saved = getSalesPrinterSettings();
-    if (saved.quickPrint) {
-      // Quick print - execute directly
-      executePrint(sale, saved);
-    } else {
-      setPrintingSale(sale);
-      setPrinterSettings(saved);
-      setShowPrintSettings(true);
-    }
-  };
-
-  const handlePrintFromModal = (sale, settings) => {
-    executePrint(sale, settings);
-  };
-
-  const executePrint = (sale, settings) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    const isThermal = settings.size === '58mm' || settings.size === '80mm';
-    const pageWidth = settings.size === '58mm' ? '58mm' : settings.size === '80mm' ? '80mm' : '210mm';
-    const template = settings.template || 'modern';
-
-    const itemFallback = t('salesPage.invoice.item');
-    const itemsHtml = sale.items?.map(item => {
-      if (template === 'grocery') {
-        return `<div class="receipt-grocery-item"><span class="receipt-grocery-item-name">${item.product?.name || item.name || itemFallback}</span><span class="receipt-grocery-item-qty">${item.quantity}${item.unit || ''}</span><span class="receipt-grocery-item-price">₹${Number(item.price).toFixed(2)}</span><span class="receipt-grocery-item-total">₹${Number(item.total).toFixed(2)}</span></div>`;
-      }
-      if (template === 'minimal') {
-        return `<div class="receipt-minimal-item"><div class="receipt-minimal-item-name">${item.product?.name || item.name || itemFallback}</div><div class="receipt-minimal-item-line"><span>${item.quantity} x ₹${Number(item.price).toFixed(2)}</span><span class="receipt-minimal-item-total">₹${Number(item.total).toFixed(2)}</span></div></div>`;
-      }
-      return `<tr><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px">${item.product?.name || item.name || itemFallback}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:center">${item.quantity} ${item.unit || ''}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.price).toFixed(2)}</td><td style="padding:4px 6px;border-bottom:1px dotted #ddd;font-size:11px;text-align:right">₹${Number(item.total).toFixed(2)}</td></tr>`;
-    }).join('') || '';
-
-    const discountHtml = Number(sale.discount || 0) > 0 ? `<div class="total-row" style="color:#e74c3c"><span>${t('sale.discount')}</span><span>-₹${Number(sale.discount).toFixed(2)}</span></div>` : '';
-    const taxHtml = Number(sale.tax || 0) > 0 ? `<div class="total-row"><span>${t('sale.tax')}</span><span>₹${Number(sale.tax).toFixed(2)}</span></div>` : '';
-    const dueHtml = Number(sale.dueAmount || 0) > 0 ? `<div class="total-row"><span>${t('common.due')}</span><span style="color:#e74c3c;font-weight:700">₹${Number(sale.dueAmount).toFixed(2)}</span></div>` : '';
-    const footerMsg = shopInfo?.settings?.receiptFooter || t('salesPage.invoice.thankYou');
-
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Invoice - ${sale.invoiceNo || ''}</title>
-    <style>
-      @page{width:${pageWidth};margin:${isThermal ? '0' : '10mm'};padding:${isThermal ? '3mm' : '0'}}
-      *{margin:0;padding:0;box-sizing:border-box}
-      body{font-family:${isThermal ? "'Courier New',monospace" : "'Inter',-apple-system,sans-serif"};width:100%;padding:${isThermal ? '3mm' : '0'};font-size:${isThermal ? (settings.size === '58mm' ? '10px' : '11px') : '14px'};line-height:1.4;color:#000;background:#fff}
-      .no-print{display:none!important}
-      ${template === 'grocery' ? `
-        .receipt-grocery-item{display:flex;font-size:${isThermal ? '9px' : '11px'};padding:2px 0;border-bottom:1px dotted #eee}
-        .receipt-grocery-item-name{flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .receipt-grocery-item-qty{flex:0.6;text-align:center}
-        .receipt-grocery-item-price{flex:0.7;text-align:right}
-        .receipt-grocery-item-total{flex:0.7;text-align:right;font-weight:600}
-      ` : template === 'minimal' ? `
-        .receipt-minimal-item{padding:3px 0;border-bottom:1px dotted #eee}
-        .receipt-minimal-item-name{font-size:${isThermal ? '9px' : '11px'};font-weight:500}
-        .receipt-minimal-item-line{display:flex;justify-content:space-between;font-size:${isThermal ? '8px' : '10px'};color:#666}
-        .receipt-minimal-item-total{font-weight:600;color:#333}
-      ` : `
-        .total-row{display:flex;justify-content:space-between;font-size:${isThermal ? '10px' : '12px'};margin-bottom:2px}
-        .grand-total-row{font-size:${isThermal ? '12px' : '16px'};font-weight:800;border-top:1px dashed #999;padding-top:4px;margin-top:4px}
-      `}
-    </style></head><body>
-    ${template === 'grocery' ? `
-      <div style="text-align:center;margin-bottom:6px">
-        <h2 style="font-size:${isThermal ? '13px' : '18px'};font-weight:800;color:#2ecc71">${shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2>
-        <p style="font-size:${isThermal ? '8px' : '10px'};color:#666">${formatAddress(shopInfo?.address)}</p>
-        ${shopInfo?.phone ? `<p style="font-size:9px;color:#333">📞 ${shopInfo.phone}</p>` : ''}
-      </div>
-      <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-      <div style="margin-bottom:4px">
-        <div style="display:flex;justify-content:space-between;font-size:${isThermal ? '9px' : '11px'};color:#555"><span>🧾 ${sale.invoiceNo || t('common.notAvailable')}</span><span>📅 ${formatDate(sale.createdAt)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:${isThermal ? '9px' : '11px'};color:#555"><span>👤 ${sale.customer?.name || t('dashboard.walkInCustomer')}</span></div>
-      </div>
-      <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-      <div style="display:flex;font-weight:700;font-size:${isThermal ? '9px' : '11px'};color:#2ecc71;border-bottom:1px solid #2ecc71;padding-bottom:3px;margin-bottom:3px"><span style="flex:2">${t('salesPage.invoice.item')}</span><span style="flex:0.6;text-align:center">${t('salesPage.invoice.qty')}</span><span style="flex:0.7;text-align:right">₹</span><span style="flex:0.7;text-align:right">${t('common.total')}</span></div>
-      ${itemsHtml}
-      <div style="border-top:2px solid #2ecc71;margin:4px 0"></div>
-      <div style="font-size:${isThermal ? '10px' : '12px'}">
-        <div class="total-row"><span>${t('sale.subtotal')}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
-        ${discountHtml}${taxHtml}
-        <div class="total-row" style="font-size:${isThermal ? '13px' : '16px'};font-weight:800;color:#2ecc71"><span>${t('common.total')}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-        <div class="total-row"><span>${t('common.paid')}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
-        ${dueHtml}
-        <div class="total-row"><span>${t('salesPage.invoice.payment')}</span><span style="background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700">${sale.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
-      </div>
-      <div style="text-align:center;font-size:${isThermal ? '9px' : '11px'};color:#2ecc71;margin-top:6px"><p>🛒 ${footerMsg}</p></div>
-    ` : template === 'minimal' ? `
-      <div style="text-align:center;margin-bottom:6px">
-        <h2 style="font-size:${isThermal ? '14px' : '20px'};font-weight:300;letter-spacing:1px;text-transform:uppercase">${shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</h2>
-        <p style="font-size:${isThermal ? '8px' : '10px'};color:#999">${formatAddress(shopInfo?.address)}</p>
-        ${shopInfo?.phone ? `<p style="font-size:8px;color:#999">${shopInfo.phone}</p>` : ''}
-      </div>
-      <div style="border-top:1px solid #333;margin:4px 0"></div>
-      <div style="font-size:${isThermal ? '9px' : '11px'};color:#555"><div style="display:flex;justify-content:space-between"><span>${t('sale.invoice')}</span><span>${sale.invoiceNo || t('common.notAvailable')}</span></div><div style="display:flex;justify-content:space-between"><span>${t('common.date')}</span><span>${formatDate(sale.createdAt)}</span></div><div style="display:flex;justify-content:space-between"><span>${t('sale.customer')}</span><span>${sale.customer?.name || t('salesPage.invoice.walkIn')}</span></div></div>
-      <div style="border-top:1px solid #333;margin:4px 0"></div>
-      ${itemsHtml}
-      <div style="border-top:1px solid #333;margin:4px 0"></div>
-      <div style="font-size:${isThermal ? '10px' : '12px'}">
-        <div class="total-row"><span>${t('sale.subtotal')}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
-        ${discountHtml}${taxHtml}
-        <div class="total-row" style="font-size:${isThermal ? '13px' : '16px'};font-weight:800;border-top:1px solid #333;padding-top:4px;margin-top:4px"><span>${t('common.total')}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-        <div class="total-row"><span>${t('common.paid')}</span><span>₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
-        ${dueHtml}
-      </div>
-      <div style="text-align:center;font-size:${isThermal ? '9px' : '11px'};color:#999;margin-top:6px;font-style:italic"><p>${footerMsg}</p></div>
-    ` : `
-      <div style="text-align:center;margin-bottom:8px">
-        <h2 style="font-size:${isThermal ? '13px' : '18px'};font-weight:800">${shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</h2>
-        <p style="font-size:${isThermal ? '9px' : '11px'};color:#555">${formatAddress(shopInfo?.address)}</p>
-        ${shopInfo?.phone ? `<p style="font-size:9px;color:#555">${t('salesPage.invoice.tel')} ${shopInfo.phone}</p>` : ''}
-      </div>
-      <div style="border-top:1px dashed #999;margin:6px 0"></div>
-      <div style="font-size:${isThermal ? '10px' : '12px'};margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">${t('salesPage.invoice.invoiceLabel')}</span><span style="font-weight:700">${sale.invoiceNo || t('common.notAvailable')}</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">${t('salesPage.invoice.dateLabel')}</span><span style="font-weight:700">${formatDate(sale.createdAt)}</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">${t('salesPage.invoice.customerLabel')}</span><span style="font-weight:700">${sale.customer?.name || t('dashboard.walkInCustomer')}</span></div>
-      </div>
-      <div style="border-top:1px dashed #999;margin:6px 0"></div>
-      <table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:${isThermal ? '10px' : '12px'}">
-        <tr><th style="text-align:left;border-bottom:1px solid #333;padding:4px 6px">${t('salesPage.invoice.item')}</th><th style="text-align:center;border-bottom:1px solid #333;padding:4px 6px">${t('salesPage.invoice.qty')}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${t('common.price')}</th><th style="text-align:right;border-bottom:1px solid #333;padding:4px 6px">${t('common.total')}</th></tr>
-        ${itemsHtml}
-      </table>
-      <div style="border-top:1px dashed #999;margin:6px 0"></div>
-      <div style="font-size:${isThermal ? '11px' : '13px'}">
-        <div class="total-row"><span>${t('sale.subtotal')}</span><span>₹${Number(sale.subtotal || 0).toFixed(2)}</span></div>
-        ${discountHtml}${taxHtml}
-        <div class="total-row grand-total-row"><span>${t('salesPage.invoice.grandTotal')}</span><span>₹${Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
-        <div class="total-row"><span>${t('common.paid')}</span><span style="color:#2ecc71;font-weight:700">₹${Number(sale.paidAmount || 0).toFixed(2)}</span></div>
-        ${dueHtml}
-        <div class="total-row"><span>${t('salesPage.invoice.payment')}</span><span style="font-weight:800;color:#2ecc71">${sale.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
-      </div>
-      <div style="border-top:1px dashed #999;margin:6px 0"></div>
-      <div style="text-align:center;font-size:${isThermal ? '9px' : '11px'};color:#888;margin-top:6px">
-        <p>${footerMsg}</p>
-        <p style="font-size:${isThermal ? '8px' : '9px'}">${t('salesPage.invoice.visitAgain')}</p>
-      </div>
-    `}
-    </body></html>`);
-    printWindow.document.close();
-    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
+    setPrintingSale(sale);
+    setShowPrintPreview(true);
   };
 
   const statCards = [
@@ -1378,21 +909,28 @@ const Sales = () => {
         ) : sales.map((sale) => {
           const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
           const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
+          const hasReturn = sale.returnStatus && sale.returnStatus !== 'none';
           return (
             <ExpandableCard
               key={sale._id}
               compact={
                 <>
                   <div className="expandable-card__compact-row">
-                    <span className="expandable-card__name">{sale.invoiceNo || t('common.notAvailable')}</span>
-                    <span className="expandable-card__price">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                    <span className="expandable-card__name" style={{ fontSize: '0.75rem' }}>{sale.invoiceNo || t('common.notAvailable')}</span>
+                    <span className="expandable-card__price" style={{ fontSize: '0.85rem' }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
                   </div>
                   <div className="expandable-card__meta">
                     <span className="expandable-card__meta-item">
                       <BiUser />
                       <span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
                     </span>
-                    <span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      {hasReturn ? (
+                        <span className="sales-status-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span>
+                      ) : (
+                        <span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
+                      )}
+                    </div>
                   </div>
                 </>
               }
@@ -1468,19 +1006,15 @@ const Sales = () => {
         </div>
       )}
 
-      {showPrintSettings && printingSale && (
-        <PrintSettingsModal
-          currentSettings={printerSettings}
-          sale={printingSale}
-          shopInfo={shopInfo}
-          onPrint={handlePrintFromModal}
-          onDownload={() => {}}
-          onClose={() => { setShowPrintSettings(false); setPrintingSale(null); }}
-        />
-      )}
-
       <SaleViewDrawer open={drawerOpen} onClose={() => { setDrawerOpen(false); setViewingSale(null); }} sale={viewingSale} shopInfo={shopInfo} onPrint={handlePrintClick} onCopyInvoice={handleCopyInvoice} />
       <ReturnDrawer open={returnDrawerOpen} onClose={() => { setReturnDrawerOpen(false); setReturningSale(null); }} sale={returningSale} onReturnProcessed={handleReturnProcessed} />
+      {showPrintPreview && printingSale && (
+        <PrintPreview
+          sale={printingSale}
+          shopInfo={shopInfo}
+          onClose={() => { setShowPrintPreview(false); setPrintingSale(null); }}
+        />
+      )}
     </div>
   );
 };

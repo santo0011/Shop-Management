@@ -12,19 +12,7 @@ import {
   BiStore, BiQr, BiIdCard, BiUserCircle, BiCalendar,
   BiNote, BiChevronRight
 } from 'react-icons/bi';
-
-const getPrinterSizes = (t) => [
-  { key: 'a4', label: t('posPage.printer.sizeA4'), icon: <BiFile size={18} />, width: '210mm' },
-  { key: '80mm', label: t('posPage.printer.size80mm'), icon: <BiGridSmall size={18} />, width: '80mm' },
-  { key: '58mm', label: t('posPage.printer.size58mm'), icon: <BiGridSmall size={18} />, width: '58mm' },
-];
-
-const getInvoiceTemplates = (t) => [
-  { key: 'classic', label: t('posPage.printer.templateClassic'), icon: <BiLayout size={18} /> },
-  { key: 'modern', label: t('posPage.printer.templateModern'), icon: <BiFile size={18} /> },
-  { key: 'minimal', label: t('posPage.printer.templateMinimal'), icon: <BiGridSmall size={18} /> },
-  { key: 'grocery', label: t('posPage.printer.templateGrocery'), icon: <BiStore size={18} /> },
-];
+import PrintPreview from '../../components/common/PrintPreview';
 
 const formatAddress = (addr) => {
   if (!addr) return '';
@@ -41,258 +29,9 @@ const formatDate = (dateStr) => {
   });
 };
 
-const getPrinterSettings = () => {
-  try {
-    const saved = localStorage.getItem('pos_printer_settings');
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  return { size: '80mm', template: 'modern' };
-};
-
-const savePrinterSettings = (settings) => {
-  try {
-    localStorage.setItem('pos_printer_settings', JSON.stringify(settings));
-  } catch {}
-};
-
 const getLastPayment = () => {
   try { return localStorage.getItem('pos_last_payment') || 'cash'; } catch { return 'cash'; }
 };
-
-const InvoiceQR = ({ invoiceNo, size = 60 }) => {
-  const chars = (invoiceNo || 'INV').split('');
-  const cellSize = Math.max(2, Math.floor(size / (chars.length + 4)));
-  const padding = cellSize * 2;
-  const totalSize = padding * 2 + chars.length * cellSize;
-  return (
-    <svg width={totalSize} height={totalSize} viewBox={`0 0 ${totalSize} ${totalSize}`} style={{ display: 'block' }}>
-      <rect width={totalSize} height={totalSize} fill="white" rx="2" />
-      <rect x={padding} y={padding} width={cellSize * 7} height={cellSize * 7} fill="black" rx="1" />
-      <rect x={padding + cellSize} y={padding + cellSize} width={cellSize * 5} height={cellSize * 5} fill="white" />
-      <rect x={padding + cellSize * 2} y={padding + cellSize * 2} width={cellSize * 3} height={cellSize * 3} fill="black" />
-      {chars.map((ch, i) => (
-        <rect key={i} x={padding + (i % chars.length) * cellSize} y={padding + Math.floor(i / chars.length) * cellSize + cellSize * 8} width={cellSize} height={cellSize} fill={ch.charCodeAt(0) % 2 === 0 ? 'black' : 'white'} opacity={0.8} />
-      ))}
-    </svg>
-  );
-};
-
-const PrinterSettingsModal = ({ currentSettings, onSelect, onClose }) => {
-  const { t } = useTranslation();
-  const [size, setSize] = useState(currentSettings.size);
-  const [template, setTemplate] = useState(currentSettings.template);
-  const printerSizes = getPrinterSizes(t);
-  const invoiceTemplates = getInvoiceTemplates(t);
-  const handleApply = () => { savePrinterSettings({ size, template }); onSelect({ size, template }); onClose(); };
-  return (
-    <div className="printer-settings-overlay" onClick={onClose}>
-      <div className="printer-settings-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="printer-settings-header">
-          <div className="printer-settings-header-left">
-            <div className="printer-settings-icon"><BiPrinter size={22} /></div>
-            <h3>{t('posPage.printer.settings')}</h3>
-          </div>
-          <button className="printer-settings-close" onClick={onClose}><BiX size={20} /></button>
-        </div>
-        <div className="printer-settings-body">
-          <div className="printer-settings-mobile-row">
-            <div className="printer-settings-group printer-settings-group--half">
-              <label className="printer-settings-label">{t('posPage.printer.paperSize')}</label>
-              <div className="printer-settings-options">
-                {printerSizes.map(s => (
-                  <button key={s.key} className={`printer-settings-option ${size === s.key ? 'active' : ''}`} onClick={() => setSize(s.key)}>{s.icon}<span>{s.label}</span></button>
-                ))}
-              </div>
-            </div>
-            <div className="printer-settings-group printer-settings-group--half">
-              <label className="printer-settings-label">{t('posPage.printer.invoiceDesign')}</label>
-              <div className="printer-settings-options">
-                {invoiceTemplates.map(tpl => (
-                  <button key={tpl.key} className={`printer-settings-option ${template === tpl.key ? 'active' : ''}`} onClick={() => setTemplate(tpl.key)}>{tpl.icon}<span>{tpl.label}</span></button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="printer-settings-preview-hint"><BiPrinter size={16} /> {t('posPage.printer.preview')}: {size.toUpperCase()} | {template.charAt(0).toUpperCase() + template.slice(1)}</div>
-        </div>
-        <div className="printer-settings-footer">
-          <button className="printer-settings-btn printer-settings-btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="printer-settings-btn printer-settings-btn-apply" onClick={handleApply}>{t('posPage.printer.apply')}</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const Invoice = React.forwardRef(({ sale, shopInfo, template, size, onClose, onPrint, onDownload, onSettingsChange }, ref) => {
-  const { t } = useTranslation();
-  const combinedRef = useRef(null);
-  const isThermal = size === '58mm' || size === '80mm';
-  const isA4 = size === 'a4';
-  const cashierName = t('posPage.receipt.cashier');
-  const footerMsg = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
-  const taxName = shopInfo?.settings?.taxName || t('posPage.receipt.defaultTaxName');
-
-  const renderClassic = () => (
-    <div className={`receipt ${isA4 ? 'receipt-a4' : ''}`} style={isThermal ? { maxWidth: size === '58mm' ? '48mm' : '72mm' } : {}}>
-      <div className="receipt-header">
-        <div className="receipt-logo">{shopInfo?.logo ? <img src={shopInfo.logo} alt="Logo" className="receipt-logo-img" /> : <div className="receipt-logo-placeholder"><BiStore size={isThermal ? 20 : 28} /></div>}</div>
-        <h2 className="receipt-shop-name">{shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2>
-        <p className="receipt-shop-address">{formatAddress(shopInfo?.address)}</p>
-        {shopInfo?.phone && <p className="receipt-shop-address">📞 {shopInfo.phone}</p>}
-        {shopInfo?.gst && <p className="receipt-shop-address">GST: {shopInfo.gst}</p>}
-      </div>
-      <div className="receipt-divider" />
-      <div className="receipt-info">
-        <div className="receipt-info-row"><span className="receipt-label">{t('sale.invoice')}</span><span className="receipt-value">{sale?.invoiceNo || t('common.notAvailable')}</span></div>
-        <div className="receipt-info-row"><span className="receipt-label">{t('common.date')}</span><span className="receipt-value">{formatDate(sale?.createdAt)}</span></div>
-        <div className="receipt-info-row"><span className="receipt-label">{t('sale.customer')}</span><span className="receipt-value">{sale?.customer?.name || t('posPage.customer.walkIn')}</span></div>
-        <div className="receipt-info-row"><span className="receipt-label">{t('posPage.receipt.cashier')}</span><span className="receipt-value">{cashierName}</span></div>
-      </div>
-      <div className="receipt-divider" />
-      <div className="receipt-items">
-        <div className="receipt-items-header"><span className="receipt-col-item">{t('posPage.receipt.item')}</span><span className="receipt-col-qty">{t('posPage.receipt.qty')}</span><span className="receipt-col-price">{t('common.price')}</span><span className="receipt-col-total">{t('common.total')}</span></div>
-        {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-item-row">
-            <div className="receipt-col-item"><span className="receipt-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span>{item.discount > 0 && <span className="receipt-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</span>}</div>
-            <div className="receipt-col-qty">{item.quantity} {item.unit || ''}</div>
-            <div className="receipt-col-price">₹{Number(item.price).toFixed(2)}</div>
-            <div className="receipt-col-total">₹{Number(item.total).toFixed(2)}</div>
-          </div>
-        ))}
-      </div>
-      <div className="receipt-divider" />
-      <div className="receipt-totals">
-        <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.grandTotal')}</span><span className="receipt-grand-total">₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-payment-method">{sale?.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
-      </div>
-      <div className="receipt-footer"><p>{footerMsg}</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}</div>
-    </div>
-  );
-
-  const renderModern = () => (
-    <div className={`receipt receipt-modern ${isA4 ? 'receipt-a4' : ''}`} style={isThermal ? { maxWidth: size === '58mm' ? '48mm' : '72mm' } : {}}>
-      <div className="receipt-modern-header">
-        <div className="receipt-modern-brand">
-          {shopInfo?.logo ? <img src={shopInfo.logo} alt="Logo" className="receipt-modern-logo" /> : <div className="receipt-modern-logo-placeholder"><BiStore size={isThermal ? 18 : 24} /></div>}
-          <div><h2 className="receipt-modern-shop-name">{shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2><p className="receipt-modern-address">{formatAddress(shopInfo?.address)}</p></div>
-        </div>
-        <div className="receipt-modern-invoice-badge">#{sale?.invoiceNo || t('common.notAvailable')}</div>
-      </div>
-      <div className="receipt-modern-meta">
-        <span className="receipt-modern-meta-item"><BiCalendar size={12} /> {formatDate(sale?.createdAt)}</span>
-        <span className="receipt-modern-meta-item"><BiUser size={12} /> {sale?.customer?.name || t('posPage.customer.walkIn')}</span>
-        <span className="receipt-modern-meta-item"><BiIdCard size={12} /> {cashierName}</span>
-      </div>
-      <div className="receipt-modern-divider" />
-      <div className="receipt-modern-items">
-        <div className="receipt-modern-items-header"><span>{t('posPage.receipt.item')}</span><span>{t('posPage.receipt.qty')}</span><span>{t('common.price')}</span><span>{t('common.total')}</span></div>
-        {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-modern-item">
-            <div className="receipt-modern-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div>
-            <div className="receipt-modern-item-details"><span>{item.quantity} {item.unit || ''}</span><span>₹{Number(item.price).toFixed(2)}</span><span className="receipt-modern-item-total">₹{Number(item.total).toFixed(2)}</span></div>
-            {item.discount > 0 && <div className="receipt-modern-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</div>}
-          </div>
-        ))}
-      </div>
-      <div className="receipt-modern-divider" />
-      <div className="receipt-modern-totals">
-        <div className="receipt-modern-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-modern-total-row receipt-modern-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-modern-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        <div className="receipt-modern-grand-total"><span>{t('posPage.totals.grandTotal')}</span><span className="receipt-modern-grand-amount">₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-modern-total-row"><span>{t('common.paid')}</span><span className="receipt-modern-paid">₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-modern-total-row"><span>{t('common.due')}</span><span className="receipt-modern-due">₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
-        <div className="receipt-modern-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-modern-payment-badge">{sale?.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
-      </div>
-      <div className="receipt-modern-footer"><p>{footerMsg}</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}</div>
-    </div>
-  );
-
-  const renderMinimal = () => (
-    <div className={`receipt receipt-minimal ${isA4 ? 'receipt-a4' : ''}`} style={isThermal ? { maxWidth: size === '58mm' ? '48mm' : '72mm' } : {}}>
-      <div className="receipt-minimal-header"><h2 className="receipt-minimal-shop-name">{shopInfo?.shopName || t('posPage.receipt.shopNameFallback')}</h2><p className="receipt-minimal-address">{formatAddress(shopInfo?.address)}</p>{shopInfo?.phone && <p className="receipt-minimal-address">{shopInfo.phone}</p>}</div>
-      <div className="receipt-minimal-divider" />
-      <div className="receipt-minimal-info">
-        <div className="receipt-minimal-info-row"><span>{t('sale.invoice')}</span><span>{sale?.invoiceNo || t('common.notAvailable')}</span></div>
-        <div className="receipt-minimal-info-row"><span>{t('common.date')}</span><span>{formatDate(sale?.createdAt)}</span></div>
-        <div className="receipt-minimal-info-row"><span>{t('sale.customer')}</span><span>{sale?.customer?.name || t('posPage.customer.walkIn')}</span></div>
-      </div>
-      <div className="receipt-minimal-divider" />
-      <div className="receipt-minimal-items">{sale?.items?.map((item, idx) => (
-        <div key={idx} className="receipt-minimal-item"><div className="receipt-minimal-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div><div className="receipt-minimal-item-line"><span>{item.quantity} x ₹{Number(item.price).toFixed(2)}</span><span className="receipt-minimal-item-total">₹{Number(item.total).toFixed(2)}</span></div></div>
-      ))}</div>
-      <div className="receipt-minimal-divider" />
-      <div className="receipt-minimal-totals">
-        <div className="receipt-minimal-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-minimal-total-row receipt-minimal-grand"><span>{t('common.total')}</span><span>₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-minimal-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
-      </div>
-      <div className="receipt-minimal-footer"><p>{footerMsg}</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 70 : 40} /></div>}</div>
-    </div>
-  );
-
-  const renderGrocery = () => (
-    <div className={`receipt receipt-grocery ${isA4 ? 'receipt-a4' : ''}`} style={isThermal ? { maxWidth: size === '58mm' ? '48mm' : '72mm' } : {}}>
-      <div className="receipt-grocery-header">
-        <div className="receipt-grocery-logo">{shopInfo?.logo ? <img src={shopInfo.logo} alt="Logo" className="receipt-grocery-logo-img" /> : <div className="receipt-grocery-logo-placeholder"><BiStore size={isThermal ? 20 : 28} /></div>}</div>
-        <h2 className="receipt-grocery-shop-name">{shopInfo?.shopName || t('posPage.printer.templateGrocery')}</h2>
-        <p className="receipt-grocery-address">{formatAddress(shopInfo?.address)}</p>
-        {shopInfo?.phone && <p className="receipt-grocery-phone">📞 {shopInfo.phone}</p>}
-        {shopInfo?.gst && <p className="receipt-grocery-gst">GST: {shopInfo.gst}</p>}
-      </div>
-      <div className="receipt-grocery-divider" />
-      <div className="receipt-grocery-info">
-        <div className="receipt-grocery-info-row"><span>🧾 {sale?.invoiceNo || t('common.notAvailable')}</span><span>📅 {formatDate(sale?.createdAt)}</span></div>
-        <div className="receipt-grocery-info-row"><span>👤 {sale?.customer?.name || t('posPage.customer.walkInCustomer')}</span><span>👨‍💼 {cashierName}</span></div>
-      </div>
-      <div className="receipt-grocery-divider" />
-      <div className="receipt-grocery-items">
-        <div className="receipt-grocery-items-header"><span>{t('posPage.receipt.item')}</span><span>{t('posPage.receipt.qty')}</span><span>₹</span><span>{t('common.total')}</span></div>
-        {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-grocery-item"><span className="receipt-grocery-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span><span className="receipt-grocery-item-qty">{item.quantity}{item.unit || ''}</span><span className="receipt-grocery-item-price">₹{Number(item.price).toFixed(2)}</span><span className="receipt-grocery-item-total">₹{Number(item.total).toFixed(2)}</span></div>
-        ))}
-      </div>
-      <div className="receipt-grocery-divider" />
-      <div className="receipt-grocery-totals">
-        <div className="receipt-grocery-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row receipt-grocery-grand"><span>{t('common.total')}</span><span>₹{Number(sale?.totalAmount || sale?.grandTotal || 0).toFixed(2)}</span></div>
-        <div className="receipt-grocery-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-grocery-payment">{sale?.paymentMethod?.toUpperCase() || t('sale.cash').toUpperCase()}</span></div>
-      </div>
-      <div className="receipt-grocery-divider" />
-      <div className="receipt-grocery-footer"><p>🛒 {footerMsg}</p><p className="receipt-grocery-footer-small">{t('posPage.receipt.visitAgain')} 🥦🍎</p>{!isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}</div>
-    </div>
-  );
-
-  const renderTemplate = () => { switch (template) { case 'classic': return renderClassic(); case 'modern': return renderModern(); case 'minimal': return renderMinimal(); case 'grocery': return renderGrocery(); default: return renderModern(); } };
-
-  return (
-    <div className="invoice-modal-overlay" onClick={onClose}>
-      <div className="invoice-modal invoice-theme" onClick={(e) => e.stopPropagation()}>
-        <div className="invoice-actions no-print">
-          <button className="invoice-action-btn" onClick={onSettingsChange} title={t('posPage.printer.settings')}><BiPrinter size={16} /> {size.toUpperCase()} | {template.charAt(0).toUpperCase() + template.slice(1)}</button>
-          <div className="invoice-actions-right">
-            <button className="btn btn-premium btn-premium-primary btn-premium-sm" onClick={onPrint}><BiPrinter /> {t('common.print')}</button>
-            <button className="btn btn-premium btn-premium-secondary btn-premium-sm" onClick={onDownload}><BiDownload /> {t('common.pdf')}</button>
-            <button className="btn-close-premium" onClick={onClose}><BiX /></button>
-          </div>
-        </div>
-        <div className={`invoice-content invoice-content-${size}`} ref={combinedRef}>{renderTemplate()}</div>
-      </div>
-    </div>
-  );
-});
-Invoice.displayName = 'Invoice';
 
 const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
   const { t } = useTranslation();
@@ -363,13 +102,10 @@ const POS = () => {
   const [showTopSelling, setShowTopSelling] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmData, setConfirmData] = useState(null);
-  const [printerSettings, setPrinterSettings] = useState(getPrinterSettings);
-  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [discountMode, setDiscountMode] = useState('percent');
   const [discountValue, setDiscountValue] = useState(0);
   const [customerNote, setCustomerNote] = useState('');
   const searchRef = useRef(null);
-  const invoiceRef = useRef(null);
 
   // Close customer dropdown when clicking outside
   useEffect(() => {
@@ -464,6 +200,7 @@ const POS = () => {
     setDiscountMode('percent');
     setCustomerNote('');
     setPaymentMethod(getLastPayment());
+    setLastSale(null);
   };
 
   const taxRate = shopInfo?.settings?.taxRate ?? 0;
@@ -512,34 +249,6 @@ const POS = () => {
     finally { setLoading(false); }
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    const content = invoiceRef.current?.innerHTML || '';
-    const isThermal = printerSettings.size === '58mm' || printerSettings.size === '80mm';
-    const pageWidth = printerSettings.size === '58mm' ? '58mm' : printerSettings.size === '80mm' ? '80mm' : '210mm';
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Invoice - ${lastSale?.invoiceNo || ''}</title><style>@page{width:${pageWidth};margin:${isThermal?'0':'10mm'};padding:${isThermal?'3mm':'0'}}*{margin:0;padding:0;box-sizing:border-box}body{font-family:${isThermal?"'Courier New',monospace":"'Inter',-apple-system,sans-serif"};width:100%;padding:${isThermal?'3mm':'0'};font-size:${isThermal?(printerSettings.size==='58mm'?'10px':'11px'):'14px'};line-height:1.4;color:#000;background:#fff}.receipt{max-width:100%;margin:0 auto}.receipt-a4{max-width:190mm;padding:10mm}.receipt-header,.receipt-modern-header,.receipt-minimal-header,.receipt-grocery-header{text-align:center;margin-bottom:${isThermal?'4px':'12px'}}.receipt-logo{margin-bottom:${isThermal?'3px':'8px'}}.receipt-logo-img{max-width:${isThermal?'50px':'80px'};max-height:${isThermal?'50px':'80px'}}.receipt-logo-placeholder,.receipt-modern-logo-placeholder,.receipt-grocery-logo-placeholder{width:${isThermal?'36px':'60px'};height:${isThermal?'36px':'60px'};margin:0 auto;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D9A6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:${isThermal?'14px':'24px'}}.receipt-shop-name{font-size:${isThermal?'13px':'18px'};font-weight:800;margin-bottom:2px}.receipt-shop-address{font-size:${isThermal?'9px':'11px'};color:#555;line-height:1.3}.receipt-divider{border-top:1px dashed #999;margin:${isThermal?'4px':'8px'}0}.receipt-info{margin-bottom:${isThermal?'4px':'8px'}}.receipt-info-row{display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px}.receipt-label{color:#888}.receipt-value{font-weight:700}.receipt-items{margin-bottom:${isThermal?'4px':'8px'}}.receipt-items-header{display:flex;font-weight:700;font-size:${isThermal?'9px':'11px'};border-bottom:1px solid #333;padding-bottom:3px;margin-bottom:3px}.receipt-col-item{flex:2;overflow:hidden;text-overflow:ellipsis;white-space:${isThermal?'nowrap':'normal'}}.receipt-col-qty{flex:0.6;text-align:center}.receipt-col-price{flex:0.8;text-align:right}.receipt-col-total{flex:0.8;text-align:right}.receipt-item-row{display:flex;font-size:${isThermal?'9px':'11px'};margin-bottom:2px;padding-bottom:2px;border-bottom:1px dotted #ddd}.receipt-item-name{display:block;word-break:break-word}.receipt-item-discount{font-size:8px;color:#e74c3c}.receipt-totals{margin-bottom:${isThermal?'4px':'8px'}}.receipt-total-row{display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px}.receipt-discount{color:#e74c3c}.receipt-due{color:#e74c3c;font-weight:700}.receipt-grand-total{font-size:${isThermal?'12px':'16px'};font-weight:800}.receipt-payment-method{font-weight:800;color:#2ecc71}.receipt-footer{text-align:center;font-size:${isThermal?'9px':'11px'};color:#888;margin-top:${isThermal?'4px':'8px'}}.receipt-footer-small{font-size:8px}.receipt-qr{display:flex;justify-content:center;margin-top:${isThermal?'4px':'12px'}}.no-print{display:none!important}.receipt-modern-header{display:flex;justify-content:space-between;align-items:flex-start;text-align:left;margin-bottom:8px}.receipt-modern-brand{display:flex;align-items:center;gap:8px}.receipt-modern-logo{max-width:50px;max-height:50px;border-radius:8px}.receipt-modern-shop-name{font-size:${isThermal?'12px':'16px'};font-weight:800}.receipt-modern-address{font-size:${isThermal?'8px':'10px'};color:#666}.receipt-modern-invoice-badge{background:#6C63FF;color:#fff;padding:2px 8px;border-radius:4px;font-size:${isThermal?'9px':'11px'};font-weight:700}.receipt-modern-meta{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:6px}.receipt-modern-meta-item{display:flex;align-items:center;gap:3px}.receipt-modern-divider{border-top:2px solid #6C63FF;margin:6px 0}.receipt-modern-items{margin-bottom:6px}.receipt-modern-items-header{display:flex;justify-content:space-between;font-weight:700;font-size:${isThermal?'9px':'11px'};padding:4px 0;border-bottom:1px solid #ddd}.receipt-modern-item{padding:4px 0;border-bottom:1px dotted #eee}.receipt-modern-item-name{font-weight:600;font-size:${isThermal?'10px':'12px'}}.receipt-modern-item-details{display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555}.receipt-modern-item-total{font-weight:700;color:#333}.receipt-modern-item-discount{font-size:8px;color:#e74c3c}.receipt-modern-totals{margin-bottom:6px}.receipt-modern-total-row{display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px}.receipt-modern-discount{color:#e74c3c}.receipt-modern-grand-total{display:flex;justify-content:space-between;font-size:${isThermal?'13px':'18px'};font-weight:800;padding:4px 0;border-top:2px solid #6C63FF;margin-top:4px}.receipt-modern-grand-amount{color:#6C63FF}.receipt-modern-paid{color:#2ecc71;font-weight:700}.receipt-modern-due{color:#e74c3c;font-weight:700}.receipt-modern-payment-badge{background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-size:${isThermal?'9px':'11px'};font-weight:700}.receipt-modern-footer{text-align:center;font-size:${isThermal?'9px':'11px'};color:#888;margin-top:6px}.receipt-minimal-header{text-align:center;margin-bottom:6px}.receipt-minimal-shop-name{font-size:${isThermal?'14px':'20px'};font-weight:300;letter-spacing:1px;text-transform:uppercase}.receipt-minimal-address{font-size:${isThermal?'8px':'10px'};color:#999}.receipt-minimal-divider{border-top:1px solid #333;margin:4px 0}.receipt-minimal-info{margin-bottom:4px}.receipt-minimal-info-row{display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:1px}.receipt-minimal-items{margin-bottom:4px}.receipt-minimal-item{padding:3px 0;border-bottom:1px dotted #eee}.receipt-minimal-item-name{font-size:${isThermal?'10px':'12px'};font-weight:500}.receipt-minimal-item-line{display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#666}.receipt-minimal-item-total{font-weight:600;color:#333}.receipt-minimal-totals{margin-bottom:4px}.receipt-minimal-total-row{display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px}.receipt-minimal-discount{color:#e74c3c}.receipt-minimal-grand{font-size:${isThermal?'13px':'16px'};font-weight:800;border-top:1px solid #333;padding-top:4px;margin-top:4px}.receipt-minimal-due{color:#e74c3c}.receipt-minimal-footer{text-align:center;font-size:${isThermal?'9px':'11px'};color:#999;margin-top:6px;font-style:italic}.receipt-grocery-header{text-align:center;margin-bottom:6px}.receipt-grocery-logo{margin-bottom:4px}.receipt-grocery-logo-img{max-width:${isThermal?'40px':'70px'};max-height:${isThermal?'40px':'70px'}}.receipt-grocery-shop-name{font-size:${isThermal?'13px':'18px'};font-weight:800;color:#2ecc71}.receipt-grocery-address{font-size:${isThermal?'8px':'10px'};color:#666}.receipt-grocery-phone{font-size:${isThermal?'9px':'11px'};color:#333}.receipt-grocery-gst{font-size:${isThermal?'8px':'10px'};color:#999}.receipt-grocery-divider{border-top:2px solid #2ecc71;margin:4px 0}.receipt-grocery-info{margin-bottom:4px}.receipt-grocery-info-row{display:flex;justify-content:space-between;font-size:${isThermal?'9px':'11px'};color:#555;margin-bottom:2px}.receipt-grocery-items{margin-bottom:4px}.receipt-grocery-items-header{display:flex;font-weight:700;font-size:${isThermal?'9px':'11px'};border-bottom:1px solid #2ecc71;padding-bottom:3px;margin-bottom:3px;color:#2ecc71}.receipt-grocery-item{display:flex;font-size:${isThermal?'9px':'11px'};padding:2px 0;border-bottom:1px dotted #eee}.receipt-grocery-item-name{flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.receipt-grocery-item-qty{flex:0.6;text-align:center}.receipt-grocery-item-price{flex:0.7;text-align:right}.receipt-grocery-item-total{flex:0.7;text-align:right;font-weight:600}.receipt-grocery-totals{margin-bottom:4px}.receipt-grocery-total-row{display:flex;justify-content:space-between;font-size:${isThermal?'10px':'12px'};margin-bottom:2px}.receipt-grocery-discount{color:#e74c3c}.receipt-grocery-grand{font-size:${isThermal?'13px':'16px'};font-weight:800;color:#2ecc71;border-top:1px solid #2ecc71;padding-top:4px;margin-top:4px}.receipt-grocery-due{color:#e74c3c}.receipt-grocery-payment{background:#2ecc71;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700}.receipt-grocery-footer{text-align:center;font-size:${isThermal?'9px':'11px'};color:#2ecc71;margin-top:6px}.receipt-grocery-footer-small{font-size:8px;color:#888}</style></head><body>${content}</body></html>`);
-    printWindow.document.close();
-    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 500);
-  };
-
-  const handleDownloadPDF = async () => {
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const jsPDF = (await import('jspdf')).default;
-      const element = invoiceRef.current;
-      if (!element) return;
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const isA4 = printerSettings.size === 'a4';
-      const imgWidth = isA4 ? 190 : 80;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const pdf = new jsPDF('p', 'mm', isA4 ? 'a4' : [imgWidth, Math.max(imgHeight + 10, 50)]);
-      pdf.addImage(imgData, 'PNG', isA4 ? 10 : 0, isA4 ? 10 : 5, imgWidth, imgHeight);
-      pdf.save(`Invoice-${lastSale?.invoiceNo || 'sale'}.pdf`);
-    } catch (err) { showToast.error(t('posPage.toast.pdfFailed')); }
-  };
-
   const handleReprint = () => { if (lastSale) setShowInvoice(true); else showToast.warning(t('posPage.totals.noPreviousInvoice')); };
   const quickAmounts = [100, 200, 500, 1000];
   const quickDiscounts = [
@@ -582,7 +291,6 @@ const POS = () => {
           </div>
         </div>
         {showTopSelling && topSelling.length > 0 && <div className="pos-section-header"><BiTrendingUp /> {t('dashboard.topSellingProducts')}</div>}
-        {/* Mobile compact card list — used for both Top Selling and search results (rendered before grid so CSS sibling selector works) */}
         {showMobileList && (
           <div className="pos-top-selling-mobile">
             <div className="pos-top-selling-mobile-list">
@@ -598,14 +306,6 @@ const POS = () => {
                           <span className="pos-top-selling-mobile-stat-label">{t('common.price')}</span>
                           <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--price">₹{product.sellingPrice || 0}</span>
                         </div>
-                        <div className="pos-top-selling-mobile-stat">
-                          <span className="pos-top-selling-mobile-stat-label">{t('posPage.product.sold')}</span>
-                          <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--sold">{product.totalSold || 0}</span>
-                        </div>
-                        <div className="pos-top-selling-mobile-stat">
-                          <span className="pos-top-selling-mobile-stat-label">{t('product.stock')}</span>
-                          <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--stock">{isOutOfStock ? t('product.outOfStock') : `${product.stock ?? 0} ${product.unit || ''}`}</span>
-                        </div>
                       </div>
                     </div>
                     <button className="pos-top-selling-mobile-add" disabled={isOutOfStock} onClick={(e) => { e.stopPropagation(); !isOutOfStock && addToCart(product); }}><BiPlus /></button>
@@ -620,7 +320,6 @@ const POS = () => {
             )}
           </div>
         )}
-        {/* Desktop grid - unchanged */}
         <div className="pos-product-grid">
           {!showTopSelling && products.length === 0 && search && <div className="pos-empty-state"><BiPackage size={48} /><p>{t('product.noProductsFoundFor', { query: search })}</p></div>}
           {displayProducts.slice(0, desktopDisplayLimit).map(product => {
@@ -635,7 +334,6 @@ const POS = () => {
                   <div className="pos-product-stock">
                     {isOutOfStock ? <span className="stock-badge out-of-stock">{t('product.outOfStock')}</span> : isLowStock ? <span className="stock-badge low-stock">{product.stock} {product.unit || t('product.piece')}</span> : <span className="stock-badge in-stock">{product.stock} {product.unit || t('product.piece')}</span>}
                   </div>
-                  {product.totalSold > 0 && <div className="pos-product-sold"><BiStar /> {t('posPage.product.soldCount', { count: product.totalSold })}</div>}
                 </div>
                 <button className="pos-add-btn" disabled={isOutOfStock} onClick={(e) => { e.stopPropagation(); addToCart(product); }}><BiPlus /></button>
               </div>
@@ -645,7 +343,6 @@ const POS = () => {
       </div>
 
       <div className="pos-cart-panel">
-        {/* Modern Customer Search Header */}
         <div className="pos-customer-modern-header">
           <div className="pos-customer-search-area" ref={customerDropdownRef}>
             <div className="pos-customer-search-inner">
@@ -674,7 +371,6 @@ const POS = () => {
               )}
             </div>
 
-            {/* Searchable Dropdown */}
             {customerDropdownOpen && (
               <div className="pos-customer-dropdown-modern">
                 <div className="pos-customer-dropdown-header">
@@ -684,7 +380,6 @@ const POS = () => {
                   </button>
                 </div>
                 <div className="pos-customer-dropdown-list">
-                  {/* Walk-in option always on top */}
                   <div
                     className={`pos-customer-option ${!customer ? 'active' : ''}`}
                     onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setCustomerDropdownOpen(false); }}
@@ -737,7 +432,6 @@ const POS = () => {
           </div>
         </div>
 
-        {/* Selected Customer Info Card */}
         {selectedCustomerData && (
           <div className="pos-customer-selected-card">
             <div className="pos-customer-selected-avatar">
@@ -759,7 +453,6 @@ const POS = () => {
           </div>
         )}
 
-        {/* Cart Items */}
         <div className="pos-cart-items">
           {cart.length === 0 ? (
             <div className="pos-cart-empty">
@@ -788,9 +481,7 @@ const POS = () => {
           )}
         </div>
 
-        {/* Checkout Section */}
         <div className="pos-checkout-section">
-          {/* Summary Cards */}
           <div className="pos-summary-cards">
             <div className="pos-summary-card pos-summary-subtotal">
               <span className="pos-summary-label">{t('sale.subtotal')}</span>
@@ -806,13 +497,11 @@ const POS = () => {
             </div>
           </div>
 
-          {/* Grand Total */}
           <div className="pos-grand-total">
             <span>{t('posPage.totals.grandTotal')}</span>
             <span className="pos-grand-total-amount">₹{grandTotal.toFixed(2)}</span>
           </div>
 
-          {/* Due Alert */}
           {dueAmount > 0 && (
             <div className="pos-due-alert">
               <BiErrorCircle size={16} />
@@ -820,7 +509,6 @@ const POS = () => {
             </div>
           )}
 
-          {/* Change Display */}
           {change > 0 && (
             <div className="pos-change-display">
               <BiCheckCircle size={16} />
@@ -828,7 +516,6 @@ const POS = () => {
             </div>
           )}
 
-          {/* Payment Options */}
           <div className="pos-payment-section">
             <label className="pos-payment-label">{t('sale.paymentMethod')}</label>
             <div className="pos-payment-options">
@@ -845,7 +532,6 @@ const POS = () => {
             </div>
           </div>
 
-          {/* Paid Amount */}
           <div className="pos-paid-section">
             <label className="pos-payment-label">{t('sale.paidAmount')}</label>
             <div className="pos-paid-input-group">
@@ -860,7 +546,6 @@ const POS = () => {
             </div>
           </div>
 
-          {/* Discount Section */}
           <div className="pos-discount-section">
             <label className="pos-payment-label">{t('posPage.discount.extraLabel')}</label>
             <div className="pos-discount-input-row">
@@ -877,17 +562,16 @@ const POS = () => {
             </div>
           </div>
 
-          {/* Customer Note */}
           <div className="pos-note-section">
             <label className="pos-payment-label">{t('posPage.note.label')}</label>
             <input type="text" className="pos-note-input" value={customerNote} onChange={(e) => setCustomerNote(e.target.value)} placeholder={t('posPage.note.placeholder')} maxLength={200} />
           </div>
 
-          {/* Action Buttons */}
           <div className="pos-action-buttons">
             <div className="pos-action-row">
-              <button className="pos-action-btn" onClick={handleReprint} disabled={!lastSale}><BiPrinter size={16} /> {t('posPage.actions.reprint')}</button>
-              <button className="pos-action-btn" onClick={() => { setShowPrinterSettings(true); }}><BiGridSmall size={16} /> {t('posPage.actions.printerSettingsShort')}</button>
+              {lastSale && (
+                <button className="pos-action-btn" onClick={handleReprint}><BiPrinter size={16} /> {t('posPage.actions.reprint')}</button>
+              )}
             </div>
             <button className="pos-checkout-btn" onClick={handleOpenConfirm} disabled={cart.length === 0}>
               <BiReceipt size={18} />
@@ -900,28 +584,14 @@ const POS = () => {
         </div>
       </div>
 
-      {/* Modals */}
       {showConfirmModal && confirmData && (
         <ConfirmSaleModal data={confirmData} onConfirm={handleProcessSale} onCancel={() => setShowConfirmModal(false)} loading={loading} />
       )}
       {showInvoice && lastSale && (
-        <Invoice
-          ref={invoiceRef}
+        <PrintPreview
           sale={lastSale}
           shopInfo={shopInfo}
-          template={printerSettings.template}
-          size={printerSettings.size}
           onClose={() => setShowInvoice(false)}
-          onPrint={handlePrint}
-          onDownload={handleDownloadPDF}
-          onSettingsChange={() => { setShowInvoice(false); setShowPrinterSettings(true); }}
-        />
-      )}
-      {showPrinterSettings && (
-        <PrinterSettingsModal
-          currentSettings={printerSettings}
-          onSelect={setPrinterSettings}
-          onClose={() => setShowPrinterSettings(false)}
         />
       )}
       {showAddCustomer && (

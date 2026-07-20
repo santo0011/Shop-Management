@@ -183,18 +183,23 @@ const safeAddress = (addr, t) => {
   if (!addr) return t('common.notAvailable');
   if (typeof addr === 'string') return addr;
   // It's an object
-  const parts = [];
-  if (addr.street) parts.push(addr.street);
-  if (addr.city) parts.push(addr.city);
-  if (addr.state) parts.push(addr.state);
-  if (addr.country) {
-    if (typeof addr.country === 'string') parts.push(addr.country);
-    else if (addr.country?.name) parts.push(addr.country.name);
-    else if (addr.country?.label) parts.push(addr.country.label);
-    else if (addr.country?.value) parts.push(addr.country.value);
+  if (addr.street || addr.city || addr.state || addr.zipCode || addr.country) {
+    const parts = [];
+    if (addr.street) parts.push(addr.street);
+    if (addr.city) parts.push(addr.city);
+    if (addr.state) parts.push(addr.state);
+    if (addr.country) {
+      if (typeof addr.country === 'string') parts.push(addr.country);
+      else if (addr.country?.name) parts.push(addr.country.name);
+      else if (addr.country?.label) parts.push(addr.country.label);
+      else if (addr.country?.value) parts.push(addr.country.value);
+    }
+    if (addr.zipCode) parts.push(addr.zipCode);
+    return parts.length > 0 ? parts.join(', ') : t('common.notAvailable');
   }
-  if (addr.zipCode) parts.push(addr.zipCode);
-  return parts.length > 0 ? parts.join(', ') : t('common.notAvailable');
+  // Corrupted object (e.g. from old bug where string was spread into object)
+  const values = Object.values(addr).filter(v => typeof v === 'string');
+  return values.length > 0 ? values.join('') : t('common.notAvailable');
 };
 
 const ManageShops = () => {
@@ -588,14 +593,61 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
     address: '',
   });
 
+  // Convert address object to a comma-separated string for the textarea
+  const formatAddress = (addr) => {
+    if (!addr) return '';
+    if (typeof addr === 'string') return addr;
+    // Handle address object
+    if (typeof addr === 'object') {
+      // Check if it has expected address fields
+      if (addr.street || addr.city || addr.state || addr.zipCode || addr.country) {
+        const parts = [];
+        if (addr.street) parts.push(addr.street);
+        if (addr.city) parts.push(addr.city);
+        if (addr.state) parts.push(addr.state);
+        if (addr.zipCode) parts.push(addr.zipCode);
+        if (addr.country) {
+          if (typeof addr.country === 'string') parts.push(addr.country);
+          else if (addr.country?.name) parts.push(addr.country.name);
+          else if (addr.country?.label) parts.push(addr.country.label);
+        }
+        return parts.join(', ');
+      }
+      // Corrupted object (from old bug where string was spread into object, 
+      // e.g. { ...shop.address, ..."Dhaka" } -> { '0': 'D', '1': 'h', ... })
+      // Collect all string values and join them to reconstruct the original string
+      const strValues = Object.values(addr).filter(v => typeof v === 'string');
+      if (strValues.length > 0) {
+        // Try joining - if it was a spread string, they'll form the original text
+        const joined = strValues.join('');
+        if (joined.length > 0) return joined;
+      }
+    }
+    return '';
+  };
+
+  // Convert comma-separated string back to address object for the API
+  const parseAddress = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+    return {
+      street: parts[0] || '',
+      city: parts[1] || '',
+      state: parts[2] || '',
+      zipCode: parts[3] || '',
+      country: parts[4] || 'India',
+    };
+  };
+
   useEffect(() => {
     if (shop) {
       setForm({
         shopName: shop.name || '',
-        ownerName: shop.ownerName || '',
+        // shop.ownerName from list, or shop.owner?.name from populated detail
+        ownerName: shop.ownerName || shop.owner?.name || '',
         email: shop.email || '',
         phone: shop.phone || '',
-        address: shop.address || '',
+        address: formatAddress(shop.address),
       });
       setErrors({});
       setError(null);
