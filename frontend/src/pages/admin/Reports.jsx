@@ -398,7 +398,7 @@ const Reports = () => {
           </p>
         </div>
         <div className="d-flex gap-2">
-          {loading && <div className="spinner-border spinner-border-sm" style={{ color: 'var(--primary)', alignSelf: 'center' }} />}
+          {/* {loading && <div className="" style={{ color: 'var(--primary)', alignSelf: 'center' }} />} */}
           <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false)} disabled={refreshing}>
             {refreshing ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('common.refresh')}
           </button>

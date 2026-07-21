@@ -243,7 +243,8 @@
     "id": "ID",
     "stackTrace": "Stack Trace",
     "reloadPage": "Reload Page",
-    "loadingApplication": "Loading application..."
+    "loadingApplication": "Loading application...",
+    "stock": "Stock"
   },
   "toast": {
     "createSuccess": "{{item}} created successfully",
@@ -535,6 +536,18 @@
   },
   "productsPage": {
     "subtitle": "Manage your product catalog, pricing, and stock levels",
+    "detailsTitle": "Product Details",
+    "productInfo": "Product Information",
+    "profitMargin": "Profit Margin",
+    "stockValue": "Stock Value",
+    "inventoryInfo": "Inventory Information",
+    "totalStockValue": "Total Stock Value",
+    "supplier": "Supplier",
+    "viewLedger": "Product Ledger",
+    "purchaseHistory": "Purchase History",
+    "salesHistory": "Sales History",
+    "totalPurchased": "Total Purchased",
+    "totalSold": "Total Sold",
     "bulkImportButton": "Bulk Import",
     "created": "Created",
     "bulkImport": {
@@ -846,6 +859,14 @@
     "editSupplier": "Edit Supplier",
     "bulkImportButton": "Bulk Import",
     "searchPlaceholder": "Search suppliers...",
+    "detailsTitle": "Supplier Details",
+    "totalPurchases": "Total Purchases",
+    "totalPurchaseAmount": "Total Purchase Amount",
+    "currentDue": "Current Due",
+    "supplierInfo": "Supplier Information",
+    "gstVat": "GST/VAT Number",
+    "lastUpdated": "Last Updated",
+    "viewLedger": "Supplier Ledger",
     "dueAmount": "Due Amount",
     "created": "Created",
     "form": {
@@ -980,7 +1001,15 @@
     "statusUpdate": "Update",
     "duplicateOfTitle": "Duplicate of {{name}}",
     "willUpdateTitle": "Will update {{name}}",
-    "removeRowTitle": "Remove row"
+    "removeRowTitle": "Remove row",
+    "detailsTitle": "Category Details",
+    "totalProducts": "Total Products",
+    "activeProducts": "Active Products",
+    "totalStock": "Total Stock",
+    "categoryInfo": "Category Information",
+    "productsUsingCategory": "Products Using This Category",
+    "viewAllProducts": "View All Products",
+    "lastUpdated": "Last Updated"
   },
   "managePlansPage": {
     "addFeaturePlaceholder": "Add a feature",

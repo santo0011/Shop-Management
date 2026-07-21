@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
+import SupplierDetailsDrawer from './SupplierDetailsDrawer';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
   BiError, BiMessageSquare, BiRefresh, BiInfoCircle,
   BiPhone, BiEnvelope, BiMapPin, BiBuilding, BiDollar,
-  BiCalendar, BiUser
+  BiCalendar, BiUser, BiShow
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
 
@@ -706,6 +707,7 @@ const Suppliers = () => {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [viewDetailsId, setViewDetailsId] = useState(null);
   const isFirstLoad = useRef(true);
 
   useEffect(() => { fetchSuppliers(); }, []);
@@ -820,6 +822,9 @@ const Suppliers = () => {
                   </td>
                   <td>
                     <div className="d-flex gap-1">
+                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => setViewDetailsId(supplier._id)}>
+                        <BiShow />
+                      </button>
                       <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(supplier)}>
                         <BiEdit />
                       </button>
@@ -905,6 +910,9 @@ const Suppliers = () => {
             }
             actions={
               <>
+                <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => setViewDetailsId(supplier._id)}>
+                  <BiShow />
+                </button>
                 <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(supplier)}>
                   <BiEdit />
                 </button>
@@ -931,6 +939,14 @@ const Suppliers = () => {
         open={bulkImportOpen}
         onClose={() => { setBulkImportOpen(false); }}
         onSuccess={fetchSuppliers}
+        t={t}
+      />
+
+      {/* Supplier Details Drawer */}
+      <SupplierDetailsDrawer
+        open={!!viewDetailsId}
+        supplierId={viewDetailsId}
+        onClose={() => setViewDetailsId(null)}
         t={t}
       />
 

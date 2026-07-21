@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ProductDrawer from '../../../components/common/ProductDrawer';
+import ProductDetailsDrawer from './ProductDetailsDrawer';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
@@ -669,7 +670,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
 // ─── Main Products Page ──────────────────────────────────────────────────────
 const Products = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -680,6 +681,8 @@ const Products = () => {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
+  const [viewProductId, setViewProductId] = useState(null);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -838,6 +841,9 @@ const Products = () => {
                   </td>
                   <td>
                     <div className="d-flex gap-1">
+                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => { setViewProductId(product._id); setViewDrawerOpen(true); }}>
+                        <BiShow />
+                      </button>
                       <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(product)}>
                         <BiEdit />
                       </button>
@@ -936,6 +942,9 @@ const Products = () => {
             }
             actions={
               <>
+                <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => { setViewProductId(product._id); setViewDrawerOpen(true); }}>
+                  <BiShow />
+                </button>
                 <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(product)}>
                   <BiEdit />
                 </button>
@@ -965,6 +974,15 @@ const Products = () => {
         onClose={() => { setBulkImportOpen(false); }}
         onSuccess={fetchProducts}
         t={t}
+      />
+
+      {/* Product Details Drawer */}
+      <ProductDetailsDrawer
+        open={viewDrawerOpen}
+        productId={viewProductId}
+        onClose={() => { setViewDrawerOpen(false); setViewProductId(null); }}
+        t={t}
+        i18n={i18n}
       />
 
       {/* Delete Confirmation */}

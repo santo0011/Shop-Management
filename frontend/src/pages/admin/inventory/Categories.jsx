@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
+import CategoryDetailsDrawer from './CategoryDetailsDrawer';
 import {
-  BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
+  BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
   BiError, BiRefresh, BiInfoCircle, BiCategory,
   BiCalendar, BiMessageSquare, BiCheckCircle
@@ -632,6 +633,8 @@ const Categories = () => {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
+  const [viewCategoryId, setViewCategoryId] = useState(null);
   const isFirstLoad = useRef(true);
 
   useEffect(() => { fetchCategories(); }, []);
@@ -740,6 +743,9 @@ const Categories = () => {
                   <td>{category.nameBn || '-'}</td>
                   <td>
                     <div className="d-flex gap-1">
+                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => { setViewCategoryId(category._id); setViewDrawerOpen(true); }}>
+                        <BiShow />
+                      </button>
                       <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(category)}>
                         <BiEdit />
                       </button>
@@ -814,6 +820,9 @@ const Categories = () => {
             }
             actions={
               <>
+                <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => { setViewCategoryId(category._id); setViewDrawerOpen(true); }}>
+                  <BiShow />
+                </button>
                 <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(category)}>
                   <BiEdit />
                 </button>
@@ -840,6 +849,14 @@ const Categories = () => {
         open={bulkImportOpen}
         onClose={() => { setBulkImportOpen(false); }}
         onSuccess={fetchCategories}
+        t={t}
+      />
+
+      {/* Category Details Drawer */}
+      <CategoryDetailsDrawer
+        open={viewDrawerOpen}
+        categoryId={viewCategoryId}
+        onClose={() => { setViewDrawerOpen(false); setViewCategoryId(null); }}
         t={t}
       />
 

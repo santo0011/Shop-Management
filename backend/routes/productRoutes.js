@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { getProducts, getProduct, createProduct, updateProduct, deleteProduct, adjustStock, searchProducts } = require('../controllers/productController');
+const { getProductDetails } = require('../controllers/productDetailsController');
 const { protect } = require('../middlewares/auth');
 
 router.get('/search', protect, searchProducts);
 router.get('/', protect, getProducts);
 router.get('/:id', protect, getProduct);
+router.get('/:id/details', protect, getProductDetails);
 router.post('/', protect, createProduct);
 router.put('/:id', protect, updateProduct);
 router.delete('/:id', protect, deleteProduct);

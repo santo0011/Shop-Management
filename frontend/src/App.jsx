@@ -18,6 +18,8 @@ import Dashboard from './pages/admin/Dashboard';
 import Products from './pages/admin/inventory/Products';
 import Categories from './pages/admin/inventory/Categories';
 import Suppliers from './pages/admin/inventory/Suppliers';
+import SupplierLedgerPage from './pages/admin/SupplierLedgerPage';
+import ProductLedgerPage from './pages/admin/ProductLedgerPage';
 import Customers from './pages/admin/inventory/Customers';
 import Purchases from './pages/admin/inventory/Purchases';
 import Sales from './pages/admin/Sales';
@@ -134,8 +136,10 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="pos" element={<POS />} />
           <Route path="products" element={<Products />} />
+          <Route path="products/:productId/ledger" element={<ProductLedgerPage />} />
           <Route path="categories" element={<Categories />} />
           <Route path="suppliers" element={<Suppliers />} />
+          <Route path="suppliers/:supplierId/ledger" element={<SupplierLedgerPage />} />
           <Route path="customers" element={<Customers />} />
           <Route path="customers/:customerId/ledger" element={<CustomerLedgerPage />} />
           <Route path="purchases" element={<Purchases />} />
