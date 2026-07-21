@@ -21,6 +21,7 @@ import Suppliers from './pages/admin/inventory/Suppliers';
 import Customers from './pages/admin/inventory/Customers';
 import Purchases from './pages/admin/inventory/Purchases';
 import Sales from './pages/admin/Sales';
+import CustomerLedgerPage from './pages/admin/CustomerLedgerPage';
 import POS from './pages/admin/POS';
 import Reports from './pages/admin/Reports';
 import Subscription from './pages/admin/Subscription';
@@ -136,6 +137,7 @@ function App() {
           <Route path="categories" element={<Categories />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="customers" element={<Customers />} />
+          <Route path="customers/:customerId/ledger" element={<CustomerLedgerPage />} />
           <Route path="purchases" element={<Purchases />} />
           <Route path="sales" element={<Sales />} />
           <Route path="reports" element={<Reports />} />

@@ -1,5 +1,17 @@
 const mongoose = require('mongoose');
 
+const editHistorySchema = new mongoose.Schema({
+  previousName: { type: String },
+  newName: { type: String },
+  previousPhone: { type: String },
+  newPhone: { type: String },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  updatedAt: { type: Date, default: Date.now },
+});
+
 const customerSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -61,6 +73,7 @@ const customerSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  editHistory: [editHistorySchema],
 }, {
   timestamps: true,
 });

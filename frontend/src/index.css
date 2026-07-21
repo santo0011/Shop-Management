@@ -2200,7 +2200,11 @@ select:-webkit-autofill {
   top: 0;
   right: 0;
   width: 520px;
-  max-width: 100vw;
+  /* `100%` (not `100vw`) — for a fixed-position box, `vw` includes the
+     scrollbar gutter while `%` resolves against the actual viewport, so
+     `100vw` can render a few pixels wider than the visible screen and force
+     an unwanted page-level horizontal scrollbar the moment the drawer opens. */
+  max-width: 100%;
   height: 100vh;
   background: var(--bg-card);
   border-left: 1px solid var(--border-color);
@@ -2238,6 +2242,19 @@ select:-webkit-autofill {
   padding: 1.5rem;
 }
 
+/* Customer Details (view) drawer body — belt-and-braces clip for horizontal
+   overflow. Vertical scrolling (inherited from .drawer-body) is untouched;
+   this only ever engages if some content would otherwise render wider than
+   the drawer, which none of this drawer's content legitimately needs. */
+.customer-details-drawer-body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+.customer-details-drawer-body * {
+  max-width: 100%;
+}
+
 .drawer-footer {
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--border-color);
@@ -2249,7 +2266,7 @@ select:-webkit-autofill {
 
 @media (max-width: 575.98px) {
   .drawer {
-    width: 100vw;
+    width: 100%;
   }
 
   /* On mobile, drawer bodies should not stretch to fill empty space.
@@ -2338,6 +2355,13 @@ select:-webkit-autofill {
   border: 1px solid var(--border-color);
   border-radius: 3px;
   color: var(--text-secondary);
+}
+
+/* Hide F1 Search hint on mobile screens */
+@media (max-width: 991.98px) {
+  .pos-kbd-f1 {
+    display: none;
+  }
 }
 
 /* ─── Section Header ────────────────────────────────────── */
@@ -2875,6 +2899,12 @@ select:-webkit-autofill {
 }
 
 /* ─── Summary Cards ─────────────────────────────────────── */
+.pos-summary-section {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+
 .pos-summary-cards {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -2883,43 +2913,26 @@ select:-webkit-autofill {
 }
 
 .pos-summary-card {
-  padding: 8px 10px;
+  padding: 5px 8px;
   border-radius: var(--border-radius-sm);
   text-align: center;
   border: 1px solid var(--border-light);
   background: var(--bg-card);
 }
 
-/* Mobile: compact 3-column summary with label above value */
-@media (max-width: 575.98px) {
-  .pos-summary-cards {
-    gap: 4px;
-    margin-bottom: 6px;
-  }
+.pos-summary-label {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
 
-  .pos-summary-card {
-    padding: 5px 4px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-  }
-
-  .pos-summary-label {
-    font-size: 0.6rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-  }
-
-  .pos-summary-value {
-    font-size: 0.75rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-  }
+.pos-summary-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .pos-summary-subtotal {
@@ -2934,20 +2947,36 @@ select:-webkit-autofill {
   border-left: 3px solid var(--warning);
 }
 
-.pos-summary-label {
-  display: block;
-  font-size: 0.65rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 2px;
-}
+/* Mobile: compact 3-column summary with label above value */
+@media (max-width: 575.98px) {
+  .pos-summary-cards {
+    gap: 4px;
+    margin-bottom: 6px;
+  }
 
-.pos-summary-value {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  .pos-summary-card {
+    padding: 4px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .pos-summary-label {
+    font-size: 0.55rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .pos-summary-value {
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
 }
 
 /* ─── Grand Total ───────────────────────────────────────── */
@@ -3039,14 +3068,50 @@ select:-webkit-autofill {
   margin-bottom: 8px;
 }
 
+.pos-paid-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .pos-paid-input-group {
   display: flex;
   align-items: center;
+  flex: 1;
   background: var(--bg-card);
   border: 1.5px solid var(--border-color);
   border-radius: var(--border-radius-md);
   overflow: hidden;
   transition: all var(--transition-fast);
+  min-width: 0;
+}
+
+.pos-paid-exact-btn {
+  flex-shrink: 0;
+  padding: 0 12px;
+  height: 32px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-card);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.pos-paid-exact-btn:hover {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.06);
+}
+
+.pos-paid-exact-btn.active {
+  border-color: var(--secondary);
+  background: rgba(0, 217, 166, 0.1);
+  color: var(--secondary);
 }
 
 .pos-paid-input-group:focus-within {
@@ -3056,18 +3121,18 @@ select:-webkit-autofill {
 
 .pos-paid-currency {
   padding: 0 8px 0 12px;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-muted);
   background: var(--bg-input);
-  line-height: 36px;
+  line-height: 32px;
   border-right: 1px solid var(--border-color);
 }
 
 .pos-paid-input {
   flex: 1;
-  padding: 8px 12px;
-  font-size: 1rem;
+  padding: 4px 8px;
+  font-size: 0.85rem;
   font-weight: 700;
   font-family: var(--font-family);
   border: none;
@@ -3142,6 +3207,19 @@ select:-webkit-autofill {
   font-size: 0.85rem;
   font-weight: 600;
   margin-bottom: 8px;
+}
+
+.pos-paid-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border-radius: var(--border-radius-sm);
+  background: rgba(255, 107, 107, 0.08);
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 500;
 }
 
 .pos-change-display strong {
@@ -5474,6 +5552,143 @@ select:-webkit-autofill {
 .pos-customer-selected-remove:hover {
   background: var(--danger);
   color: #fff;
+}
+
+/* ─── Previous Due Card (POS customer selection) ───────────── */
+.pos-prev-due-card {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  background: var(--glow-warning);
+  border: 1px solid rgba(255, 181, 69, 0.35);
+  animation: fadeIn 0.25s ease;
+}
+
+.pos-prev-due-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Everything — label, amount, invoice count, oldest date — on one compact line. */
+.pos-prev-due-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.pos-prev-due-icon-inline {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.pos-prev-due-label {
+  font-weight: 700;
+  color: var(--warning);
+}
+
+.pos-prev-due-amount {
+  font-weight: 800;
+  color: var(--warning);
+}
+
+.pos-prev-due-dot {
+  color: rgba(255, 181, 69, 0.6);
+}
+
+.pos-prev-due-meta-item {
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pos-prev-due-toggle {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px;
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-card);
+}
+
+.pos-prev-due-option {
+  flex: 1;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.pos-prev-due-option:hover {
+  color: var(--text-primary);
+}
+
+.pos-prev-due-option.active {
+  background: var(--warning);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 181, 69, 0.35);
+}
+
+/* Grid-rows trick — animates smoothly to the content's natural height
+   without needing to measure it in JS. */
+.pos-prev-due-breakdown {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.pos-prev-due-breakdown.expanded {
+  grid-template-rows: 1fr;
+  margin-top: 6px;
+}
+
+.pos-prev-due-breakdown-inner {
+  overflow: hidden;
+}
+
+/* The whole Current Bill + Previous Due = Total Payable breakdown on one line. */
+.pos-prev-due-breakdown-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 2px 2px;
+  border-top: 1px dashed rgba(255, 181, 69, 0.4);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.pos-prev-due-op {
+  color: rgba(255, 181, 69, 0.7);
+  font-weight: 700;
+}
+
+.pos-prev-due-total-inline {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+@media (max-width: 575.98px) {
+  .pos-prev-due-card {
+    margin: 8px 8px 0;
+  }
+  .pos-prev-due-line {
+    gap: 4px;
+  }
 }
 
 /* ─── Add Customer Modal ──────────────────────────────────── */
@@ -10730,5 +10945,1099 @@ select:-webkit-autofill {
 
   .login-mobile-badge-wrapper .dev-badge-role {
     font-size: 0.65rem;
+  }
+}
+
+/* ==========================================================
+   CUSTOMER LEDGER — premium ERP/CRM page
+   ========================================================== */
+
+/* ─── Header banner ──────────────────────────────────────── */
+.ledger-header-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--border-radius-lg);
+  background: linear-gradient(135deg, rgba(108, 99, 255, 0.08), rgba(0, 217, 166, 0.05));
+  border: 1px solid rgba(108, 99, 255, 0.14);
+  overflow: hidden;
+}
+
+.ledger-header-banner::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+}
+
+.ledger-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.ledger-titlebar .btn-premium {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.ledger-titlebar-heading {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+
+@media (max-width: 575.98px) {
+  .ledger-titlebar {
+    gap: 8px;
+  }
+  .ledger-titlebar-heading {
+    font-size: 1.02rem;
+  }
+}
+
+.ledger-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  box-shadow: 0 6px 18px rgba(108, 99, 255, 0.32);
+}
+
+.ledger-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.ledger-status-badge.is-active { background: rgba(0, 217, 166, 0.12); color: var(--secondary); }
+.ledger-status-badge.is-inactive { background: var(--glow-danger); color: var(--danger); }
+.ledger-status-badge.is-due { background: var(--glow-danger); color: var(--danger); }
+.ledger-status-badge.is-clear { background: rgba(0, 217, 166, 0.12); color: var(--secondary); }
+
+.ledger-header-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.ledger-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ledger-meta-chip.is-due-highlight {
+  background: var(--glow-danger);
+  border-color: rgba(255, 107, 107, 0.25);
+  color: var(--danger);
+  font-weight: 800;
+}
+
+.ledger-meta-chip.is-due-highlight.is-clear {
+  background: rgba(0, 217, 166, 0.1);
+  border-color: rgba(0, 217, 166, 0.25);
+  color: var(--secondary);
+}
+
+.ledger-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ledger-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.ledger-icon-btn:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: rgba(108, 99, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.ledger-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── KPI grid ───────────────────────────────────────────── */
+.ledger-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ledger-kpi-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1.15rem 1.25rem;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  overflow: hidden;
+}
+
+.ledger-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--kpi-accent, var(--primary));
+}
+
+.ledger-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.ledger-kpi-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  background: var(--kpi-glow, var(--glow-primary));
+  color: var(--kpi-accent, var(--primary));
+}
+
+.ledger-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ledger-kpi-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Sticky filter bar ──────────────────────────────────── */
+.ledger-filter-bar {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 1010;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 1rem;
+  border-radius: var(--border-radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.ledger-filter-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ledger-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.ledger-pill:hover:not(.is-active) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.ledger-pill.is-active {
+  background: var(--gradient-primary);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(108, 99, 255, 0.3);
+}
+
+.ledger-filter-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ledger-filter-select {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  min-width: 118px;
+}
+
+.ledger-search-box {
+  width: 190px;
+  max-width: 100%;
+}
+
+.ledger-search-box input {
+  height: 34px;
+  font-size: 0.78rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-right: 28px;
+}
+
+.ledger-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  animation: ledgerClearIn 0.15s ease;
+}
+
+.ledger-search-clear:hover {
+  background: var(--glow-danger);
+  color: var(--danger);
+  transform: translateY(-50%) scale(1.08);
+}
+
+@keyframes ledgerClearIn {
+  from { opacity: 0; transform: translateY(-50%) scale(0.6); }
+  to { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+/* ─── Invoice match highlight ────────────────────────────── */
+.ledger-txn-invoice-highlight {
+  background: rgba(108, 99, 255, 0.18);
+  color: var(--primary);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-weight: 800;
+  transition: background 0.2s ease;
+}
+
+/* ─── Filtered results — fade + slide entrance ──────────────
+   Replays whenever the timeline/empty-state branch remounts
+   (i.e. whenever the debounced search / type / method filters
+   actually change), giving a smooth transition instead of an
+   instant swap, without affecting scroll position. */
+@keyframes ledgerResultIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ledger-timeline .ledger-txn-row {
+  animation: ledgerResultIn 240ms ease both;
+  animation-delay: calc(var(--row-delay, 0) * 25ms);
+}
+
+.ledger-empty-state {
+  animation: ledgerResultIn 260ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-timeline .ledger-txn-row,
+  .ledger-empty-state,
+  .ledger-search-clear {
+    animation: none;
+  }
+}
+
+/* ─── Timeline ───────────────────────────────────────────── */
+.ledger-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ledger-txn-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.ledger-txn-rail {
+  position: relative;
+  width: 36px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.ledger-txn-rail::before {
+  content: '';
+  position: absolute;
+  top: 40px;
+  bottom: -10px;
+  width: 2px;
+  background: var(--border-light);
+}
+
+.ledger-txn-row:last-child .ledger-txn-rail::before {
+  display: none;
+}
+
+.ledger-txn-dot {
+  position: relative;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  background: var(--txn-glow, var(--glow-primary));
+  color: var(--txn-color, var(--primary));
+  border: 2px solid var(--bg-body);
+  box-shadow: 0 0 0 1px var(--border-light);
+  flex-shrink: 0;
+}
+
+.ledger-txn-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.ledger-timeline .ledger-txn-row:nth-child(even) .ledger-txn-card {
+  background: var(--bg-card-hover);
+}
+
+.ledger-txn-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--txn-color, var(--primary));
+}
+
+.ledger-txn-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ledger-txn-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--txn-glow, var(--glow-primary));
+  color: var(--txn-color, var(--primary));
+}
+
+.ledger-txn-invoice {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ledger-txn-datetime {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ledger-txn-amounts {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.ledger-txn-amount-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ledger-txn-amount-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ledger-txn-amount-value {
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.ledger-txn-balance-badge {
+  margin-left: auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: var(--bg-input);
+}
+
+.ledger-txn-balance-badge .ledger-txn-amount-label { color: var(--text-muted); }
+
+.ledger-txn-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-light);
+}
+
+/* Hide the desktop rail/timeline connector on small screens, keep cards */
+@media (max-width: 767.98px) {
+  .ledger-txn-rail {
+    width: 28px;
+  }
+  .ledger-txn-dot {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+    border-radius: 9px;
+  }
+  .ledger-txn-rail::before {
+    top: 32px;
+  }
+  .ledger-txn-row {
+    gap: 10px;
+  }
+  .ledger-txn-card {
+    padding: 12px;
+  }
+  .ledger-txn-amounts {
+    gap: 12px;
+  }
+  .ledger-header-banner {
+    padding: 1.25rem;
+  }
+  .ledger-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .ledger-txn-rail {
+    display: none;
+  }
+  .ledger-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .ledger-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ledger-search-box {
+    width: 100%;
+  }
+}
+
+/* ─── Empty state ────────────────────────────────────────── */
+.ledger-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  border-radius: var(--border-radius-lg);
+  background: var(--bg-card);
+  border: 1px dashed var(--border-light);
+}
+
+.ledger-empty-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  background: var(--glow-primary);
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.ledger-empty-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ledger-empty-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 320px;
+}
+
+/* ─── Payment modal ──────────────────────────────────────── */
+.ledger-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 26, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.ledger-modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ledger-modal {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-light);
+  transform: translateY(12px) scale(0.98);
+  transition: transform 0.2s ease;
+  overflow: hidden;
+}
+
+.ledger-modal-overlay.open .ledger-modal {
+  transform: translateY(0) scale(1);
+}
+
+@media (max-width: 991.98px) {
+  .ledger-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ==========================================================
+   CUSTOMER DUE DETAILS DRAWER — premium account-statement view
+   ========================================================== */
+
+.due-details-drawer {
+  width: 560px;
+}
+
+/* Full-screen bottom sheet on mobile instead of a right-side slide-in. */
+@media (max-width: 575.98px) {
+  .due-details-drawer {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100vw;
+    height: 92vh;
+    max-height: 92vh;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    transition: transform var(--transition-slow);
+  }
+
+  .due-details-drawer.open {
+    transform: translateY(0);
+  }
+}
+
+/* ─── Profile hero ───────────────────────────────────────── */
+.due-details-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.85rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(108, 99, 255, 0.07), rgba(255, 107, 107, 0.05));
+  border: 1px solid rgba(255, 107, 107, 0.15);
+}
+
+.due-details-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 14px rgba(108, 99, 255, 0.3);
+}
+
+.due-details-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.due-details-hero-info h4 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.due-details-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.due-details-hero-due {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.due-details-hero-due-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.due-details-hero-due-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--danger);
+  line-height: 1.25;
+}
+
+.due-details-hero-invoices {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ─── Summary cards ──────────────────────────────────────── */
+.due-details-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 1.1rem;
+}
+
+.due-details-summary-grid .stat-card {
+  padding: 0.85rem 0.9rem !important;
+}
+
+/* ─── Section tabs ───────────────────────────────────────── */
+.due-details-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0.85rem;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg-input);
+}
+
+.due-details-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0.5rem 0.5rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.due-details-tab.active {
+  background: var(--bg-card);
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.due-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ─── Due invoice cards ──────────────────────────────────── */
+.due-invoice-card {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.due-invoice-card:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+  transform: translateY(-1px);
+}
+
+.due-invoice-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.due-invoice-no {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.due-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.due-invoice-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.due-invoice-amounts {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.due-invoice-amount-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.due-invoice-amount-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.due-amount-paid {
+  color: var(--secondary);
+}
+
+.due-amount-remaining {
+  color: var(--danger);
+}
+
+.due-invoice-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.due-invoice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.due-invoice-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(108, 99, 255, 0.05);
+}
+
+/* ─── Recent purchases (compact rows) ────────────────────── */
+.due-purchase-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+}
+
+.due-purchase-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.due-purchase-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.due-purchase-amount {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+@media (max-width: 575.98px) {
+  .due-details-hero {
+    flex-wrap: wrap;
+  }
+  .due-details-hero-due {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .due-invoice-amounts {
+    flex-wrap: wrap;
+    gap: 10px 16px;
+  }
+}
+
+/* ==========================================================
+   CUSTOMERS PAGE — mobile tab bar (3 equal columns, no scroll)
+   Desktop/tablet layout is untouched — these overrides only
+   apply below 768px, and use !important solely to win over the
+   component's existing inline styles (kept as-is for desktop).
+   ========================================================== */
+@media (max-width: 767.98px) {
+  .customers-tabs-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 7px !important;
+    overflow-x: hidden !important;
+    padding-bottom: 0 !important;
+  }
+
+  .customers-tab-btn {
+    width: 100%;
+    justify-content: center !important;
+    padding: 0.5rem 0.35rem !important;
+    font-size: 0.68rem !important;
+    gap: 4px !important;
+    border-radius: 15px !important;
+    transition: all 0.2s ease !important;
+    overflow: hidden;
+  }
+
+  .customers-tab-btn:not(.is-active) {
+    border: 1px solid var(--border-light) !important;
+  }
+
+  /* Icons removed on mobile — text-only tabs to save horizontal space. */
+  .customers-tab-btn svg {
+    display: none;
+  }
+
+  .customers-tab-btn-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ==========================================================
+   CUSTOMERS PAGE — mobile summary cards (2 + 1 layout)
+   Desktop (col-xl-4) and tablet (col-sm-6) keep their existing
+   Bootstrap column behavior untouched — this only overrides the
+   <768px range, where the cards used to stack full-width in a
+   single column (col-12). !important is only needed to win over
+   Bootstrap's own column width/padding rules at this breakpoint.
+   ========================================================== */
+@media (max-width: 767.98px) {
+  .customers-summary-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    /* column-gap: unchanged spacing between card 1 and card 2.
+       row-gap: small separation above the full-width third card only
+       (8–12px) — grid gap never adds trailing space after the last row,
+       so this can't leak into a bottom margin below card 3. */
+    column-gap: 14px !important;
+    row-gap: 10px !important;
+    /* Cancel Bootstrap's .row negative top/side margins (from .g-3), and set
+       the bottom spacing explicitly (8–12px, matching the row-gap above card 3)
+       instead of leaving it to the .mb-4 utility (1.5rem — too much below the
+       compact 2+1 mobile layout). Explicit value guarantees this regardless
+       of any other rule's cascade order. */
+    margin-top: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 10px !important;
+  }
+
+  .customers-summary-grid > [class*="col-"] {
+    width: auto !important;
+    max-width: 100% !important;
+    flex: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Third card (last child) drops to its own full-width row, aligned with
+     column 1 since it still starts at the same grid line as card 1. */
+  .customers-summary-grid > [class*="col-"]:nth-child(3) {
+    grid-column: 1 / -1 !important;
+  }
+
+  /* Customers page only — unlike every other page's stat cards (which hide
+     their icon on mobile via .stat-card-modern .stat-icon-wrapper below),
+     card 3 keeps a smaller icon inline with the title/value; cards 1 and 2
+     drop their icon entirely so the value/label get the full card width. */
+  .customers-summary-grid > [class*="col-"]:nth-child(1) .stat-icon-wrapper,
+  .customers-summary-grid > [class*="col-"]:nth-child(2) .stat-icon-wrapper {
+    display: none !important;
+  }
+
+  .customers-summary-grid > [class*="col-"]:nth-child(3) .stat-icon-wrapper {
+    display: flex !important;
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1rem !important;
+    margin-bottom: 0 !important;
   }
 }

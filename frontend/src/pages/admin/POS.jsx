@@ -9,7 +9,7 @@ import {
   BiStar, BiCreditCard, BiMoney, BiMobile, BiBookmark,
   BiDollar, BiShoppingBag, BiTag, BiCrown, BiCheckCircle,
   BiErrorCircle, BiWallet, BiFile, BiGridSmall, BiLayout,
-  BiStore, BiQr, BiIdCard, BiUserCircle, BiCalendar,
+  BiStore, BiQr, BiIdCard, BiUserCircle,
   BiNote, BiChevronRight
 } from 'react-icons/bi';
 import PrintPreview from '../../components/common/PrintPreview';
@@ -33,6 +33,11 @@ const getLastPayment = () => {
   try { return localStorage.getItem('pos_last_payment') || 'cash'; } catch { return 'cash'; }
 };
 
+const formatShortDate = (dateStr) => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
   const { t } = useTranslation();
   const [selectedPayment, setSelectedPayment] = useState(data.paymentMethod || 'cash');
@@ -43,11 +48,16 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
     { key: 'upi', icon: <BiMobile size={18} />, label: t('sale.upi'), color: '#00D9A6' },
     { key: 'mobile_banking', icon: <BiBookmark size={18} />, label: t('sale.mobileBanking'), color: '#FF6B9D' },
   ];
+  const includesPreviousDue = data.includePreviousDue && data.previousDueAmount > 0;
   const summaryCards = [
     { key: 'totalItems', icon: <BiShoppingBag size={16} />, label: t('posPage.confirmSale.totalItems'), value: t('posPage.confirmSale.itemsCount', { count: data.totalItems }), color: '#6C63FF' },
     { key: 'subtotal', icon: <BiDollar size={16} />, label: t('sale.subtotal'), value: `₹${data.subtotal.toFixed(2)}`, color: '#17A2B8' },
     { key: 'discount', icon: <BiTag size={16} />, label: t('sale.discount'), value: `-₹${data.discount.toFixed(2)}`, color: data.discount > 0 ? '#FF6B6B' : '#9a9ab0' },
-    { key: 'grandTotal', icon: <BiCrown size={16} />, label: t('posPage.totals.grandTotal'), value: `₹${data.grandTotal.toFixed(2)}`, color: '#6C63FF', highlight: true },
+    { key: 'grandTotal', icon: <BiCrown size={16} />, label: t('posPage.totals.grandTotal'), value: `₹${data.grandTotal.toFixed(2)}`, color: '#6C63FF', highlight: !includesPreviousDue },
+    ...(includesPreviousDue ? [
+      { key: 'previousDue', icon: <BiErrorCircle size={16} />, label: t('posPage.previousDue.title'), value: `₹${data.previousDueAmount.toFixed(2)}`, color: '#F39C12' },
+      { key: 'totalPayable', icon: <BiCrown size={16} />, label: t('posPage.previousDue.totalPayable'), value: `₹${data.totalPayable.toFixed(2)}`, color: '#6C63FF', highlight: true },
+    ] : []),
     { key: 'paidAmount', icon: <BiCheckCircle size={16} />, label: t('sale.paidAmount'), value: `₹${data.paidAmount.toFixed(2)}`, color: '#2ecc71' },
     { key: 'dueAmount', icon: <BiErrorCircle size={16} />, label: t('sale.dueAmount'), value: `₹${data.dueAmount.toFixed(2)}`, color: data.dueAmount > 0 ? '#FF6B6B' : '#2ecc71' },
     { key: 'paymentMethod', icon: <BiWallet size={16} />, label: t('sale.paymentMethod'), value: selectedPayment.toUpperCase(), badge: true, color: '#6C63FF' },
@@ -89,12 +99,15 @@ const POS = () => {
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [selectedCustomerData, setSelectedCustomerData] = useState(null);
+  const [previousDue, setPreviousDue] = useState(null); // { dueAmount, unpaidInvoiceCount, oldestDueDate } | null
+  const [loadingPreviousDue, setLoadingPreviousDue] = useState(false);
+  const [includePreviousDue, setIncludePreviousDue] = useState(false); // never defaults to true — explicit opt-in only
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [addCustomerForm, setAddCustomerForm] = useState({ name: '', phone: '', address: '' });
   const customerSearchRef = useRef(null);
   const customerDropdownRef = useRef(null);
   const [paymentMethod, setPaymentMethod] = useState(getLastPayment);
-  const [paidAmount, setPaidAmount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState('');
   const [showInvoice, setShowInvoice] = useState(false);
   const [lastSale, setLastSale] = useState(null);
   const [shopInfo, setShopInfo] = useState(null);
@@ -103,7 +116,7 @@ const POS = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmData, setConfirmData] = useState(null);
   const [discountMode, setDiscountMode] = useState('percent');
-  const [discountValue, setDiscountValue] = useState(0);
+  const [discountValue, setDiscountValue] = useState('');
   const [customerNote, setCustomerNote] = useState('');
   const searchRef = useRef(null);
 
@@ -117,6 +130,25 @@ const POS = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Whenever the selected customer changes, check for previous outstanding due.
+  // The choice to include it is never carried over — every new selection starts
+  // from "Current Bill Only" and the cashier must explicitly opt in again.
+  useEffect(() => {
+    setIncludePreviousDue(false);
+    if (!customer || !(selectedCustomerData?.dueAmount > 0)) {
+      setPreviousDue(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setLoadingPreviousDue(true);
+    api.get(`/customers/${customer}/due-summary`, { _skipLoading: true })
+      .then(({ data }) => { if (!cancelled) setPreviousDue(data?.dueAmount > 0 ? data : null); })
+      .catch(() => { if (!cancelled) setPreviousDue(null); })
+      .finally(() => { if (!cancelled) setLoadingPreviousDue(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer]);
 
   const handleAddCustomer = async () => {
     if (!addCustomerForm.name || !addCustomerForm.phone) {
@@ -192,14 +224,25 @@ const POS = () => {
 
   const removeItem = useCallback((id) => { setCart(prev => prev.filter(item => item.product._id !== id)); }, []);
 
-  const clearCart = () => {
+  // Resets the cart/inputs for the next transaction WITHOUT touching lastSale —
+  // used right after a successful checkout, where we still want the Print
+  // Invoice / Reprint buttons (gated on lastSale) to stay visible.
+  const resetCartFieldsForNextSale = () => {
     setCart([]);
-    setPaidAmount(0);
+    setPaidAmount('');
     setCustomer('');
-    setDiscountValue(0);
+    setSelectedCustomerData(null);
+    setCustomerSearch('');
+    setDiscountValue('');
     setDiscountMode('percent');
     setCustomerNote('');
     setPaymentMethod(getLastPayment());
+  };
+
+  // Full reset for the explicit "Clear Cart" action / F2 shortcut — also
+  // drops lastSale, hiding Print Invoice / Reprint until another bill is generated.
+  const clearCart = () => {
+    resetCartFieldsForNextSale();
     setLastSale(null);
   };
 
@@ -208,40 +251,95 @@ const POS = () => {
   const receiptFooter = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const itemDiscount = cart.reduce((sum, item) => sum + ((item.price * item.discount / 100) * item.quantity), 0);
-  const extraDiscount = discountMode === 'percent' ? (subtotal - itemDiscount) * (discountValue / 100) : discountValue;
+  const extraDiscount = discountMode === 'percent' ? (subtotal - itemDiscount) * ((discountValue || 0) / 100) : (discountValue || 0);
   const totalDiscount = itemDiscount + extraDiscount;
   const taxableAmount = subtotal - totalDiscount;
   const tax = taxableAmount > 0 ? taxableAmount * (taxRate / 100) : 0;
   const grandTotal = subtotal + tax - totalDiscount;
+  // Current-bill due — formula is unchanged regardless of the previous-due
+  // toggle, since paying against the current bill is always allocated first.
   const dueAmount = Math.max(0, grandTotal - Number(paidAmount || 0));
   const change = Math.max(0, Number(paidAmount || 0) - grandTotal);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  useEffect(() => { if (paidAmount === 0 && grandTotal > 0) setPaidAmount(grandTotal); }, [grandTotal]);
+  const hasPreviousDue = !!(previousDue && previousDue.dueAmount > 0);
+  const previousDueAmount = hasPreviousDue ? previousDue.dueAmount : 0;
+  // The amount the cashier is actually being asked to collect right now —
+  // the current bill alone, or current bill + previous due once opted in.
+  const totalPayable = includePreviousDue && hasPreviousDue ? grandTotal + previousDueAmount : grandTotal;
+  // Any amount paid beyond the current bill is applied to the previous due
+  // (current bill is always settled first), capped so it never exceeds it.
+  const paidTowardPreviousDue = includePreviousDue && hasPreviousDue
+    ? Math.min(Math.max(0, Number(paidAmount || 0) - grandTotal), previousDueAmount)
+    : 0;
+
+  useEffect(() => { if ((paidAmount === 0 || paidAmount === '') && grandTotal > 0) setPaidAmount(grandTotal); }, [grandTotal]);
   useEffect(() => { try { localStorage.setItem('pos_last_payment', paymentMethod); } catch {} }, [paymentMethod]);
+
+  const isPaidOverTotal = paidAmount !== '' && Number(paidAmount) > totalPayable;
+  // Once there's an outstanding due, the sale must be traceable back to a real
+  // customer (walk-in has no name/phone to collect the due from later).
+  const hasValidCustomerInfo = !!(selectedCustomerData?.name && selectedCustomerData?.phone);
+  const customerRequiredForDue = dueAmount > 0 && !hasValidCustomerInfo;
 
   const handleOpenConfirm = () => {
     if (cart.length === 0) return;
-    setConfirmData({ totalItems, subtotal, discount: totalDiscount, grandTotal, paidAmount, dueAmount, paymentMethod, tax, taxRate, taxName, extraDiscount, customerNote });
+    if (isPaidOverTotal) return;
+    if (customerRequiredForDue) {
+      showToast.error(t('posPage.validation.customerRequiredForDue'));
+      return;
+    }
+    setConfirmData({ totalItems, subtotal, discount: totalDiscount, grandTotal, paidAmount, dueAmount, paymentMethod, tax, taxRate, taxName, extraDiscount, customerNote, includePreviousDue, previousDueAmount, totalPayable });
     setShowConfirmModal(true);
   };
 
   const handleProcessSale = async (selectedPayment) => {
     if (cart.length === 0) return;
+    if (customerRequiredForDue) {
+      showToast.error(t('posPage.validation.customerRequiredForDue'));
+      return;
+    }
     setLoading(true);
     try {
+      // The amount actually entered/confirmed by the cashier — clamped to
+      // [0, grandTotal] so it can never manufacture a fake full payment
+      // (previously this was force-raised to grandTotal, which made every
+      // sale look fully paid and silently erased the due amount). The current
+      // bill is always settled first; anything paid beyond it is a separate
+      // payment against the previous due (see paidTowardPreviousDue below) —
+      // the sale itself never knows about the customer's older invoices.
+      const confirmedPaidAmount = Math.min(Math.max(0, Number(paidAmount) || 0), grandTotal);
+      const previousDuePayment = paidTowardPreviousDue; // snapshot before cart/customer reset
+      const targetCustomerId = customer;
       const payload = {
         customer: customer || null,
         items: cart.map(item => ({ product: item.product._id, quantity: item.quantity, unit: item.product.unit, price: item.price, discount: item.discount, tax: item.product.tax || 0, total: item.total })),
-        subtotal, discount: totalDiscount, tax, totalAmount: grandTotal, paidAmount: Math.max(paidAmount, grandTotal), dueAmount, paymentMethod: selectedPayment, posType: 'pos', notes: customerNote,
+        subtotal, discount: totalDiscount, tax, totalAmount: grandTotal, paidAmount: confirmedPaidAmount, dueAmount: Math.max(0, grandTotal - confirmedPaidAmount), paymentMethod: selectedPayment, posType: 'pos', notes: customerNote,
       };
       const { data } = await api.post('/sales', payload);
       const saleDetail = await api.get(`/sales/${data._id || data.sale}`);
       const saleData = saleDetail.data.sale || saleDetail.data;
       setLastSale({ ...saleData, invoiceNo: data.invoiceNo || saleData.invoiceNo, totalAmount: data.totalAmount || saleData.totalAmount || grandTotal, paidAmount: data.paidAmount || saleData.paidAmount || paidAmount, dueAmount: data.dueAmount || saleData.dueAmount || dueAmount, paymentMethod: selectedPayment, notes: customerNote });
+
+      // The current sale is safely recorded at this point. If the cashier chose
+      // to also settle some/all of the previous due, record that as a normal
+      // customer payment (same endpoint used by "Receive Payment" elsewhere) so
+      // it shows up correctly in the customer ledger and payment history.
+      if (previousDuePayment > 0 && targetCustomerId) {
+        try {
+          await api.post(`/customers/${targetCustomerId}/payment`, {
+            amount: previousDuePayment,
+            paymentMethod: selectedPayment,
+            notes: `Previous due settled during POS checkout (Invoice ${data.invoiceNo || ''})`,
+          });
+        } catch (payErr) {
+          showToast.warning(t('posPage.previousDue.paymentRecordFailed'));
+        }
+      }
+
       setShowConfirmModal(false);
       setShowInvoice(true);
-      clearCart();
+      resetCartFieldsForNextSale();
       loadTopSelling();
       loadRecentSales();
       showToast.success(t('posPage.toast.invoiceGenerated', { invoiceNo: data.invoiceNo || '' }));
@@ -287,7 +385,7 @@ const POS = () => {
           </div>
           <div className="pos-search-hints">
             <small><BiBarcode /> {t('posPage.search.hint')}</small>
-            <small className="pos-kbd-hint"><kbd>F1</kbd> {t('posPage.search.shortcutSearch')} <kbd>F8</kbd> {t('posPage.search.shortcutBill')}</small>
+            <small className="pos-kbd-hint"><span className="pos-kbd-f1"><kbd>F1</kbd> {t('posPage.search.shortcutSearch')} </span><kbd>F8</kbd> {t('posPage.search.shortcutBill')}</small>
           </div>
         </div>
         {showTopSelling && topSelling.length > 0 && <div className="pos-section-header"><BiTrendingUp /> {t('dashboard.topSellingProducts')}</div>}
@@ -401,7 +499,7 @@ const POS = () => {
                     .slice(0, 20)
                     .map(c => {
                       const isSelected = customer === c._id;
-                      const due = c.totalDue || 0;
+                      const due = c.dueAmount || 0;
                       return (
                         <div
                           key={c._id}
@@ -440,16 +538,69 @@ const POS = () => {
             <div className="pos-customer-selected-info">
               <span className="pos-customer-selected-name">{selectedCustomerData.name}</span>
               <span className="pos-customer-selected-phone">{selectedCustomerData.phone || t('posPage.customer.noPhone')}</span>
-              {selectedCustomerData.totalDue > 0 && (
+              {selectedCustomerData.dueAmount > 0 && (
                 <div className="pos-customer-selected-due-row">
                   <span className="pos-customer-selected-due-label">{t('posPage.totals.dueAmount')}</span>
-                  <span className="pos-customer-selected-due-value" style={{ color: 'var(--danger)' }}>₹{Number(selectedCustomerData.totalDue).toFixed(2)}</span>
+                  <span className="pos-customer-selected-due-value" style={{ color: 'var(--danger)' }}>₹{Number(selectedCustomerData.dueAmount).toFixed(2)}</span>
                 </div>
               )}
             </div>
             <button className="pos-customer-selected-remove" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); }}>
               <BiX size={16} />
             </button>
+          </div>
+        )}
+
+        {loadingPreviousDue && (
+          <div className="pos-prev-due-card pos-prev-due-loading">
+            <span className="spinner-border spinner-border-sm" /> {t('posPage.previousDue.checking')}
+          </div>
+        )}
+
+        {!loadingPreviousDue && hasPreviousDue && (
+          <div className="pos-prev-due-card">
+            <div className="pos-prev-due-line">
+              <BiErrorCircle size={13} className="pos-prev-due-icon-inline" />
+              <span className="pos-prev-due-label">{t('posPage.previousDue.title')}</span>
+              <span className="pos-prev-due-amount">₹{previousDueAmount.toFixed(2)}</span>
+              <span className="pos-prev-due-dot">•</span>
+              <span className="pos-prev-due-meta-item">{t('posPage.previousDue.unpaidInvoices', { count: previousDue.unpaidInvoiceCount || 0 })}</span>
+              {previousDue.oldestDueDate && (
+                <>
+                  <span className="pos-prev-due-dot">•</span>
+                  <span className="pos-prev-due-meta-item">{t('posPage.previousDue.oldest')}: {formatShortDate(previousDue.oldestDueDate)}</span>
+                </>
+              )}
+            </div>
+
+            <div className="pos-prev-due-toggle">
+              <button
+                type="button"
+                className={`pos-prev-due-option ${!includePreviousDue ? 'active' : ''}`}
+                onClick={() => setIncludePreviousDue(false)}
+              >
+                {t('posPage.previousDue.currentBillOnly')}
+              </button>
+              <button
+                type="button"
+                className={`pos-prev-due-option ${includePreviousDue ? 'active' : ''}`}
+                onClick={() => setIncludePreviousDue(true)}
+              >
+                {t('posPage.previousDue.includePreviousDue')}
+              </button>
+            </div>
+
+            <div className={`pos-prev-due-breakdown ${includePreviousDue ? 'expanded' : ''}`}>
+              <div className="pos-prev-due-breakdown-inner">
+                <div className="pos-prev-due-breakdown-line">
+                  <span>{t('posPage.previousDue.currentBill')} ₹{grandTotal.toFixed(2)}</span>
+                  <span className="pos-prev-due-op">+</span>
+                  <span>{t('posPage.previousDue.title')} ₹{previousDueAmount.toFixed(2)}</span>
+                  <span className="pos-prev-due-op">=</span>
+                  <span className="pos-prev-due-total-inline">{t('posPage.previousDue.totalPayable')} ₹{totalPayable.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -482,40 +633,6 @@ const POS = () => {
         </div>
 
         <div className="pos-checkout-section">
-          <div className="pos-summary-cards">
-            <div className="pos-summary-card pos-summary-subtotal">
-              <span className="pos-summary-label">{t('sale.subtotal')}</span>
-              <span className="pos-summary-value">₹{subtotal.toFixed(2)}</span>
-            </div>
-            <div className="pos-summary-card pos-summary-discount">
-              <span className="pos-summary-label">{t('sale.discount')}</span>
-              <span className="pos-summary-value">-₹{totalDiscount.toFixed(2)}</span>
-            </div>
-            <div className="pos-summary-card pos-summary-tax">
-              <span className="pos-summary-label">{taxName}</span>
-              <span className="pos-summary-value">₹{tax.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div className="pos-grand-total">
-            <span>{t('posPage.totals.grandTotal')}</span>
-            <span className="pos-grand-total-amount">₹{grandTotal.toFixed(2)}</span>
-          </div>
-
-          {dueAmount > 0 && (
-            <div className="pos-due-alert">
-              <BiErrorCircle size={16} />
-              <span>{t('posPage.totals.dueAmount')} ₹{dueAmount.toFixed(2)}</span>
-            </div>
-          )}
-
-          {change > 0 && (
-            <div className="pos-change-display">
-              <BiCheckCircle size={16} />
-              <span>{t('posPage.totals.change')} <strong>₹{change.toFixed(2)}</strong></span>
-            </div>
-          )}
-
           <div className="pos-payment-section">
             <label className="pos-payment-label">{t('sale.paymentMethod')}</label>
             <div className="pos-payment-options">
@@ -532,20 +649,6 @@ const POS = () => {
             </div>
           </div>
 
-          <div className="pos-paid-section">
-            <label className="pos-payment-label">{t('sale.paidAmount')}</label>
-            <div className="pos-paid-input-group">
-              <span className="pos-paid-currency">₹</span>
-              <input type="number" className="pos-paid-input" value={paidAmount} onChange={(e) => setPaidAmount(Number(e.target.value) || 0)} min={0} step="any" />
-            </div>
-            <div className="pos-quick-amounts">
-              {quickAmounts.map(amt => (
-                <button key={amt} className={`pos-quick-amt-btn ${paidAmount === amt ? 'active' : ''}`} onClick={() => setPaidAmount(amt)}>₹{amt}</button>
-              ))}
-              <button className={`pos-quick-amt-btn pos-quick-amt-exact ${paidAmount === grandTotal ? 'active' : ''}`} onClick={() => setPaidAmount(grandTotal)}>{t('posPage.payment.exact')}</button>
-            </div>
-          </div>
-
           <div className="pos-discount-section">
             <label className="pos-payment-label">{t('posPage.discount.extraLabel')}</label>
             <div className="pos-discount-input-row">
@@ -553,24 +656,66 @@ const POS = () => {
                 <button className={`pos-discount-mode-btn ${discountMode === 'percent' ? 'active' : ''}`} onClick={() => setDiscountMode('percent')}>%</button>
                 <button className={`pos-discount-mode-btn ${discountMode === 'fixed' ? 'active' : ''}`} onClick={() => setDiscountMode('fixed')}>₹</button>
               </div>
-              <input type="number" className="pos-discount-input" value={discountValue} onChange={(e) => setDiscountValue(Number(e.target.value) || 0)} min={0} placeholder={discountMode === 'percent' ? t('posPage.discount.percentPlaceholder') : t('posPage.discount.amountPlaceholder')} />
-            </div>
-            <div className="pos-quick-amounts">
-              {quickDiscounts.map((d, idx) => (
-                <button key={idx} className={`pos-quick-amt-btn ${discountValue === d.value && discountMode === d.mode ? 'active' : ''}`} onClick={() => { setDiscountValue(d.value); setDiscountMode(d.mode); }}>{d.label}</button>
-              ))}
+              <input type="number" className="pos-discount-input" value={discountValue} onChange={(e) => setDiscountValue(e.target.value === '' ? '' : Number(e.target.value))} min={0} placeholder={t('posPage.discount.extraLabel')} />
             </div>
           </div>
 
-          <div className="pos-note-section">
-            <label className="pos-payment-label">{t('posPage.note.label')}</label>
-            <input type="text" className="pos-note-input" value={customerNote} onChange={(e) => setCustomerNote(e.target.value)} placeholder={t('posPage.note.placeholder')} maxLength={200} />
+          <div className="pos-paid-section">
+            <label className="pos-payment-label">{t('sale.paidAmount')}</label>
+            <div className="pos-paid-row">
+              <div className="pos-paid-input-group">
+                <span className="pos-paid-currency">₹</span>
+                <input type="number" className="pos-paid-input" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value === '' ? '' : Number(e.target.value))} min={0} step="any" placeholder="Enter amount" />
+              </div>
+              <button className={`pos-paid-exact-btn ${paidAmount === totalPayable ? 'active' : ''}`} onClick={() => setPaidAmount(totalPayable)} title={t('posPage.payment.exact')}>
+                {t('posPage.payment.exact')}
+              </button>
+            </div>
+            {isPaidOverTotal && cart.length > 0 && (
+              <div className="pos-paid-error">
+                <BiErrorCircle size={14} />
+                <span>
+                  {includePreviousDue && hasPreviousDue
+                    ? t('posPage.previousDue.paidOverTotalPayable')
+                    : t('posPage.payment.paidOverGrandTotal')}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {dueAmount > 0 && (
+            <div className="pos-due-alert">
+              <BiErrorCircle size={16} />
+              <span>{t('posPage.totals.dueAmount')} ₹{dueAmount.toFixed(2)}</span>
+            </div>
+          )}
+
+          <div className="pos-summary-section">
+            <div className="pos-summary-cards">
+              <div className="pos-summary-card pos-summary-subtotal">
+                <span className="pos-summary-label">{t('sale.subtotal')}</span>
+                <span className="pos-summary-value">₹{subtotal.toFixed(2)}</span>
+              </div>
+              <div className="pos-summary-card pos-summary-discount">
+                <span className="pos-summary-label">{t('sale.discount')}</span>
+                <span className="pos-summary-value">-₹{totalDiscount.toFixed(2)}</span>
+              </div>
+              <div className="pos-summary-card pos-summary-tax">
+                <span className="pos-summary-label">{taxName}</span>
+                <span className="pos-summary-value">₹{tax.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="pos-grand-total">
+              <span>{t('posPage.totals.grandTotal')}</span>
+              <span className="pos-grand-total-amount">₹{grandTotal.toFixed(2)}</span>
+            </div>
           </div>
 
           <div className="pos-action-buttons">
             <div className="pos-action-row">
               {lastSale && (
-                <button className="pos-action-btn" onClick={handleReprint}><BiPrinter size={16} /> {t('posPage.actions.reprint')}</button>
+                <button className="pos-action-btn pos-reprint-btn" onClick={handleReprint}><BiPrinter size={16} /> {t('posPage.actions.reprint')}</button>
               )}
             </div>
             <button className="pos-checkout-btn" onClick={handleOpenConfirm} disabled={cart.length === 0}>

@@ -1,59 +1,113 @@
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
-const { getTodayRangeIST } = require('../utils/dateRange');
+const CustomerPayment = require('../models/CustomerPayment');
+
+// ─── Shared filter builder ──────────────────────────────────────
+// Single source of truth for turning the Sales page's filters (search,
+// date range, customer, payment method/status) into a Mongo query — used by
+// BOTH getSales (the table) and the stats aggregation below, so the summary
+// cards can never drift out of sync with what the table is actually showing.
+const buildSalesQuery = async (req) => {
+  const { startDate, endDate, customer, paymentMethod, paymentStatus, search } = req.query;
+
+  const query = { shop: req.user.shop };
+
+  if (startDate || endDate) {
+    query.createdAt = {};
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      query.createdAt.$gte = start;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = end;
+    }
+  }
+  if (customer) query.customer = customer;
+  if (paymentMethod) query.paymentMethod = paymentMethod;
+  if (paymentStatus) query.paymentStatus = paymentStatus;
+  if (search) {
+    // Find customer IDs matching name or phone
+    const matchingCustomers = await Customer.find({
+      shop: req.user.shop,
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ],
+    }).distinct('_id');
+
+    query.$or = [
+      { invoiceNo: { $regex: search, $options: 'i' } },
+      { customer: { $in: matchingCustomers } },
+    ];
+  }
+
+  return query;
+};
+
+// Aggregates the 4 Sales-page summary cards (+ due, for completeness) for
+// whatever query is passed in — always the same `query` object used to fetch
+// the table rows, so cards and table are guaranteed to reflect the same
+// filtered dataset. Profit mirrors the existing Reports page formula
+// (revenue net of refunds, minus cost of goods sold via Product.purchasePrice).
+const aggregateSalesStats = async (query) => {
+  const [totalsAgg, costAgg] = await Promise.all([
+    Sale.aggregate([
+      { $match: query },
+      { $addFields: { refundAmount: { $sum: '$returns.totalRefund' } } },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: '$totalAmount' },
+          totalDue: { $sum: '$dueAmount' },
+          totalRefunds: { $sum: '$refundAmount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+    Sale.aggregate([
+      { $match: query },
+      { $unwind: '$items' },
+      { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'product' } },
+      { $unwind: '$product' },
+      { $group: { _id: null, cost: { $sum: { $multiply: ['$items.quantity', '$product.purchasePrice'] } } } },
+    ]),
+  ]);
+
+  const totalSales = totalsAgg[0]?.totalSales || 0;
+  const totalOrders = totalsAgg[0]?.count || 0;
+  const totalRefunds = totalsAgg[0]?.totalRefunds || 0;
+  const totalRevenue = Math.max(0, totalSales - totalRefunds);
+  const totalDue = totalsAgg[0]?.totalDue || 0;
+  const totalCost = costAgg[0]?.cost || 0;
+  const totalProfit = totalRevenue - totalCost;
+
+  return { totalSales, totalRevenue, totalProfit, totalOrders, totalDue };
+};
 
 const getSales = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    const { startDate, endDate, customer, paymentMethod, paymentStatus, search } = req.query;
 
-    let query = { shop: req.user.shop };
+    const query = await buildSalesQuery(req);
 
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        query.createdAt.$gte = start;
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = end;
-      }
-    }
-    if (customer) query.customer = customer;
-    if (paymentMethod) query.paymentMethod = paymentMethod;
-    if (paymentStatus) query.paymentStatus = paymentStatus;
-    if (search) {
-      // Find customer IDs matching name or phone
-      const matchingCustomers = await Customer.find({
-        shop: req.user.shop,
-        $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { phone: { $regex: search, $options: 'i' } },
-        ],
-      }).distinct('_id');
+    const [sales, total, stats] = await Promise.all([
+      Sale.find(query)
+        .populate('customer', 'name phone')
+        .populate('items.product', 'name nameBn unit')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Sale.countDocuments(query),
+      aggregateSalesStats(query),
+    ]);
 
-      query.$or = [
-        { invoiceNo: { $regex: search, $options: 'i' } },
-        { customer: { $in: matchingCustomers } },
-      ];
-    }
-
-    const sales = await Sale.find(query)
-      .populate('customer', 'name phone')
-      .populate('items.product', 'name nameBn unit')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Sale.countDocuments(query);
-
-    res.json({ sales, page, pages: Math.ceil(total / limit), total });
+    res.json({ sales, page, pages: Math.ceil(total / limit), total, stats });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -73,6 +127,14 @@ const getSale = async (req, res) => {
 
 const createSale = async (req, res) => {
   try {
+    // Validate items up front — everything below depends on this array existing.
+    if (!req.body.items || req.body.items.length === 0) {
+      return res.status(400).json({ message: 'Sale must contain at least one item' });
+    }
+    if (!req.body.paymentMethod) {
+      return res.status(400).json({ message: 'Missing required fields: paymentMethod' });
+    }
+
     req.body.shop = req.user.shop;
 
     // Generate invoice number
@@ -84,13 +146,15 @@ const createSale = async (req, res) => {
     // Calculate totals
     const subtotal = req.body.items.reduce((sum, item) => sum + (item.total || item.price * item.quantity), 0);
     req.body.subtotal = subtotal;
-    req.body.totalAmount = subtotal - (req.body.discount || 0) + (req.body.tax || 0);
+    req.body.totalAmount = Math.max(0, subtotal - (req.body.discount || 0) + (req.body.tax || 0));
 
-    // Set paid and due amounts
-    const paid = req.body.paidAmount || 0;
+    // Set paid and due amounts — dueAmount is always derived from the SAME
+    // clamped paidAmount so `Due = Grand Total - Paid Amount` holds exactly,
+    // covers full/partial/zero payment, and can never go negative.
     const totalAmt = req.body.totalAmount;
-    req.body.paidAmount = Math.min(paid, totalAmt);
-    req.body.dueAmount = Math.max(0, totalAmt - paid);
+    const requestedPaid = Math.max(0, Number(req.body.paidAmount) || 0);
+    req.body.paidAmount = Math.min(requestedPaid, totalAmt);
+    req.body.dueAmount = Math.max(0, totalAmt - req.body.paidAmount);
 
     // Set payment status
     if (req.body.dueAmount === 0) {
@@ -101,14 +165,15 @@ const createSale = async (req, res) => {
       req.body.paymentStatus = 'unpaid';
     }
 
-    // Validate required fields
-    const requiredFields = ['items', 'subtotal', 'totalAmount', 'paidAmount', 'dueAmount', 'paymentMethod'];
-    const missing = requiredFields.filter(f => req.body[f] === undefined || req.body[f] === null);
-    if (missing.length > 0) {
-      return res.status(400).json({ message: `Missing required fields: ${missing.join(', ')}` });
-    }
-    if (!req.body.items || req.body.items.length === 0) {
-      return res.status(400).json({ message: 'Sale must contain at least one item' });
+    // A due balance must be traceable to a real customer to collect later.
+    if (req.body.dueAmount > 0) {
+      if (!req.body.customer) {
+        return res.status(400).json({ message: 'Customer name and phone number are required for due sales.' });
+      }
+      const dueCustomer = await Customer.findOne({ _id: req.body.customer, shop: req.user.shop });
+      if (!dueCustomer || !dueCustomer.name || !dueCustomer.phone) {
+        return res.status(400).json({ message: 'Customer name and phone number are required for due sales.' });
+      }
     }
 
     const sale = await Sale.create(req.body);
@@ -116,6 +181,37 @@ const createSale = async (req, res) => {
     // Update product stock
     for (const item of req.body.items) {
       await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } });
+    }
+
+    // Keep the customer's aggregate totals (purchases/paid/due) in sync so the
+    // Customer list, Customer Ledger, Reports, and Dashboard all reflect this
+    // sale immediately — this was previously never updated on sale creation.
+    if (sale.customer) {
+      await Customer.findByIdAndUpdate(sale.customer, {
+        $inc: {
+          totalPurchases: sale.totalAmount,
+          totalPaid: sale.paidAmount,
+          dueAmount: sale.dueAmount,
+        },
+      });
+    }
+
+    // Record the amount collected at checkout as an actual payment so it shows
+    // up in the customer's Payment History — previously only money collected
+    // later via the separate "Receive Payment" flow ever created a
+    // CustomerPayment record, so any customer who only ever paid at checkout
+    // had a payment history that looked empty even though they'd clearly paid.
+    if (sale.customer && sale.paidAmount > 0) {
+      await CustomerPayment.create({
+        customer: sale.customer,
+        shop: req.user.shop,
+        amount: sale.paidAmount,
+        paymentMethod: sale.paymentMethod,
+        notes: `Payment at checkout for invoice ${sale.invoiceNo}`,
+        collectedBy: req.user._id,
+        sale: sale._id,
+        source: sale.posType === 'regular' ? 'sale' : 'pos',
+      });
     }
 
     res.status(201).json(sale);
@@ -214,36 +310,18 @@ const getRecentSales = async (req, res) => {
   }
 };
 
-// ─── Get Sales Stats (Today's Summary) ──────────────────────────────────────
+// ─── Get Sales Stats ─────────────────────────────────────────────────────
+// Same filters (search/date range/customer/paymentMethod/paymentStatus) and
+// the same aggregation as the stats embedded in getSales — kept as a
+// standalone endpoint for API completeness, but the Sales page itself now
+// reads `stats` straight off the getSales response instead of calling this
+// separately, so the table and cards can never end up on two different
+// requests (and therefore two different results) for the same filter change.
 const getSalesStats = async (req, res) => {
   try {
-    const shop = req.user.shop;
-
-    const { start: todayStart, end: todayEnd } = getTodayRangeIST();
-
-    const todaySales = await Sale.find({
-      shop,
-      createdAt: { $gte: todayStart, $lte: todayEnd },
-    });
-
-    const totalTransactions = todaySales.length;
-    const todayRevenue = todaySales.reduce((sum, s) => sum + (s.paidAmount || 0), 0);
-    const todayDue = todaySales.reduce((sum, s) => sum + (s.dueAmount || 0), 0);
-    const todayTotal = todaySales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
-
-    // Calculate net revenue excluding refunds
-    const todayRefunds = todaySales.reduce((sum, s) => {
-      const saleRefunds = (s.returns || []).reduce((rSum, r) => rSum + (r.totalRefund || 0), 0);
-      return sum + saleRefunds;
-    }, 0);
-
-    res.json({
-      todaySales: totalTransactions,
-      todayRevenue: Math.max(0, todayRevenue - todayRefunds),
-      todayDue,
-      totalAmount: todayTotal,
-      count: totalTransactions,
-    });
+    const query = await buildSalesQuery(req);
+    const stats = await aggregateSalesStats(query);
+    res.json(stats);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -314,6 +392,12 @@ const processReturn = async (req, res) => {
       });
     }
 
+    // Snapshot pre-return totals so the customer's aggregates can be adjusted
+    // by the exact delta below, regardless of how the refund math below plays out.
+    const prevTotalAmount = sale.totalAmount || 0;
+    const prevPaidAmount = sale.paidAmount || 0;
+    const prevDueAmount = sale.dueAmount || 0;
+
     // Update sale totals
     sale.paidAmount = Math.max(0, (sale.paidAmount || 0) - totalRefund);
     sale.totalAmount = Math.max(0, (sale.totalAmount || 0) - totalRefund);
@@ -342,10 +426,16 @@ const processReturn = async (req, res) => {
 
     await sale.save();
 
-    // If customer exists, update their due
+    // Keep the customer's aggregate totals in sync by the exact delta this
+    // return caused (mirrors the sync done on sale creation).
     if (sale.customer) {
-      const Customer = require('../models/Customer');
-      await Customer.findByIdAndUpdate(sale.customer, { $inc: { totalDue: -sale.dueAmount } });
+      await Customer.findByIdAndUpdate(sale.customer, {
+        $inc: {
+          totalPurchases: sale.totalAmount - prevTotalAmount,
+          totalPaid: sale.paidAmount - prevPaidAmount,
+          dueAmount: sale.dueAmount - prevDueAmount,
+        },
+      });
     }
 
     // Populate and return

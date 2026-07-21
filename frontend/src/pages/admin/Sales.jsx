@@ -671,13 +671,12 @@ const Sales = () => {
     api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    // Always skip global loading overlay — this page uses its own table loader
-    api.get('/sales/stats', { _skipLoading: true }).then(({ data }) => setStats(data)).catch(() => {});
-  }, []);
-
   // Only the very first load shows the full-page loader; subsequent fetches
   // caused by search/filter/pagination stay silent and use the table indicator.
+  // The summary cards are read straight off this same response's `stats`
+  // field — one request, one query on the backend, so the table and the
+  // cards can never disagree about what "the current filter" means, and
+  // there's no separate /sales/stats round-trip to keep in sync or forget.
   const fetchSales = useCallback(async () => {
     const silent = !isFirstLoad.current;
     if (silent) setSearching(true); else setLoading(true);
@@ -693,6 +692,7 @@ const Sales = () => {
       setSales(data.sales || []);
       setTotalPages(data.pages || 1);
       setTotal(data.total || 0);
+      setStats(data.stats || null);
     } catch (err) { console.error(err); }
     finally {
       if (silent) setSearching(false); else setLoading(false);
@@ -719,7 +719,6 @@ const Sales = () => {
 
   const refreshAll = () => {
     fetchSales();
-    api.get('/sales/stats', { _skipLoading: true }).then(({ data }) => setStats(data)).catch(() => {});
   };
 
   const applyDatePreset = (key) => {
@@ -764,11 +763,14 @@ const Sales = () => {
     setShowPrintPreview(true);
   };
 
+  // All four read from `stats`, which comes from the same filtered response
+  // as `sales`/`total` (see fetchSales) — always the currently selected date
+  // range + payment status + search, same as the table below.
   const statCards = [
-    { label: t('salesPage.stats.todaySales'), value: stats?.todaySales || 0, icon: BiDollar, color: 'primary', isCurrency: true },
-    { label: t('salesPage.stats.todayRevenue'), value: stats?.todayRevenue || 0, icon: BiTrendingUp, color: 'success', isCurrency: true },
-    { label: t('salesPage.stats.totalDue'), value: stats?.todayDue || 0, icon: BiWallet, color: 'danger', isCurrency: true },
-    { label: t('salesPage.stats.transactions'), value: stats?.count || 0, icon: BiCart, color: 'warning', isCurrency: false },
+    { label: t('salesPage.stats.totalSales'), value: stats?.totalSales || 0, icon: BiDollar, color: 'primary', isCurrency: true },
+    { label: t('salesPage.stats.totalRevenue'), value: stats?.totalRevenue || 0, icon: BiWallet, color: 'success', isCurrency: true },
+    { label: t('salesPage.stats.totalProfit'), value: stats?.totalProfit || 0, icon: BiTrendingUp, color: 'warning', isCurrency: true },
+    { label: t('salesPage.stats.totalOrders'), value: stats?.totalOrders || 0, icon: BiCart, color: 'danger', isCurrency: false },
   ];
 
   return (
