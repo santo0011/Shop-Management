@@ -21,7 +21,11 @@ const login = async (req, res) => {
     }
 
     if (!user.isActive) {
-      return res.status(401).json({ message: 'Account is deactivated. Contact admin.' });
+      return res.status(401).json({
+        success: false,
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'Account is deactivated. Contact Super admin.',
+      });
     }
 
     user.lastLogin = new Date();

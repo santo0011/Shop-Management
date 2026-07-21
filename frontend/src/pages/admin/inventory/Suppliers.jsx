@@ -4,6 +4,7 @@ import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import SupplierDetailsDrawer from './SupplierDetailsDrawer';
+import Pagination from '../../../components/common/Pagination';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
@@ -696,6 +697,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   );
 };
 
+// Fixed page size for the Suppliers list — server-side pagination via ?page=&limit=.
+const SUPPLIERS_PER_PAGE = 10;
+
 // ─── Main Suppliers Page ─────────────────────────────────────────────────────
 const Suppliers = () => {
   const { t } = useTranslation();
@@ -703,6 +707,10 @@ const Suppliers = () => {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -710,27 +718,45 @@ const Suppliers = () => {
   const [viewDetailsId, setViewDetailsId] = useState(null);
   const isFirstLoad = useRef(true);
 
-  useEffect(() => { fetchSuppliers(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const fetchSuppliers = async () => {
+  // A new search term invalidates the current page — always land back on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const fetchSuppliers = useCallback(async () => {
     const silent = !isFirstLoad.current;
     // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/suppliers?search=${search}`, { _skipLoading: true });
-      setSuppliers(data.suppliers);
+      const { data } = await api.get(
+        `/suppliers?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${SUPPLIERS_PER_PAGE}`,
+        { _skipLoading: true }
+      );
+      setSuppliers(data.suppliers || []);
+      setTotalCount(data.total || 0);
+      const pages = Math.max(1, data.pages || 1);
+      setTotalPages(pages);
+      // Self-correct if the current page no longer exists — e.g. the last
+      // supplier on the last page was just deleted.
+      if (page > pages) {
+        setPage(pages);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       if (silent) setSearching(false); else setLoading(false);
       isFirstLoad.current = false;
     }
-  };
+  }, [debouncedSearch, page]);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchSuppliers(), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    fetchSuppliers();
+  }, [fetchSuppliers]);
 
   const handleEdit = (supplier) => {
     setEditing(supplier);
@@ -741,7 +767,13 @@ const Suppliers = () => {
     try {
       await api.delete(`/suppliers/${id}`);
       setDeleteConfirm(null);
-      fetchSuppliers();
+      // Deleting the only supplier on a page beyond the first would otherwise
+      // fetch that now-empty page first — step back a page up front instead.
+      if (suppliers.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchSuppliers();
+      }
     } catch (err) {
       console.error(err);
     }
@@ -786,6 +818,7 @@ const Suppliers = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
+                <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
                 <th>{t('auth.email')}</th>
@@ -796,19 +829,22 @@ const Suppliers = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
                     {t('empty.noSuppliers')}
                   </td>
                 </tr>
-              ) : suppliers.map((supplier) => (
+              ) : suppliers.map((supplier, idx) => (
                 <tr key={supplier._id}>
+                  <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {(page - 1) * SUPPLIERS_PER_PAGE + idx + 1}
+                  </td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{supplier.name}</div>
                     {supplier.nameBn && <small style={{ color: 'var(--text-muted)' }}>{supplier.nameBn}</small>}
@@ -924,6 +960,15 @@ const Suppliers = () => {
           />
         ))}
       </div>
+
+      {/* Pagination — shared between desktop table and mobile cards */}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={SUPPLIERS_PER_PAGE}
+        onPageChange={setPage}
+      />
 
       {/* Add / Edit Supplier Drawer */}
       <SupplierDrawer

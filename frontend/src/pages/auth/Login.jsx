@@ -52,7 +52,10 @@ const Login = () => {
         navigate('/');
       }
     } catch (err) {
-      dispatch(loginFailure(err.response?.data?.message || t('auth.loginFailed')));
+      const message = err.response?.data?.code === 'ACCOUNT_DEACTIVATED'
+        ? t('auth.accountDeactivated')
+        : (err.response?.data?.message || t('auth.loginFailed'));
+      dispatch(loginFailure(message));
     }
   };
 

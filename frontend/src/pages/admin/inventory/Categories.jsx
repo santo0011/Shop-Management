@@ -4,6 +4,7 @@ import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import CategoryDetailsDrawer from './CategoryDetailsDrawer';
+import Pagination from '../../../components/common/Pagination';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
@@ -622,6 +623,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   );
 };
 
+// Fixed page size for the Categories list — server-side pagination via ?page=&limit=.
+const CATEGORIES_PER_PAGE = 10;
+
 // ─── Main Categories Page ────────────────────────────────────────────────────
 const Categories = () => {
   const { t } = useTranslation();
@@ -629,6 +633,10 @@ const Categories = () => {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -637,27 +645,45 @@ const Categories = () => {
   const [viewCategoryId, setViewCategoryId] = useState(null);
   const isFirstLoad = useRef(true);
 
-  useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const fetchCategories = async () => {
+  // A new search term invalidates the current page — always land back on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const fetchCategories = useCallback(async () => {
     const silent = !isFirstLoad.current;
     // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get('/categories', { _skipLoading: true });
-      setCategories(data);
+      const { data } = await api.get(
+        `/categories?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${CATEGORIES_PER_PAGE}`,
+        { _skipLoading: true }
+      );
+      setCategories(data.categories || []);
+      setTotalCount(data.total || 0);
+      const pages = Math.max(1, data.pages || 1);
+      setTotalPages(pages);
+      // Self-correct if the current page no longer exists — e.g. the last
+      // category on the last page was just deleted.
+      if (page > pages) {
+        setPage(pages);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       if (silent) setSearching(false); else setLoading(false);
       isFirstLoad.current = false;
     }
-  };
+  }, [debouncedSearch, page]);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchCategories(), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    fetchCategories();
+  }, [fetchCategories]);
 
   const handleEdit = (category) => {
     setEditing(category);
@@ -668,7 +694,13 @@ const Categories = () => {
     try {
       await api.delete(`/categories/${id}`);
       setDeleteConfirm(null);
-      fetchCategories();
+      // Deleting the only category on a page beyond the first would otherwise
+      // fetch that now-empty page first — step back a page up front instead.
+      if (categories.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchCategories();
+      }
       showToast.success(t('categoriesPage.deleteSuccess'));
     } catch (err) {
       const msg = err.response?.data?.message || t('categoriesPage.deleteFailed');
@@ -716,6 +748,7 @@ const Categories = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
+                <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('product.productName')} (EN)</th>
                 <th>{t('product.productName')} (BN)</th>
                 <th style={{ width: '120px' }}>{t('common.actions')}</th>
@@ -724,19 +757,22 @@ const Categories = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={3} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={4} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : categories.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={4} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
                     {t('categoriesPage.noCategoriesFound')}
                   </td>
                 </tr>
-              ) : categories.map((category) => (
+              ) : categories.map((category, idx) => (
                 <tr key={category._id}>
+                  <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {(page - 1) * CATEGORIES_PER_PAGE + idx + 1}
+                  </td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{category.name}</div>
                   </td>
@@ -834,6 +870,15 @@ const Categories = () => {
           />
         ))}
       </div>
+
+      {/* Pagination — shared between desktop table and mobile cards */}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={CATEGORIES_PER_PAGE}
+        onPageChange={setPage}
+      />
 
       {/* Add / Edit Category Drawer */}
       <CategoryDrawer
