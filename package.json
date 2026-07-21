@@ -1,5 +1,9 @@
 {
   "dependencies": {
-    "sweetalert2": "^11.26.25"
+    "@fortawesome/fontawesome-free": "^7.3.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "sweetalert2": "^11.26.25",
+    "xlsx": "^0.18.5"
   }
 }

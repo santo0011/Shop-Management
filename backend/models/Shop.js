@@ -26,7 +26,7 @@ const shopSchema = new mongoose.Schema({
     city: String,
     state: String,
     zipCode: String,
-    country: { type: String, default: 'Bangladesh' },
+    country: { type: String, default: 'India' },
   },
   logo: {
     type: String,
@@ -66,6 +66,24 @@ const shopSchema = new mongoose.Schema({
     enableLoyalty: { type: Boolean, default: false },
     loyaltyPointsPerAmount: { type: Number, default: 100 }, // points per 100 currency
     loyaltyRedeemRate: { type: Number, default: 1 }, // 1 point = 1 currency
+    barcodePrefix: { type: String, default: '' },
+    barcodeSymbology: { type: String, enum: ['CODE128', 'EAN13', 'UPC', 'CODE39'], default: 'CODE128' },
+    autoGenerateBarcode: { type: Boolean, default: false },
+    // Printer settings
+    paperSize: { type: String, enum: ['58mm', '80mm', 'a4'], default: '80mm' },
+    invoiceTemplate: { type: String, enum: ['classic', 'modern', 'minimal', 'grocery'], default: 'modern' },
+    printMode: { type: String, enum: ['thermal', 'normal'], default: 'thermal' },
+    autoPrint: { type: Boolean, default: true },
+    printCopies: { type: Number, default: 1 },
+    marginTop: { type: Number, default: 0 },
+    marginBottom: { type: Number, default: 0 },
+    marginLeft: { type: Number, default: 0 },
+    marginRight: { type: Number, default: 0 },
+    showLogo: { type: Boolean, default: true },
+    showQR: { type: Boolean, default: true },
+    showBarcode: { type: Boolean, default: false },
+    showHeader: { type: Boolean, default: true },
+    showFooter: { type: Boolean, default: true },
   },
 }, {
   timestamps: true,

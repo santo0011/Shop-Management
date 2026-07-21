@@ -57,4 +57,8 @@ const supplierSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Unique compound indexes: name and phone must be unique within a shop
+supplierSchema.index({ name: 1, shop: 1 }, { unique: true });
+supplierSchema.index({ phone: 1, shop: 1 }, { unique: true });
+
 module.exports = mongoose.model('Supplier', supplierSchema);

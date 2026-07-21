@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
+import showToast from '../../utils/toast';
 
 const Subscription = () => {
   const { t } = useTranslation();
@@ -15,14 +16,14 @@ const Subscription = () => {
 
   const fetchPlans = async () => {
     try {
-      const { data } = await api.get('/plans');
+      const { data } = await api.get('/plans', { _skipLoading: true });
       setPlans(data);
     } catch (err) { console.error(err); }
   };
 
   const fetchStatus = async () => {
     try {
-      const { data } = await api.get('/subscription/status');
+      const { data } = await api.get('/subscription/status', { _skipLoading: true });
       setStatus(data);
     } catch (err) { console.error(err); }
   };
@@ -30,10 +31,10 @@ const Subscription = () => {
   const handleSubscribe = async (planId) => {
     try {
       await api.post('/subscription/subscribe', { planId, paymentMethod: 'cash' });
-      alert('Subscribed successfully!');
+      showToast.success(t('subscriptionPage.subscribedSuccess'));
       fetchStatus();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed');
+      showToast.error(err.response?.data?.message || t('subscriptionPage.subscribeFailed'));
     }
   };
 
@@ -54,8 +55,8 @@ const Subscription = () => {
               )}
             </div>
             <div className="text-end">
-              {status.isExpired && <span className="badge badge-danger">Expired</span>}
-              {!status.isExpired && <span className="badge badge-success">Active</span>}
+              {status.isExpired && <span className="badge badge-danger">{t('subscriptionPage.expired')}</span>}
+              {!status.isExpired && <span className="badge badge-success">{t('subscriptionPage.active')}</span>}
             </div>
           </div>
         </div>
@@ -65,9 +66,9 @@ const Subscription = () => {
         {plans.map(plan => (
           <div key={plan._id} className="col-md-4">
             <div className={`glass-card p-4 text-center ${plan.isPopular ? 'border border-primary' : ''}`}>
-              {plan.isPopular && <span className="badge badge-primary mb-2">Popular</span>}
+              {plan.isPopular && <span className="badge badge-primary mb-2">{t('subscriptionPage.popular')}</span>}
               <h5>{plan.name}</h5>
-              <h2 className="my-3" style={{ color: 'var(--primary-color)' }}>৳{plan.price}</h2>
+              <h2 className="my-3" style={{ color: 'var(--primary-color)' }}>₹{plan.price}</h2>
               <small className="d-block mb-3">{plan.duration === 'monthly' ? t('subscription.monthly') : plan.duration === 'quarterly' ? t('subscription.quarterly') : t('subscription.yearly')}</small>
               <ul className="list-unstyled mb-4">
                 {(plan.features || []).map((f, i) => <li key={i} className="mb-2">✓ {f}</li>)}

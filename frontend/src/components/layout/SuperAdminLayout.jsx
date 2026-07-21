@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSelector, useDispatch } from 'react-redux';
+import { updateLanguage } from '../../redux/slices/authSlice';
 import { toggleTheme } from '../../redux/slices/themeSlice';
-import ConfirmModal from '../common/ConfirmModal';
+import { showToast } from '../../utils/toast';
 import {
   BiGridAlt, BiStore, BiSun, BiMoon,
-  BiLogOut, BiMenu, BiGlobe, BiUser, BiX,
-  BiCog, BiTrendingUp, BiDollar
+  BiMenu, BiGlobe, BiUser, BiX,
+  BiCog, BiTrendingUp, BiDollar, BiLogOut
 } from 'react-icons/bi';
 
 const SuperAdminLayout = () => {
@@ -42,50 +43,51 @@ const SuperAdminLayout = () => {
 
   const menuSections = [
     {
-      title: 'Main Menu',
+      title: t('nav.mainMenu'),
       items: [
         { path: '/super-admin', icon: BiGridAlt, label: t('nav.dashboard'), end: true },
-        { path: '/super-admin/shops', icon: BiStore, label: 'Shops', end: false },
+        { path: '/super-admin/shops', icon: BiStore, label: t('nav.shops'), end: false },
       ],
     },
     {
-      title: 'Management',
+      title: t('nav.management'),
       items: [
         { path: '/super-admin/plans', icon: BiTrendingUp, label: t('nav.plans'), end: false },
         { path: '/super-admin/transactions', icon: BiDollar, label: t('nav.transactions'), end: false },
       ],
     },
     {
-      title: 'System',
+      title: t('nav.system'),
       items: [
         { path: '/super-admin/settings', icon: BiCog, label: t('nav.settings'), end: false },
       ],
     },
   ];
 
-  const handleNavClick = (item) => {
+  const handleNavClick = () => {
     if (window.innerWidth <= 991.98) setMobileOpen(false);
   };
 
   const handleLanguageChange = async (lang) => {
     i18n.changeLanguage(lang);
+    dispatch(updateLanguage(lang));
     setLangOpen(false);
     try {
       const api = (await import('../../services/api')).default;
-      await api.put('/auth/profile', { language: lang });
+      await api.put('/auth/profile', { language: lang }, { _skipLoading: true });
     } catch (err) {
       console.error('Failed to save language preference');
     }
   };
 
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-
   const handleLogout = () => {
-    setLogoutConfirmOpen(true);
-  };
-
-  const confirmLogout = () => {
+    showToast.success(t('toast.logoutSuccess'));
+    // Preserve language preference while clearing auth data
+    const savedLang = localStorage.getItem('appLanguage');
     localStorage.clear();
+    if (savedLang) {
+      localStorage.setItem('appLanguage', savedLang);
+    }
     window.location.href = '/login';
   };
 
@@ -110,7 +112,7 @@ const SuperAdminLayout = () => {
       <div className={`sidebar ${sidebarOpen ? '' : 'collapsed'} ${mobileOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <div className="logo-icon">SA</div>
-          <span className="logo-text">Super Admin</span>
+          <span className="logo-text">{t('nav.superAdmin')}</span>
           {mobileOpen && (
             <button className="btn-close-premium ms-auto d-lg-none" onClick={() => setMobileOpen(false)}>
               <BiX />
@@ -128,7 +130,7 @@ const SuperAdminLayout = () => {
                   to={item.path}
                   end={item.end}
                   className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => handleNavClick(item)}
+                  onClick={handleNavClick}
                 >
                   <item.icon className="nav-icon" />
                   <span className="nav-label">{item.label}</span>
@@ -137,26 +139,7 @@ const SuperAdminLayout = () => {
             </div>
           ))}
         </div>
-
-        <div className="sidebar-footer">
-          <div className="nav-item" onClick={handleLogout}>
-            <BiLogOut className="nav-icon" />
-            <span className="nav-label">{t('nav.logout')}</span>
-          </div>
-        </div>
       </div>
-
-      {/* Logout Confirmation Modal */}
-      <ConfirmModal
-        open={logoutConfirmOpen}
-        onClose={() => setLogoutConfirmOpen(false)}
-        onConfirm={confirmLogout}
-        title="Are you sure?"
-        message="You will be logged out from the system."
-        confirmText="Logout"
-        cancelText="Cancel"
-        variant="danger"
-      />
 
       {/* Main Content */}
       <div className={`main-content ${!sidebarOpen ? 'expanded' : ''}`}>
@@ -174,10 +157,10 @@ const SuperAdminLayout = () => {
               {langOpen && (
                 <div className="dropdown-menu-premium">
                   <button className={`dropdown-item-premium ${i18n.language === 'bn' ? 'active' : ''}`} onClick={() => handleLanguageChange('bn')}>
-                    <span style={{ fontSize: '1.1rem' }}>🇧🇩</span> বাংলা
+                    <span style={{ fontSize: '1.1rem' }}>বাং</span> বাংলা
                   </button>
                   <button className={`dropdown-item-premium ${i18n.language === 'en' ? 'active' : ''}`} onClick={() => handleLanguageChange('en')}>
-                    <span style={{ fontSize: '1.1rem' }}>🇬🇧</span> English
+                    <span style={{ fontSize: '1.1rem' }}>EN</span> English
                   </button>
                 </div>
               )}
@@ -189,7 +172,7 @@ const SuperAdminLayout = () => {
               <button className="user-profile-btn" onClick={() => setProfileOpen(!profileOpen)}>
                 <div className="user-avatar">{user?.name?.charAt(0)?.toUpperCase() || <BiUser />}</div>
                 <div className="d-none d-md-block text-start">
-                  <div className="user-name">{user?.name || 'User'}</div>
+                  <div className="user-name">{user?.name || t('common.user')}</div>
                   <div className="user-email">{user?.email || ''}</div>
                 </div>
               </button>
@@ -200,7 +183,7 @@ const SuperAdminLayout = () => {
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{user?.email}</div>
                   </div>
                   <div className="dropdown-divider-premium" />
-                  <button className="dropdown-item-premium" onClick={handleLogout}>
+                  <button className="dropdown-item-premium" onClick={handleLogout} style={{ color: 'var(--danger)' }}>
                     <BiLogOut /> {t('nav.logout')}
                   </button>
                 </div>

@@ -7,7 +7,7 @@ const getPurchases = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    const { startDate, endDate, supplier, status } = req.query;
+    const { startDate, endDate, supplier, status, search } = req.query;
 
     let query = { shop: req.user.shop };
     if (startDate && endDate) {
@@ -15,6 +15,18 @@ const getPurchases = async (req, res) => {
     }
     if (supplier) query.supplier = supplier;
     if (status) query.paymentStatus = status;
+    if (search) {
+      const matchingSuppliers = await Supplier.find({
+        shop: req.user.shop,
+        name: { $regex: search, $options: 'i' },
+      }).distinct('_id');
+
+      query.$or = [
+        { purchaseNo: { $regex: search, $options: 'i' } },
+        { supplierInvoiceNo: { $regex: search, $options: 'i' } },
+        { supplier: { $in: matchingSuppliers } },
+      ];
+    }
 
     const purchases = await Purchase.find(query)
       .populate('supplier', 'name phone')
@@ -33,8 +45,8 @@ const getPurchases = async (req, res) => {
 const getPurchase = async (req, res) => {
   try {
     const purchase = await Purchase.findOne({ _id: req.params.id, shop: req.user.shop })
-      .populate('supplier', 'name phone address')
-      .populate('items.product', 'name nameBn sku');
+      .populate('supplier', 'name phone address dueAmount')
+      .populate('items.product', 'name nameBn sku unit');
     if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
     res.json(purchase);
   } catch (error) {
@@ -42,17 +54,34 @@ const getPurchase = async (req, res) => {
   }
 };
 
+// Auto-generated, e.g. PUR-260718-0001 — never accepted from the client.
+const generatePurchaseNo = async (shopId) => {
+  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const count = await Purchase.countDocuments({ shop: shopId });
+  return `PUR-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+};
+
 const createPurchase = async (req, res) => {
   try {
-    const { supplier, items, subtotal, discount, tax, shipping, totalAmount, paidAmount, paymentMethod, notes } = req.body;
+    const { supplier, supplierInvoiceNo, purchaseDate, items, subtotal, discount, tax, shipping, totalAmount, paidAmount, paymentMethod, notes } = req.body;
 
-    const count = await Purchase.countDocuments({ shop: req.user.shop });
-    const invoiceNo = `PUR-${String(count + 1).padStart(6, '0')}`;
+    // A supplier invoice number only needs to be unique for that supplier —
+    // the same number from two different suppliers is not a conflict.
+    if (supplierInvoiceNo) {
+      const duplicate = await Purchase.findOne({ shop: req.user.shop, supplier, supplierInvoiceNo });
+      if (duplicate) {
+        return res.status(400).json({ message: `Supplier invoice "${supplierInvoiceNo}" already exists for this supplier (${duplicate.purchaseNo}).` });
+      }
+    }
+
+    const purchaseNo = await generatePurchaseNo(req.user.shop);
 
     const purchase = await Purchase.create({
       shop: req.user.shop,
       supplier,
-      invoiceNo,
+      purchaseNo,
+      supplierInvoiceNo: supplierInvoiceNo || '',
+      purchaseDate: purchaseDate || Date.now(),
       items,
       subtotal,
       discount: discount || 0,
@@ -67,13 +96,16 @@ const createPurchase = async (req, res) => {
       createdBy: req.user._id,
     });
 
-    // Update product stock
+    // Sync each product's stock and latest pricing/batch info
     for (const item of items) {
-      await Product.findByIdAndUpdate(item.product, {
+      const productUpdate = {
         $inc: { stock: item.quantity },
         purchasePrice: item.purchasePrice,
         sellingPrice: item.sellingPrice,
-      });
+      };
+      if (item.batchNumber) productUpdate.batchNumber = item.batchNumber;
+      if (item.expiryDate) productUpdate.expiryDate = item.expiryDate;
+      await Product.findByIdAndUpdate(item.product, productUpdate);
     }
 
     // Update supplier due
@@ -84,6 +116,13 @@ const createPurchase = async (req, res) => {
 
     res.status(201).json(purchase);
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {}).join(',');
+      if (field.includes('supplierInvoiceNo')) {
+        return res.status(400).json({ message: 'This supplier invoice number is already used for this supplier.' });
+      }
+      return res.status(400).json({ message: 'Failed to generate a unique purchase number, please try again.' });
+    }
     res.status(500).json({ message: error.message });
   }
 };

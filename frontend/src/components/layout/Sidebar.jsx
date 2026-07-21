@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import {
   BiGridAlt, BiCart, BiPackage, BiCategory, BiCar, BiGroup,
-  BiReceipt, BiDollar, BiWallet, BiLineChart, BiCog,
-  BiCreditCard, BiLogOut, BiStore, BiX
+  BiReceipt, BiDollar, BiLineChart, BiCog,
+  BiCreditCard, BiStore, BiX
 } from 'react-icons/bi';
 
 const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
@@ -27,11 +27,13 @@ const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
 
   const financeMenu = [
     { path: '/sales', icon: BiDollar, label: t('nav.sales') },
-    { path: '/expenses', icon: BiWallet, label: t('nav.expenses') },
     { path: '/reports', icon: BiLineChart, label: t('nav.reports') },
   ];
 
-  const settingsMenu = [
+  // Kept out of the scrollable nav list and pinned in the footer so they're
+  // always reachable without scrolling, regardless of how many items are
+  // above them.
+  const accountMenu = [
     { path: '/subscription', icon: BiCreditCard, label: t('nav.subscription') },
     { path: '/settings', icon: BiCog, label: t('nav.settings') },
   ];
@@ -51,11 +53,6 @@ const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
       <span className="nav-label">{item.label}</span>
     </NavLink>
   );
-
-  const handleLogout = () => {
-    localStorage.clear();
-    window.location.href = '/login';
-  };
 
   return (
     <>
@@ -89,24 +86,18 @@ const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
           {mainMenu.map(renderNavItem)}
 
           {/* Inventory */}
-          <div className="sidebar-section-title mt-3">{t('nav.products')}</div>
+          <div className="sidebar-section-title">{t('nav.products')}</div>
           {inventoryMenu.map(renderNavItem)}
 
           {/* Finance */}
-          <div className="sidebar-section-title mt-3">{t('nav.sales')}</div>
+          <div className="sidebar-section-title">{t('nav.sales')}</div>
           {financeMenu.map(renderNavItem)}
-
-          {/* Settings */}
-          <div className="sidebar-section-title mt-3">{t('nav.settings')}</div>
-          {settingsMenu.map(renderNavItem)}
         </div>
 
-        {/* Footer */}
+        {/* Footer — Subscription/Settings stay pinned here, always visible.
+            Logout lives only in the Header profile menu now. */}
         <div className="sidebar-footer">
-          <div className="nav-item" onClick={handleLogout}>
-            <BiLogOut className="nav-icon" />
-            <span className="nav-label">{t('nav.logout')}</span>
-          </div>
+          {accountMenu.map(renderNavItem)}
         </div>
       </div>
     </>

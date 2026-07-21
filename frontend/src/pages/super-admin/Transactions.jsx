@@ -9,7 +9,7 @@ const Transactions = () => {
   useEffect(() => {
     const fetch = async () => {
       try {
-        const { data } = await api.get('/subscription/all');
+        const { data } = await api.get('/subscription/all', { _skipLoading: true });
         setSubscriptions(data.subscriptions);
       } catch (err) { console.error(err); }
     };
@@ -23,14 +23,14 @@ const Transactions = () => {
       </div>
       <div className="table-responsive">
         <table className="table table-custom mb-0">
-          <thead><tr><th>Shop</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+          <thead><tr><th>{t('transactionsPage.shop')}</th><th>{t('transactionsPage.plan')}</th><th>{t('transactionsPage.amount')}</th><th>{t('transactionsPage.status')}</th><th>{t('transactionsPage.date')}</th></tr></thead>
           <tbody>
             {subscriptions.map(sub => (
               <tr key={sub._id}>
-                <td>{sub.shop?.name || 'N/A'}</td>
-                <td>{sub.plan?.name || 'N/A'}</td>
-                <td>৳{sub.totalAmount}</td>
-                <td><span className={`badge ${sub.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{sub.status}</span></td>
+                <td>{sub.shop?.name || t('common.notAvailable')}</td>
+                <td>{sub.plan?.name || t('common.notAvailable')}</td>
+                <td>₹{sub.totalAmount}</td>
+                <td><span className={`badge ${sub.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{sub.status === 'active' ? t('common.active') : t('subscriptionPage.expired')}</span></td>
                 <td>{new Date(sub.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}

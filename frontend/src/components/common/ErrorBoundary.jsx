@@ -1,4 +1,5 @@
 import React from 'react';
+import i18n from '../../utils/i18n';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -29,7 +30,7 @@ class ErrorBoundary extends React.Component {
           background: '#f8f9fc',
           color: '#2d3436',
         }}>
-          <h2 style={{ color: '#e74c3c', marginBottom: '1rem' }}>Something went wrong</h2>
+          <h2 style={{ color: '#e74c3c', marginBottom: '1rem' }}>{i18n.t('common.somethingWentWrong')}</h2>
           <div style={{
             background: '#fff',
             borderRadius: '8px',
@@ -38,7 +39,7 @@ class ErrorBoundary extends React.Component {
             width: '100%',
             boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
           }}>
-            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Error:</p>
+            <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{i18n.t('common.error')}:</p>
             <pre style={{
               background: '#f1f2f6',
               padding: '1rem',
@@ -52,7 +53,7 @@ class ErrorBoundary extends React.Component {
             </pre>
             {this.state.errorInfo && (
               <>
-                <p style={{ fontWeight: 600, marginTop: '1rem', marginBottom: '0.5rem' }}>Stack Trace:</p>
+                <p style={{ fontWeight: 600, marginTop: '1rem', marginBottom: '0.5rem' }}>{i18n.t('common.stackTrace')}:</p>
                 <pre style={{
                   background: '#f1f2f6',
                   padding: '1rem',
@@ -81,7 +82,7 @@ class ErrorBoundary extends React.Component {
               fontWeight: 600,
             }}
           >
-            Reload Page
+            {i18n.t('common.reloadPage')}
           </button>
         </div>
       );

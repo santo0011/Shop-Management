@@ -2,7 +2,9 @@ import React, { useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import { updateLanguage } from './redux/slices/authSlice';
 import { setTheme } from './redux/slices/themeSlice';
+import { getSavedLanguage, saveLanguage } from './utils/i18n';
 
 // Layout
 import AdminLayout from './components/layout/AdminLayout';
@@ -10,16 +12,20 @@ import SuperAdminLayout from './components/layout/SuperAdminLayout';
 
 // Auth Pages
 import Login from './pages/auth/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin Pages
 import Dashboard from './pages/admin/Dashboard';
 import Products from './pages/admin/inventory/Products';
 import Categories from './pages/admin/inventory/Categories';
 import Suppliers from './pages/admin/inventory/Suppliers';
+import SupplierLedgerPage from './pages/admin/SupplierLedgerPage';
+import ProductLedgerPage from './pages/admin/ProductLedgerPage';
 import Customers from './pages/admin/inventory/Customers';
 import Purchases from './pages/admin/inventory/Purchases';
 import Sales from './pages/admin/Sales';
-import Expense from './pages/admin/Expense';
+import CustomerLedgerPage from './pages/admin/CustomerLedgerPage';
 import POS from './pages/admin/POS';
 import Reports from './pages/admin/Reports';
 import Subscription from './pages/admin/Subscription';
@@ -30,15 +36,16 @@ import SuperDashboard from './pages/super-admin/Dashboard';
 import ManageShops from './pages/super-admin/ManageShops';
 import ManagePlans from './pages/super-admin/ManagePlans';
 import Transactions from './pages/super-admin/Transactions';
+import SuperAdminSettings from './pages/super-admin/Settings';
 
 // Common
-import Loading from './components/common/Loading';
+import LoadingOverlay from './components/common/LoadingOverlay';
 
 const PrivateRoute = ({ children, role }) => {
   const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
 
   if (loading) {
-    return <Loading text="Checking authentication..." />;
+    return null; // LoadingOverlay handles this globally via API calls
   }
 
   if (!isAuthenticated) {
@@ -67,13 +74,37 @@ function App() {
     }
   }, [mode]);
 
+  // Initialize language from persistent storage on mount, independent of user object
   useEffect(() => {
-    if (user?.language) {
-      i18n.changeLanguage(user.language).catch(err => {
+    const savedLang = getSavedLanguage();
+    if (savedLang && savedLang !== i18n.language) {
+      i18n.changeLanguage(savedLang).catch(err => {
         console.error('Failed to change language:', err);
       });
     }
-  }, [user?.language, i18n]);
+  }, [i18n]);
+
+  // When user logs in, do NOT override the language from user object.
+  // The language preference is stored independently in localStorage.
+  // If the user object has a language but no preference is saved yet,
+  // store it so it persists.
+  useEffect(() => {
+    if (user?.language && !getSavedLanguage()) {
+      saveLanguage(user.language);
+    }
+  }, [user?.language]);
+
+  // Listen for language changes from any component and persist them
+  useEffect(() => {
+    const handleLanguageChanged = (lng) => {
+      saveLanguage(lng);
+      dispatch(updateLanguage(lng));
+    };
+    i18n.on('languageChanged', handleLanguageChanged);
+    return () => {
+      i18n.off('languageChanged', handleLanguageChanged);
+    };
+  }, [i18n, dispatch]);
 
   // Compute redirect paths based on auth state
   const loginRedirect = useMemo(() => {
@@ -88,6 +119,7 @@ function App() {
 
   return (
     <Router>
+      <LoadingOverlay />
       <Routes>
         {/* Auth Routes */}
         <Route 
@@ -98,6 +130,8 @@ function App() {
               : <Login />
           } 
         />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         {/* Super Admin Routes */}
         <Route 
@@ -112,6 +146,7 @@ function App() {
           <Route path="shops" element={<ManageShops />} />
           <Route path="plans" element={<ManagePlans />} />
           <Route path="transactions" element={<Transactions />} />
+          <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
 
         {/* Admin Routes */}
@@ -127,12 +162,14 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="pos" element={<POS />} />
           <Route path="products" element={<Products />} />
+          <Route path="products/:productId/ledger" element={<ProductLedgerPage />} />
           <Route path="categories" element={<Categories />} />
           <Route path="suppliers" element={<Suppliers />} />
+          <Route path="suppliers/:supplierId/ledger" element={<SupplierLedgerPage />} />
           <Route path="customers" element={<Customers />} />
+          <Route path="customers/:customerId/ledger" element={<CustomerLedgerPage />} />
           <Route path="purchases" element={<Purchases />} />
           <Route path="sales" element={<Sales />} />
-          <Route path="expenses" element={<Expense />} />
           <Route path="reports" element={<Reports />} />
           <Route path="subscription" element={<Subscription />} />
           <Route path="settings" element={<Settings />} />

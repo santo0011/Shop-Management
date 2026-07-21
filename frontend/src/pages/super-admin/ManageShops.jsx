@@ -1,13 +1,35 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import api from '../../services/api';
-import { BiSearch, BiPlus, BiStore, BiX, BiUser, BiPhone, BiEnvelope, BiMap, BiLock, BiCheck, BiShow, BiEdit, BiTrash } from 'react-icons/bi';
+import { BiSearch, BiPlus, BiStore, BiX, BiUser, BiPhone, BiEnvelope, BiMap, BiLock, BiCheck, BiShow, BiEdit, BiTrash, BiCalendar } from 'react-icons/bi';
+
+const REQUIRED_SHOP_FIELDS = ['shopName', 'ownerName', 'phone', 'email', 'password'];
+
+const validateShopField = (t, name, value) => {
+  switch (name) {
+    case 'shopName':
+      return String(value || '').trim() ? '' : t('manageShopsPage.shopNameRequired');
+    case 'ownerName':
+      return String(value || '').trim() ? '' : t('manageShopsPage.ownerNameRequired');
+    case 'phone':
+      return String(value || '').trim() ? '' : t('manageShopsPage.phoneRequired');
+    case 'email':
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || '') ? '' : t('auth.invalidEmail');
+    case 'password':
+      return value && value.length >= 6 ? '' : t('auth.passwordMinLength');
+    case 'address':
+      return '';
+    default:
+      return '';
+  }
+};
 
 const AddShopDrawer = ({ open, onClose, onSuccess }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [errors, setErrors] = useState({});
   const [form, setForm] = useState({
     shopName: '',
     ownerName: '',
@@ -18,12 +40,30 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
   });
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const msg = validateShopField(t, name, value);
+      const next = { ...prev };
+      if (msg) next[name] = msg; else delete next[name];
+      return next;
+    });
     if (error) setError(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const newErrors = {};
+    REQUIRED_SHOP_FIELDS.forEach((field) => {
+      const msg = validateShopField(t, field, form[field]);
+      if (msg) newErrors[field] = msg;
+    });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -34,23 +74,44 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
         phone: form.phone,
         password: form.password,
         address: form.address,
-      });
+      }, { _skipLoading: true });
       setForm({ shopName: '', ownerName: '', email: '', phone: '', password: '', address: '' });
+      setErrors({});
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create shop');
+      setError(err.response?.data?.message || t('manageShopsPage.createShopFailed'));
     } finally {
       setLoading(false);
     }
   };
+
+  const field = (name) => ({
+    className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
+    name,
+    value: form[name],
+    onChange: handleChange,
+    placeholder: getPlaceholder(name),
+  });
+
+  function getPlaceholder(name) {
+    switch (name) {
+      case 'shopName': return t('manageShopsPage.shopNamePlaceholder');
+      case 'ownerName': return t('manageShopsPage.ownerNamePlaceholder');
+      case 'phone': return t('manageShopsPage.phonePlaceholder');
+      case 'email': return t('manageShopsPage.emailPlaceholder');
+      case 'password': return t('manageShopsPage.setPasswordPlaceholder');
+      case 'address': return t('manageShopsPage.addressPlaceholder');
+      default: return '';
+    }
+  }
 
   return (
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />Add New Shop</h5>
+          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />{t('manageShopsPage.addNewShop')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
@@ -67,43 +128,49 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
               {error}
             </div>
           )}
-          <form onSubmit={handleSubmit} id="add-shop-form">
+          <form onSubmit={handleSubmit} id="add-shop-form" noValidate>
             <div className="form-group">
-              <label className="form-label"><BiStore style={{ marginRight: '6px' }} />Shop Name</label>
-              <input className="form-control" name="shopName" value={form.shopName} onChange={handleChange} placeholder="Enter shop name" required />
+              <label className="form-label"><BiStore style={{ marginRight: '6px' }} />{t('manageShopsPage.shopName')} <span style={{color: 'var(--danger)'}}>*</span></label>
+              <input {...field('shopName')} />
+              {errors.shopName && <div className="invalid-feedback-premium">{errors.shopName}</div>}
             </div>
             <div className="form-group">
-              <label className="form-label"><BiUser style={{ marginRight: '6px' }} />Owner Name</label>
-              <input className="form-control" name="ownerName" value={form.ownerName} onChange={handleChange} placeholder="Enter owner name" required />
+              <label className="form-label"><BiUser style={{ marginRight: '6px' }} />{t('manageShopsPage.ownerName')} <span style={{color: 'var(--danger)'}}>*</span></label>
+              <input {...field('ownerName')} />
+              {errors.ownerName && <div className="invalid-feedback-premium">{errors.ownerName}</div>}
             </div>
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="form-group">
-                  <label className="form-label"><BiPhone style={{ marginRight: '6px' }} />Phone</label>
-                  <input className="form-control" name="phone" value={form.phone} onChange={handleChange} placeholder="Phone number" required />
+                  <label className="form-label"><BiPhone style={{ marginRight: '6px' }} />{t('auth.phone')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input type="tel" {...field('phone')} />
+                  {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
                 </div>
               </div>
               <div className="col-md-6">
                 <div className="form-group">
-                  <label className="form-label"><BiEnvelope style={{ marginRight: '6px' }} />Email</label>
-                  <input type="email" className="form-control" name="email" value={form.email} onChange={handleChange} placeholder="Email address" required />
+                  <label className="form-label"><BiEnvelope style={{ marginRight: '6px' }} />{t('auth.email')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input type="email" {...field('email')} />
+                  {errors.email && <div className="invalid-feedback-premium">{errors.email}</div>}
                 </div>
               </div>
             </div>
             <div className="form-group">
-              <label className="form-label"><BiLock style={{ marginRight: '6px' }} />Password</label>
-              <input type="password" className="form-control" name="password" value={form.password} onChange={handleChange} placeholder="Set initial password" required minLength={6} />
+              <label className="form-label"><BiLock style={{ marginRight: '6px' }} />{t('auth.password')} <span style={{color: 'var(--danger)'}}>*</span></label>
+              <input type="password" {...field('password')} />
+              {errors.password && <div className="invalid-feedback-premium">{errors.password}</div>}
             </div>
             <div className="form-group">
-              <label className="form-label"><BiMap style={{ marginRight: '6px' }} />Address</label>
-              <textarea className="form-control" name="address" value={form.address} onChange={handleChange} placeholder="Enter shop address" rows={3} />
+              <label className="form-label"><BiMap style={{ marginRight: '6px' }} />{t('manageShopsPage.address')}</label>
+              <textarea className={`form-control ${errors.address ? 'is-invalid' : ''}`} name="address" value={form.address} onChange={handleChange} placeholder={t('manageShopsPage.addressPlaceholder')} rows={3} />
+              {errors.address && <div className="invalid-feedback-premium">{errors.address}</div>}
             </div>
           </form>
         </div>
         <div className="drawer-footer">
-          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" form="add-shop-form" className="btn-premium btn-premium-primary" disabled={loading}>
-            {loading ? <><span className="spinner-border spinner-border-sm" /> Creating...</> : <><BiCheck /> Create Shop</>}
+            {loading ? <><span className="spinner-border spinner-border-sm" /> {t('manageShopsPage.creating')}</> : <><BiCheck /> {t('manageShopsPage.createShop')}</>}
           </button>
         </div>
       </div>
@@ -111,13 +178,45 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
   );
 };
 
+// Helper to safely render address regardless of format (string or object)
+const safeAddress = (addr, t) => {
+  if (!addr) return t('common.notAvailable');
+  if (typeof addr === 'string') return addr;
+  // It's an object
+  if (addr.street || addr.city || addr.state || addr.zipCode || addr.country) {
+    const parts = [];
+    if (addr.street) parts.push(addr.street);
+    if (addr.city) parts.push(addr.city);
+    if (addr.state) parts.push(addr.state);
+    if (addr.country) {
+      if (typeof addr.country === 'string') parts.push(addr.country);
+      else if (addr.country?.name) parts.push(addr.country.name);
+      else if (addr.country?.label) parts.push(addr.country.label);
+      else if (addr.country?.value) parts.push(addr.country.value);
+    }
+    if (addr.zipCode) parts.push(addr.zipCode);
+    return parts.length > 0 ? parts.join(', ') : t('common.notAvailable');
+  }
+  // Corrupted object (e.g. from old bug where string was spread into object)
+  const values = Object.values(addr).filter(v => typeof v === 'string');
+  return values.length > 0 ? values.join('') : t('common.notAvailable');
+};
+
 const ManageShops = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const [shops, setShops] = useState([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const isFirstLoad = useRef(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Auto-open drawer when navigated from "Add Shop" sidebar link
   useEffect(() => {
@@ -129,28 +228,48 @@ const ManageShops = () => {
   }, [location.state]);
 
   const fetchShops = useCallback(async () => {
-    setLoading(true);
+    const silent = !isFirstLoad.current;
+    if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/shops?search=${search}`);
+      const { data } = await api.get(`/shops?search=${debouncedSearch}`, { _skipLoading: true });
       setShops(data.shops || []);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (silent) setSearching(false); else setLoading(false);
+      isFirstLoad.current = false;
     }
-  }, [search]);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     fetchShops();
   }, [fetchShops]);
 
   const [viewShop, setViewShop] = useState(null);
+  const [viewShopLoading, setViewShopLoading] = useState(false);
+  const [viewShopData, setViewShopData] = useState(null);
+  const [viewShopError, setViewShopError] = useState(null);
   const [editShop, setEditShop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  const handleViewShop = async (shop) => {
+    setViewShop(shop);
+    setViewShopLoading(true);
+    setViewShopData(null);
+    setViewShopError(null);
+    try {
+      const { data } = await api.get(`/shops/${shop._id}`, { _skipLoading: true });
+      setViewShopData(data);
+    } catch (err) {
+      setViewShopError(err.response?.data?.message || t('manageShopsPage.loadShopDetailsFailed'));
+    } finally {
+      setViewShopLoading(false);
+    }
+  };
+
   const toggleStatus = async (id) => {
     try {
-      await api.put(`/shops/${id}/toggle-status`);
+      await api.put(`/shops/${id}/toggle-status`, {}, { _skipLoading: true });
       fetchShops();
     } catch (err) {
       console.error(err);
@@ -159,7 +278,7 @@ const ManageShops = () => {
 
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/shops/${id}`);
+      await api.delete(`/shops/${id}`, { _skipLoading: true });
       setDeleteConfirm(null);
       fetchShops();
     } catch (err) {
@@ -174,11 +293,11 @@ const ManageShops = () => {
         <div>
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.shops')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-            Manage all registered shops
+            {t('manageShopsPage.subtitle')}
           </p>
         </div>
         <button className="btn-premium btn-premium-primary" onClick={() => setDrawerOpen(true)}>
-          <BiPlus /> Add Shop
+          <BiPlus /> {t('manageShopsPage.addShop')}
         </button>
       </div>
 
@@ -188,55 +307,55 @@ const ManageShops = () => {
           <BiSearch className="search-icon" />
           <input
             className="form-control"
-            placeholder={`${t('common.search')} shops...`}
+            placeholder={t('manageShopsPage.searchShopsPlaceholder')}
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
       {/* Shops Table */}
-      <div className="table-container">
+      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
               <tr>
-                <th>Shop Name</th>
-                <th>Owner</th>
-                <th>Phone</th>
-                <th>{t('nav.subscription')}</th>
+                <th>{t('manageShopsPage.shop')}</th>
+                <th>{t('manageShopsPage.owner')}</th>
+                <th>{t('manageShopsPage.contact')}</th>
                 <th>{t('common.status')}</th>
-                <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                <th style={{ width: '180px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> Loading...
+                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : shops.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🏪</div>
-                    No shops found
+                    {t('manageShopsPage.noShopsFound')}
                   </td>
                 </tr>
-              ) : shops.map(shop => (
+              ) : shops.map((shop) => (
                 <tr key={shop._id}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{shop.name}</div>
+                    <small style={{ color: 'var(--text-muted)' }}>{shop.nameBn || ''}</small>
                   </td>
-                  <td>{shop.owner?.name || 'N/A'}</td>
-                  <td>{shop.phone}</td>
                   <td>
-                    <span className={`badge ${
-                      shop.subscriptionStatus === 'active' ? 'badge-success' :
-                      shop.subscriptionStatus === 'trial' ? 'badge-warning' : 'badge-danger'
-                    }`}>
-                      {shop.subscriptionStatus}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <BiUser style={{ color: 'var(--text-muted)' }} />
+                      {shop.ownerName || t('common.notAvailable')}
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontSize: '0.85rem' }}>{shop.email}</div>
+                    <small style={{ color: 'var(--text-muted)' }}>{shop.phone}</small>
                   </td>
                   <td>
                     <span className={`badge ${shop.isActive ? 'badge-success' : 'badge-danger'}`}>
@@ -245,21 +364,21 @@ const ManageShops = () => {
                   </td>
                   <td>
                     <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip="View" onClick={() => setViewShop(shop)}>
+                      <button className="btn-action btn-action-view" data-tooltip={t('manageShopsPage.viewDetails')} onClick={() => handleViewShop(shop)}>
                         <BiShow />
                       </button>
-                      <button className="btn-action btn-action-edit" data-tooltip="Edit" onClick={() => setEditShop(shop)}>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => setEditShop(shop)}>
                         <BiEdit />
                       </button>
-                      <button className="btn-action btn-action-delete" data-tooltip="Delete" onClick={() => setDeleteConfirm(shop._id)}>
-                        <BiTrash />
-                      </button>
                       <button
-                        className={`btn-action btn-action-toggle ${shop.isActive ? 'active' : ''}`}
-                        data-tooltip={shop.isActive ? 'Deactivate' : 'Activate'}
+                        className={`btn-action ${shop.isActive ? 'btn-action-toggle active' : 'btn-action-toggle'}`}
+                        data-tooltip={shop.isActive ? t('manageShopsPage.deactivate') : t('manageShopsPage.activate')}
                         onClick={() => toggleStatus(shop._id)}
                       >
-                        {shop.isActive ? <BiX /> : <BiCheck />}
+                        <BiLock />
+                      </button>
+                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(shop._id)}>
+                        <BiTrash />
                       </button>
                     </div>
                   </td>
@@ -277,104 +396,384 @@ const ManageShops = () => {
         onSuccess={fetchShops}
       />
 
-      {/* View Shop Modal */}
-      {viewShop && (
-        <div className="modal-premium" onClick={() => setViewShop(null)}>
-          <div className="modal-premium-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-premium-header">
-              <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />{viewShop.name}</h5>
-              <button className="btn-close-premium" onClick={() => setViewShop(null)}><BiX /></button>
+      {/* View Shop Details Drawer - Premium Redesign */}
+      <div className={`drawer-overlay ${viewShop ? 'open' : ''}`} onClick={() => { setViewShop(null); setViewShopData(null); }} />
+      <div className={`drawer ${viewShop ? 'open' : ''}`}>
+        <div className="drawer-header">
+          <h5 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BiStore style={{ color: 'var(--primary)' }} />
+            {t('manageShopsPage.shopDetails')}
+          </h5>
+          <button className="btn-close-premium" onClick={() => { setViewShop(null); setViewShopData(null); }}><BiX /></button>
+        </div>
+        <div className="drawer-body">
+          {viewShopLoading ? (
+            <div className="d-flex flex-column align-items-center justify-content-center py-5">
+              <div className="spinner-border mb-3" style={{ color: 'var(--primary)', width: '2.5rem', height: '2.5rem' }} role="status" />
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>{t('manageShopsPage.loadingShopDetails')}</p>
             </div>
-            <div className="modal-premium-body">
-              <div className="row g-3">
-                <div className="col-6">
-                  <small style={{ color: 'var(--text-muted)' }}>Owner</small>
-                  <div style={{ fontWeight: 600 }}>{viewShop.owner?.name || 'N/A'}</div>
+          ) : viewShopError ? (
+            <div style={{
+              padding: '1rem',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--glow-danger)',
+              color: 'var(--danger)',
+              fontWeight: 500,
+              fontSize: '0.85rem',
+              textAlign: 'center',
+            }}>
+              {viewShopError}
+            </div>
+          ) : viewShopData ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* ========== HERO BANNER ========== */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.12), rgba(0, 217, 166, 0.08))',
+                borderRadius: 'var(--border-radius-lg)',
+                padding: '1.5rem',
+                textAlign: 'center',
+                border: '1px solid var(--border-color)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  position: 'absolute', top: '-30%', right: '-20%',
+                  width: '140px', height: '140px',
+                  borderRadius: '50%',
+                  background: 'rgba(108, 99, 255, 0.08)',
+                  pointerEvents: 'none',
+                }} />
+                <div style={{
+                  width: '72px', height: '72px', borderRadius: '18px',
+                  background: 'var(--gradient-primary)',
+                  color: '#fff', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: '1.8rem', fontWeight: 700,
+                  margin: '0 auto 1rem', boxShadow: '0 4px 15px rgba(108, 99, 255, 0.3)',
+                }}>
+                  {(viewShopData.name || 'S').charAt(0).toUpperCase()}
                 </div>
-                <div className="col-6">
-                  <small style={{ color: 'var(--text-muted)' }}>Email</small>
-                  <div style={{ fontWeight: 600 }}>{viewShop.email || 'N/A'}</div>
-                </div>
-                <div className="col-6">
-                  <small style={{ color: 'var(--text-muted)' }}>Phone</small>
-                  <div style={{ fontWeight: 600 }}>{viewShop.phone}</div>
-                </div>
-                <div className="col-6">
-                  <small style={{ color: 'var(--text-muted)' }}>Status</small>
-                  <div><span className={`badge ${viewShop.isActive ? 'badge-success' : 'badge-danger'}`}>{viewShop.isActive ? 'Active' : 'Inactive'}</span></div>
-                </div>
-                <div className="col-6">
-                  <small style={{ color: 'var(--text-muted)' }}>Subscription</small>
-                  <div><span className={`badge ${viewShop.subscriptionStatus === 'active' ? 'badge-success' : viewShop.subscriptionStatus === 'trial' ? 'badge-warning' : 'badge-danger'}`}>{viewShop.subscriptionStatus}</span></div>
-                </div>
-                <div className="col-6">
-                  <small style={{ color: 'var(--text-muted)' }}>Created</small>
-                  <div style={{ fontWeight: 600 }}>{new Date(viewShop.createdAt).toLocaleDateString()}</div>
+                <h5 style={{ fontWeight: 700, margin: '0 0 0.5rem' }}>{viewShopData.name}</h5>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <span className={`badge ${viewShopData.isActive ? 'badge-success' : 'badge-danger'}`}>
+                    {viewShopData.isActive ? `● ${t('common.active')}` : `● ${t('common.inactive')}`}
+                  </span>
+                  <span className={`badge ${viewShopData.subscriptionStatus === 'active' ? 'badge-success' : viewShopData.subscriptionStatus === 'trial' ? 'badge-warning' : 'badge-danger'}`}>
+                    {viewShopData.subscriptionStatus === 'active' ? `◉ ${t('manageShopsPage.subscribed')}` : viewShopData.subscriptionStatus === 'trial' ? `◉ ${t('subscription.trial')}` : `◉ ${t('manageShopsPage.expired')}`}
+                  </span>
                 </div>
               </div>
-            </div>
-            <div className="modal-premium-footer">
-              <button className="btn-premium btn-premium-secondary" onClick={() => setViewShop(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Edit Shop Modal */}
-      {editShop && (
-        <div className="modal-premium" onClick={() => setEditShop(null)}>
-          <div className="modal-premium-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-premium-header">
-              <h5><BiEdit style={{ marginRight: '8px', color: 'var(--primary)' }} />Edit Shop</h5>
-              <button className="btn-close-premium" onClick={() => setEditShop(null)}><BiX /></button>
+              {/* ========== INFORMATION SECTIONS (single column, no overflow) ========== */}
+              {[
+                { key: 'shop', icon: BiStore, color: 'var(--primary)', glow: 'var(--glow-primary)', title: t('manageShopsPage.shopInformation'), rows: [
+                  { icon: BiStore, label: t('manageShopsPage.shopName'), value: viewShopData.name },
+                  { icon: BiPhone, label: t('auth.phone'), value: viewShopData.phone || t('common.notAvailable') },
+                  { icon: BiEnvelope, label: t('auth.email'), value: viewShopData.email || t('common.notAvailable') },
+                ]},
+                { key: 'owner', icon: BiUser, color: 'var(--secondary)', glow: 'var(--glow-secondary)', title: t('manageShopsPage.ownerInformation'), rows: [
+                  { icon: BiUser, label: t('common.name'), value: viewShopData.owner?.name || t('common.notAvailable') },
+                  { icon: BiEnvelope, label: t('auth.email'), value: viewShopData.owner?.email || t('common.notAvailable') },
+                ]},
+                { key: 'address', icon: BiMap, color: 'var(--info)', glow: 'var(--glow-info)', title: t('manageShopsPage.addressInformation'), rows: [
+                  { icon: BiMap, label: t('manageShopsPage.address'), value: safeAddress(viewShopData.address, t) },
+                ]},
+                { key: 'system', icon: BiCalendar, color: 'var(--text-muted)', glow: 'var(--bg-input)', title: t('manageShopsPage.systemInformation'), rows: [
+                  { icon: BiCalendar, label: t('manageShopsPage.created'), value: new Date(viewShopData.createdAt).toLocaleDateString() },
+                  { icon: BiCalendar, label: t('manageShopsPage.updated'), value: new Date(viewShopData.updatedAt).toLocaleDateString() },
+                ]},
+              ].map((section, si) => (
+                <div key={si} className="premium-card" style={{ border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}>
+                  <div style={{
+                    padding: '0.75rem 1.25rem',
+                    borderBottom: '1px solid var(--border-color)',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)',
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                  }}>
+                    <section.icon style={{ color: section.color, flexShrink: 0 }} /> {section.title}
+                  </div>
+                  <div style={{ padding: '1rem 1.25rem' }}>
+                    {section.rows.map((row, ri) => (
+                      <div key={ri} style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        marginBottom: ri < section.rows.length - 1 ? '12px' : 0,
+                      }}>
+                        <div style={{
+                          width: '34px', height: '34px', borderRadius: '10px',
+                          background: section.glow, color: section.color,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.95rem', flexShrink: 0, flex: '0 0 34px',
+                        }}>
+                          <row.icon />
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '1px' }}>{row.label}</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.88rem', wordBreak: 'break-word', overflowWrap: 'break-word' }}>{row.value}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {section.key === 'address' && viewShopData.subscriptionStatus && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        marginTop: '12px', paddingTop: '12px',
+                        borderTop: '1px solid var(--border-light)',
+                      }}>
+                        <div style={{
+                          width: '34px', height: '34px', borderRadius: '10px',
+                          background: 'var(--glow-warning)', color: 'var(--warning)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.95rem', flexShrink: 0, flex: '0 0 34px',
+                        }}>
+                          <BiLock />
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '1px' }}>{t('manageShopsPage.subscription')}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span className={`badge ${viewShopData.subscriptionStatus === 'active' ? 'badge-success' : viewShopData.subscriptionStatus === 'trial' ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: '0.75rem' }}>
+                              {viewShopData.subscriptionStatus === 'active' ? t('manageShopsPage.subscribed') : viewShopData.subscriptionStatus === 'trial' ? t('subscription.trial') : t('manageShopsPage.expired')}
+                            </span>
+                            {viewShopData.trialEndsAt && (
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {t('manageShopsPage.trialEndsPrefix', { date: new Date(viewShopData.trialEndsAt).toLocaleDateString() })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="modal-premium-body">
-              <div className="form-group">
-                <label className="form-label">Shop Name</label>
-                <input className="form-control" value={editShop.name} onChange={e => setEditShop({...editShop, name: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Phone</label>
-                <input className="form-control" value={editShop.phone} onChange={e => setEditShop({...editShop, phone: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <input className="form-control" value={editShop.email} onChange={e => setEditShop({...editShop, email: e.target.value})} />
-              </div>
-            </div>
-            <div className="modal-premium-footer">
-              <button className="btn-premium btn-premium-secondary" onClick={() => setEditShop(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-primary" onClick={async () => {
-                try {
-                  await api.put(`/shops/${editShop._id}`, { name: editShop.name, phone: editShop.phone, email: editShop.email });
-                  setEditShop(null);
-                  fetchShops();
-                } catch (err) {
-                  console.error(err);
-                }
-              }}><BiCheck /> Save</button>
-            </div>
-          </div>
+          ) : null}
         </div>
-      )}
+      </div>
+
+      {/* Edit Shop Details Modal */}
+      <EditShopDrawer
+        open={!!editShop}
+        shop={editShop}
+        onClose={() => setEditShop(null)}
+        onSuccess={() => { fetchShops(); setEditShop(null); }}
+      />
 
       {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-premium" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-premium-header"><h5>Delete Shop</h5><button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button></div>
+          <div className="modal-premium-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-premium-header">
+              <h5>{t('manageShopsPage.deleteShopTitle')}</h5>
+              <button className="btn-close-premium" onClick={() => setDeleteConfirm(null)}><BiX /></button>
+            </div>
             <div className="modal-premium-body text-center">
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--glow-danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 1.25rem' }}><BiTrash /></div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>Are you sure you want to delete this shop? This action cannot be undone.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>{t('manageShopsPage.deleteShopMessage')}</p>
             </div>
             <div className="modal-premium-footer" style={{ justifyContent: 'center' }}>
-              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+              <button className="btn-premium btn-premium-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn-premium btn-premium-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+};
+
+const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [form, setForm] = useState({
+    shopName: '',
+    ownerName: '',
+    email: '',
+    phone: '',
+    address: '',
+  });
+
+  // Convert address object to a comma-separated string for the textarea
+  const formatAddress = (addr) => {
+    if (!addr) return '';
+    if (typeof addr === 'string') return addr;
+    // Handle address object
+    if (typeof addr === 'object') {
+      // Check if it has expected address fields
+      if (addr.street || addr.city || addr.state || addr.zipCode || addr.country) {
+        const parts = [];
+        if (addr.street) parts.push(addr.street);
+        if (addr.city) parts.push(addr.city);
+        if (addr.state) parts.push(addr.state);
+        if (addr.zipCode) parts.push(addr.zipCode);
+        if (addr.country) {
+          if (typeof addr.country === 'string') parts.push(addr.country);
+          else if (addr.country?.name) parts.push(addr.country.name);
+          else if (addr.country?.label) parts.push(addr.country.label);
+        }
+        return parts.join(', ');
+      }
+      // Corrupted object (from old bug where string was spread into object, 
+      // e.g. { ...shop.address, ..."Dhaka" } -> { '0': 'D', '1': 'h', ... })
+      // Collect all string values and join them to reconstruct the original string
+      const strValues = Object.values(addr).filter(v => typeof v === 'string');
+      if (strValues.length > 0) {
+        // Try joining - if it was a spread string, they'll form the original text
+        const joined = strValues.join('');
+        if (joined.length > 0) return joined;
+      }
+    }
+    return '';
+  };
+
+  // Convert comma-separated string back to address object for the API
+  const parseAddress = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+    return {
+      street: parts[0] || '',
+      city: parts[1] || '',
+      state: parts[2] || '',
+      zipCode: parts[3] || '',
+      country: parts[4] || 'India',
+    };
+  };
+
+  useEffect(() => {
+    if (shop) {
+      setForm({
+        shopName: shop.name || '',
+        // shop.ownerName from list, or shop.owner?.name from populated detail
+        ownerName: shop.ownerName || shop.owner?.name || '',
+        email: shop.email || '',
+        phone: shop.phone || '',
+        address: formatAddress(shop.address),
+      });
+      setErrors({});
+      setError(null);
+    }
+  }, [shop]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const msg = name === 'email'
+        ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || '') ? '' : t('auth.invalidEmail'))
+        : (String(value || '').trim() ? '' : (name === 'shopName' ? t('manageShopsPage.shopNameRequired') : name === 'ownerName' ? t('manageShopsPage.ownerNameRequired') : t('validation.fieldRequired')));
+      const next = { ...prev };
+      if (msg) next[name] = msg; else delete next[name];
+      return next;
+    });
+    if (error) setError(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const fields = ['shopName', 'ownerName', 'email', 'phone'];
+    const newErrors = {};
+    fields.forEach((field) => {
+      const msg = field === 'email'
+        ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form[field] || '') ? '' : t('auth.invalidEmail'))
+        : (String(form[field] || '').trim() ? '' : (field === 'shopName' ? t('manageShopsPage.shopNameRequired') : field === 'ownerName' ? t('manageShopsPage.ownerNameRequired') : t('validation.fieldRequired')));
+      if (msg) newErrors[field] = msg;
+    });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      await api.put(`/shops/${shop._id}`, {
+        name: form.shopName,
+        ownerName: form.ownerName,
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+      }, { _skipLoading: true });
+      onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.message || t('manageShopsPage.updateShopFailed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const field = (name) => ({
+    className: `form-control ${errors[name] ? 'is-invalid' : ''}`,
+    name,
+    value: form[name],
+    onChange: handleChange,
+    placeholder: name === 'shopName' ? t('manageShopsPage.shopNamePlaceholder') : name === 'ownerName' ? t('manageShopsPage.ownerNamePlaceholder') : name === 'phone' ? t('manageShopsPage.phonePlaceholder') : name === 'email' ? t('manageShopsPage.emailPlaceholder') : '',
+  });
+
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+      <div className={`drawer ${open ? 'open' : ''}`}>
+        <div className="drawer-header">
+          <h5><BiStore style={{ marginRight: '8px', color: 'var(--primary)' }} />{t('manageShopsPage.editShopTitle')}</h5>
+          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        </div>
+        <div className="drawer-body">
+          {error && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'var(--glow-danger)',
+              color: 'var(--danger)',
+              fontWeight: 500,
+              marginBottom: '1.25rem',
+              fontSize: '0.85rem',
+            }}>
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} id="edit-shop-form" noValidate>
+            <div className="form-group">
+              <label className="form-label"><BiStore style={{ marginRight: '6px' }} />{t('manageShopsPage.shopName')} <span style={{color: 'var(--danger)'}}>*</span></label>
+              <input {...field('shopName')} />
+              {errors.shopName && <div className="invalid-feedback-premium">{errors.shopName}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label"><BiUser style={{ marginRight: '6px' }} />{t('manageShopsPage.ownerName')} <span style={{color: 'var(--danger)'}}>*</span></label>
+              <input {...field('ownerName')} />
+              {errors.ownerName && <div className="invalid-feedback-premium">{errors.ownerName}</div>}
+            </div>
+            <div className="row g-3">
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label"><BiPhone style={{ marginRight: '6px' }} />{t('auth.phone')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input type="tel" {...field('phone')} />
+                  {errors.phone && <div className="invalid-feedback-premium">{errors.phone}</div>}
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label className="form-label"><BiEnvelope style={{ marginRight: '6px' }} />{t('auth.email')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <input type="email" {...field('email')} />
+                  {errors.email && <div className="invalid-feedback-premium">{errors.email}</div>}
+                </div>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label"><BiMap style={{ marginRight: '6px' }} />{t('manageShopsPage.address')}</label>
+              <textarea className={`form-control ${errors.address ? 'is-invalid' : ''}`} name="address" value={form.address} onChange={handleChange} placeholder={t('manageShopsPage.addressPlaceholder')} rows={3} />
+              {errors.address && <div className="invalid-feedback-premium">{errors.address}</div>}
+            </div>
+          </form>
+        </div>
+        <div className="drawer-footer">
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>{t('common.cancel')}</button>
+          <button type="submit" form="edit-shop-form" className="btn-premium btn-premium-primary" disabled={loading}>
+            {loading ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('manageShopsPage.updateShop')}</>}
+          </button>
+        </div>
+      </div>
+    </>
   );
 };
 

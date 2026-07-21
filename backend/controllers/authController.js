@@ -1,6 +1,8 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const Shop = require('../models/Shop');
 const { generateToken, generateRefreshToken } = require('../utils/generateToken');
+const { sendForgotPasswordEmail, sendResetSuccessEmail } = require('../services/emailService');
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -162,6 +164,102 @@ const logout = async (req, res) => {
   }
 };
 
+// @desc    Forgot password — send reset email
+// @route   POST /api/auth/forgot-password
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+
+    // Always return the same message to prevent email enumeration
+    const genericMsg = 'If an account with that email exists, a password reset link has been sent.';
+
+    const user = await User.findOne({ email }).select('+resetPasswordToken +resetPasswordExpire');
+    if (!user) {
+      console.log(`[Auth] Forgot password requested for non-existent email: ${email}`);
+      return res.json({ message: genericMsg });
+    }
+
+    // Generate secure random token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash the token before storing
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save();
+
+    // Send email
+    const sent = await sendForgotPasswordEmail({
+      email: user.email,
+      name: user.name,
+      token: resetToken,
+    });
+
+    if (sent) {
+      console.log(`[Auth] Password reset email sent to ${email}`);
+    } else {
+      console.error(`[Auth] Failed to send password reset email to ${email}`);
+      // Clear the token if email failed
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+      return res.status(500).json({ message: 'Unable to send email. Please try again later.' });
+    }
+
+    res.json({ message: genericMsg });
+  } catch (error) {
+    console.error('[Auth] Forgot password error:', error.message);
+    res.status(500).json({ message: 'Unable to process request. Please try again later.' });
+  }
+};
+
+// @desc    Reset password using token
+// @route   POST /api/auth/reset-password/:token
+const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    // Hash the incoming token to match stored hash
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    }).select('+resetPasswordToken +resetPasswordExpire +password');
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    // Update password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    user.refreshToken = null; // Invalidate all sessions
+    await user.save();
+
+    // Send confirmation email
+    await sendResetSuccessEmail({ email: user.email, name: user.name });
+
+    console.log(`[Auth] Password reset successful for ${user.email}`);
+
+    res.json({ message: 'Password reset successful. You can now log in with your new password.' });
+  } catch (error) {
+    console.error('[Auth] Reset password error:', error.message);
+    res.status(500).json({ message: 'Unable to reset password. Please try again.' });
+  }
+};
+
 module.exports = {
   login,
   refreshToken,
@@ -169,4 +267,6 @@ module.exports = {
   updateProfile,
   updatePassword,
   logout,
+  forgotPassword,
+  resetPassword,
 };
