@@ -32,12 +32,16 @@ const Login = () => {
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data));
 
-      if (data.language) {
-        i18n.changeLanguage(data.language);
-      }
+      // Do NOT override the user's selected language with the backend response.
+      // The user's language preference is stored independently in localStorage
+      // via the App.jsx languageChanged listener, and should be respected.
       if (data.theme) {
         dispatch(setTheme(data.theme));
       }
+
+      // Sync the user's selected language back to the user object
+      // so that the Redux state reflects the actual language in use
+      data.language = i18n.language;
 
       dispatch(loginSuccess(data));
       showToast.success(t('auth.loginSuccess'));

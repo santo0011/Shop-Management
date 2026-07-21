@@ -63,7 +63,12 @@ const Header = ({ onToggleSidebar }) => {
     }).then((result) => {
       if (!result.isConfirmed) return;
       showToast.success(t('toast.logoutSuccess'));
+      // Preserve language preference while clearing auth data
+      const savedLang = localStorage.getItem('appLanguage');
       localStorage.clear();
+      if (savedLang) {
+        localStorage.setItem('appLanguage', savedLang);
+      }
       window.location.href = '/login';
     });
   };

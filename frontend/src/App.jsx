@@ -2,7 +2,9 @@ import React, { useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import { updateLanguage } from './redux/slices/authSlice';
 import { setTheme } from './redux/slices/themeSlice';
+import { getSavedLanguage, saveLanguage } from './utils/i18n';
 
 // Layout
 import AdminLayout from './components/layout/AdminLayout';
@@ -72,13 +74,37 @@ function App() {
     }
   }, [mode]);
 
+  // Initialize language from persistent storage on mount, independent of user object
   useEffect(() => {
-    if (user?.language) {
-      i18n.changeLanguage(user.language).catch(err => {
+    const savedLang = getSavedLanguage();
+    if (savedLang && savedLang !== i18n.language) {
+      i18n.changeLanguage(savedLang).catch(err => {
         console.error('Failed to change language:', err);
       });
     }
-  }, [user?.language, i18n]);
+  }, [i18n]);
+
+  // When user logs in, do NOT override the language from user object.
+  // The language preference is stored independently in localStorage.
+  // If the user object has a language but no preference is saved yet,
+  // store it so it persists.
+  useEffect(() => {
+    if (user?.language && !getSavedLanguage()) {
+      saveLanguage(user.language);
+    }
+  }, [user?.language]);
+
+  // Listen for language changes from any component and persist them
+  useEffect(() => {
+    const handleLanguageChanged = (lng) => {
+      saveLanguage(lng);
+      dispatch(updateLanguage(lng));
+    };
+    i18n.on('languageChanged', handleLanguageChanged);
+    return () => {
+      i18n.off('languageChanged', handleLanguageChanged);
+    };
+  }, [i18n, dispatch]);
 
   // Compute redirect paths based on auth state
   const loginRedirect = useMemo(() => {

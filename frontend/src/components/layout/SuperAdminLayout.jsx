@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSelector, useDispatch } from 'react-redux';
+import { updateLanguage } from '../../redux/slices/authSlice';
 import { toggleTheme } from '../../redux/slices/themeSlice';
 import { showToast } from '../../utils/toast';
 import {
@@ -69,6 +70,7 @@ const SuperAdminLayout = () => {
 
   const handleLanguageChange = async (lang) => {
     i18n.changeLanguage(lang);
+    dispatch(updateLanguage(lang));
     setLangOpen(false);
     try {
       const api = (await import('../../services/api')).default;
@@ -80,7 +82,12 @@ const SuperAdminLayout = () => {
 
   const handleLogout = () => {
     showToast.success(t('toast.logoutSuccess'));
+    // Preserve language preference while clearing auth data
+    const savedLang = localStorage.getItem('appLanguage');
     localStorage.clear();
+    if (savedLang) {
+      localStorage.setItem('appLanguage', savedLang);
+    }
     window.location.href = '/login';
   };
 

@@ -386,7 +386,12 @@ const Settings = () => {
       } catch (err) {
         // Still clear the local session even if the server call fails.
       } finally {
+        // Preserve language preference while clearing auth data
+        const savedLang = localStorage.getItem('appLanguage');
         localStorage.clear();
+        if (savedLang) {
+          localStorage.setItem('appLanguage', savedLang);
+        }
         window.location.href = '/login';
       }
     });
