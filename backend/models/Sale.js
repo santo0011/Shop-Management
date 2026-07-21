@@ -121,6 +121,13 @@ const saleSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  // Always <= 0 — the amount shaved off the raw (subtotal + tax - discount)
+  // total to floor it down to a whole number. Stored so invoices/reprints
+  // can always show the same "Round Off" line that was shown at checkout.
+  roundOff: {
+    type: Number,
+    default: 0,
+  },
   paidAmount: {
     type: Number,
     default: 0,

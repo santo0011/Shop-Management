@@ -123,4 +123,39 @@ const deleteCategory = async (req, res) => {
   }
 };
 
-module.exports = { getCategories, getCategory, createCategory, updateCategory, deleteCategory };
+// @desc    Delete multiple categories at once. Categories used by any
+//          product are skipped (never partially/force-deleted) — the
+//          remaining, unused ones are still deleted in the same request.
+// @route   POST /api/categories/bulk-delete
+const bulkDeleteCategories = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No categories selected.' });
+    }
+
+    // Only ever touch categories that actually belong to this shop.
+    const categories = await Category.find({ _id: { $in: ids }, shop: req.user.shop }).select('_id name');
+
+    const usedCategoryIds = await Product.distinct('category', {
+      category: { $in: categories.map((c) => c._id) },
+      shop: req.user.shop,
+    });
+    const usedSet = new Set(usedCategoryIds.map((id) => id.toString()));
+
+    const deletableIds = categories.filter((c) => !usedSet.has(c._id.toString())).map((c) => c._id);
+    const blockedNames = categories.filter((c) => usedSet.has(c._id.toString())).map((c) => c.name);
+
+    let deletedCount = 0;
+    if (deletableIds.length > 0) {
+      const result = await Category.deleteMany({ _id: { $in: deletableIds }, shop: req.user.shop });
+      deletedCount = result.deletedCount;
+    }
+
+    res.json({ deletedCount, blockedCount: blockedNames.length, blockedNames });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getCategories, getCategory, createCategory, updateCategory, deleteCategory, bulkDeleteCategories };

@@ -37,9 +37,12 @@ const productSchema = new mongoose.Schema({
     required: true,
   },
   unit: {
+    // Free-text, validated in productController against the shop's allowed
+    // unit set (global catalog + shop.settings.customUnits) rather than a
+    // fixed enum here — lets shops add their own units without a migration.
     type: String,
-    enum: ['kg', 'gram', 'liter', 'ml', 'piece', 'packet', 'box', 'carton'],
     default: 'piece',
+    trim: true,
   },
   purchasePrice: {
     type: Number,
@@ -93,6 +96,17 @@ const productSchema = new mongoose.Schema({
   expiryDate: {
     type: Date,
   },
+  // Optional business-type-specific fields — shown/hidden in the UI per
+  // shop.settings.enabledModules, but always present on the schema so
+  // toggling a module back on never loses previously-entered data.
+  size: { type: String, trim: true },
+  color: { type: String, trim: true },
+  brand: { type: String, trim: true },
+  serialNumber: { type: String, trim: true },
+  warranty: { type: String, trim: true },
+  modelNumber: { type: String, trim: true },
+  length: { type: Number },
+  width: { type: Number },
   isActive: {
     type: Boolean,
     default: true,

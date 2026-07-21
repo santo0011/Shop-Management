@@ -143,4 +143,40 @@ const deleteSupplier = async (req, res) => {
   }
 };
 
-module.exports = { getSuppliers, getSupplier, createSupplier, updateSupplier, deleteSupplier };
+// @desc    Delete multiple suppliers at once. Suppliers used in any purchase
+//          or referenced by any product are skipped (never partially/force-
+//          deleted) — the remaining, unused ones are still deleted.
+// @route   POST /api/suppliers/bulk-delete
+const bulkDeleteSuppliers = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No suppliers selected.' });
+    }
+
+    // Only ever touch suppliers that actually belong to this shop.
+    const suppliers = await Supplier.find({ _id: { $in: ids }, shop: req.user.shop }).select('_id name');
+    const supplierIds = suppliers.map((s) => s._id);
+
+    const [usedByPurchases, usedByProducts] = await Promise.all([
+      Purchase.distinct('supplier', { supplier: { $in: supplierIds }, shop: req.user.shop }),
+      Product.distinct('supplier', { supplier: { $in: supplierIds }, shop: req.user.shop }),
+    ]);
+    const usedSet = new Set([...usedByPurchases, ...usedByProducts].map((id) => id.toString()));
+
+    const deletableIds = suppliers.filter((s) => !usedSet.has(s._id.toString())).map((s) => s._id);
+    const blockedNames = suppliers.filter((s) => usedSet.has(s._id.toString())).map((s) => s.name);
+
+    let deletedCount = 0;
+    if (deletableIds.length > 0) {
+      const result = await Supplier.deleteMany({ _id: { $in: deletableIds }, shop: req.user.shop });
+      deletedCount = result.deletedCount;
+    }
+
+    res.json({ deletedCount, blockedCount: blockedNames.length, blockedNames });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getSuppliers, getSupplier, createSupplier, updateSupplier, deleteSupplier, bulkDeleteSuppliers };

@@ -17,15 +17,15 @@ const formatDateTime = (d) =>
 // ─── Summary Card (no icon) ────────────────────────────────────
 const SummaryCard = ({ label, value, color }) => {
   const colorMap = {
-    primary: { text: 'var(--primary)' },
-    success: { text: '#00D9A6' },
-    warning: { text: 'var(--warning)' },
-    danger: { text: 'var(--danger)' },
+    primary: { text: 'var(--primary)', accent: 'var(--primary)' },
+    success: { text: '#00D9A6', accent: '#00D9A6' },
+    warning: { text: 'var(--warning)', accent: 'var(--warning)' },
+    danger: { text: 'var(--danger)', accent: 'var(--danger)' },
   };
   const colors = colorMap[color] || colorMap.primary;
 
   return (
-    <div className="supplier-summary-card">
+    <div className="supplier-summary-card" style={{ '--summary-accent': colors.accent }}>
       <div className="supplier-summary-info">
         <span className="supplier-summary-value" style={{ color: colors.text }}>{value}</span>
         <span className="supplier-summary-label">{label}</span>

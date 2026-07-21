@@ -4,6 +4,55 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Supplier = require('../models/Supplier');
 const Customer = require('../models/Customer');
+const { BUSINESS_TYPE_KEYS, getBusinessTypeDefaults } = require('../config/businessTypes');
+
+// Best-effort, additive-only: creates any default category for `businessType`
+// that doesn't already exist (by name) for this shop. Never updates or
+// deletes existing categories, so it's always safe to call again later
+// (e.g. from a "restore defaults" action after the shop switches type).
+const seedDefaultCategories = async (shopId, businessType) => {
+  const { defaultCategories } = getBusinessTypeDefaults(businessType);
+  if (!defaultCategories || defaultCategories.length === 0) return { created: 0 };
+
+  const existingNames = await Category.find({ shop: shopId }).distinct('name');
+  const existingSet = new Set(existingNames.map((n) => n.toLowerCase()));
+  const toCreate = defaultCategories.filter((c) => !existingSet.has(c.name.toLowerCase()));
+
+  if (toCreate.length === 0) return { created: 0 };
+
+  await Category.insertMany(
+    toCreate.map((c) => ({ name: c.name, nameBn: c.nameBn, shop: shopId })),
+    { ordered: false }
+  );
+  return { created: toCreate.length };
+};
+
+// Business Type is locked once a shop has any products — switching would
+// leave existing products' fields/units mismatched with the new type's
+// configuration (e.g. a Garments product's size/color on a shop switched to
+// Grocery). The supported fix is a new shop, not silently drifting data.
+const BUSINESS_TYPE_LOCKED_MESSAGE = 'Business Type cannot be changed because this shop already has products. Please create a new shop if you need a different Business Type.';
+
+// Returns a 400 response and `true` if the requested businessType change must
+// be blocked; returns `false` (no response sent) if the change is allowed.
+// Only ever checks the DB when the request actually asks for a different
+// type than the shop currently has — re-saving the same value never counts
+// as a "change" and is always allowed.
+const rejectIfBusinessTypeLocked = async (res, shop, requestedBusinessType) => {
+  if (
+    requestedBusinessType === undefined ||
+    !BUSINESS_TYPE_KEYS.includes(requestedBusinessType) ||
+    requestedBusinessType === shop.businessType
+  ) {
+    return false;
+  }
+  const productCount = await Product.countDocuments({ shop: shop._id });
+  if (productCount > 0) {
+    res.status(400).json({ message: BUSINESS_TYPE_LOCKED_MESSAGE, code: 'BUSINESS_TYPE_LOCKED', productCount });
+    return true;
+  }
+  return false;
+};
 
 // @desc    Get all shops (Super Admin)
 // @route   GET /api/shops
@@ -48,7 +97,10 @@ const getShop = async (req, res) => {
     if (!shop) {
       return res.status(404).json({ message: 'Shop not found' });
     }
-    res.json(shop);
+    // productCount lets the Super Admin's Edit Shop UI know upfront whether
+    // Business Type is locked, without a separate round trip.
+    const productCount = await Product.countDocuments({ shop: shop._id });
+    res.json({ ...shop.toObject(), productCount });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -58,11 +110,13 @@ const getShop = async (req, res) => {
 // @route   POST /api/shops
 const createShop = async (req, res) => {
   try {
-    const { name, ownerName, email, phone, password, address } = req.body;
+    const { name, ownerName, email, phone, password, address, businessType } = req.body;
 
     if (!name || !ownerName || !email || !phone || !password) {
       return res.status(400).json({ message: 'Please provide all required fields: name, ownerName, email, phone, password' });
     }
+
+    const resolvedBusinessType = BUSINESS_TYPE_KEYS.includes(businessType) ? businessType : 'grocery';
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -81,7 +135,8 @@ const createShop = async (req, res) => {
       theme: 'light',
     });
 
-    // Create the shop with the owner reference
+    // Create the shop with the owner reference, initializing its module
+    // config from the selected business type's recommended defaults.
     const shop = await Shop.create({
       name,
       phone,
@@ -89,11 +144,21 @@ const createShop = async (req, res) => {
       address: address || '',
       owner: owner._id,
       subscriptionStatus: 'trial',
+      businessType: resolvedBusinessType,
+      settings: { enabledModules: getBusinessTypeDefaults(resolvedBusinessType).modules },
     });
 
     // Update user with shop reference
     owner.shop = shop._id;
     await owner.save();
+
+    // Best-effort: seed the business type's default categories. Never blocks
+    // shop creation if this fails for any reason.
+    try {
+      await seedDefaultCategories(shop._id, resolvedBusinessType);
+    } catch (seedError) {
+      console.error('Default category seeding failed for new shop:', seedError.message);
+    }
 
     res.status(201).json({
       shop,
@@ -127,7 +192,12 @@ const updateShop = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    const { name, ownerName, email, phone, address, logo, currency, timezone, settings } = req.body;
+    const { name, ownerName, email, phone, address, logo, currency, timezone, settings, businessType } = req.body;
+
+    // Reject the whole request up front if this would change Business Type
+    // on a shop that already has products — no partial update where every
+    // other field silently saves while businessType is quietly skipped.
+    if (await rejectIfBusinessTypeLocked(res, shop, businessType)) return;
 
     if (name) shop.name = name;
     if (email) shop.email = email;
@@ -136,6 +206,11 @@ const updateShop = async (req, res) => {
     if (currency) shop.currency = currency;
     if (timezone) shop.timezone = timezone;
     if (settings) shop.settings = { ...shop.settings, ...settings };
+    // Changing business type here only relabels the shop — it never touches
+    // settings.enabledModules, so it can't silently undo module toggles the
+    // owner already customized. Applying new recommended modules is a
+    // separate, explicit action (see updateMyShopSettings).
+    if (businessType && BUSINESS_TYPE_KEYS.includes(businessType)) shop.businessType = businessType;
 
     // Handle address: if it's a string (comma-separated from frontend), parse it into an object
     if (address !== undefined) {
@@ -199,7 +274,10 @@ const getMyShop = async (req, res) => {
     if (!shop) {
       return res.status(404).json({ message: 'Shop not found' });
     }
-    res.json(shop);
+    // productCount lets the Business Configuration settings UI know upfront
+    // whether Business Type is locked, without a separate round trip.
+    const productCount = await Product.countDocuments({ shop: shop._id });
+    res.json({ ...shop.toObject(), productCount });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -248,7 +326,16 @@ const updateMyShopSettings = async (req, res) => {
       paperSize, invoiceTemplate, printMode, autoPrint,
       printCopies, marginTop, marginBottom, marginLeft, marginRight,
       showLogo, showQR, showBarcode, showHeader, showFooter,
+      // Multi-business configuration
+      businessType, enabledModules, customUnits, applyRecommendedModules,
+      // POS display settings
+      posDisplayLimit,
     } = req.body;
+
+    // Reject the whole request up front if this would change Business Type
+    // on a shop that already has products — no partial update where
+    // unrelated settings in the same payload silently save anyway.
+    if (await rejectIfBusinessTypeLocked(res, shop, businessType)) return;
 
     if (taxRate !== undefined) shop.settings.taxRate = Math.max(0, Math.min(100, Number(taxRate)));
     if (taxName !== undefined) shop.settings.taxName = taxName;
@@ -273,6 +360,37 @@ const updateMyShopSettings = async (req, res) => {
     if (showBarcode !== undefined) shop.settings.showBarcode = !!showBarcode;
     if (showHeader !== undefined) shop.settings.showHeader = !!showHeader;
     if (showFooter !== undefined) shop.settings.showFooter = !!showFooter;
+
+    // POS display settings — partial merge, clamped to the settings UI's
+    // valid option ranges (5-30 desktop, 5-20 mobile).
+    if (posDisplayLimit && typeof posDisplayLimit === 'object') {
+      const current = shop.settings.posDisplayLimit?.toObject?.() || shop.settings.posDisplayLimit || {};
+      const next = { ...current };
+      if (posDisplayLimit.desktop !== undefined) next.desktop = Math.max(5, Math.min(30, Number(posDisplayLimit.desktop) || 20));
+      if (posDisplayLimit.mobile !== undefined) next.mobile = Math.max(5, Math.min(20, Number(posDisplayLimit.mobile) || 10));
+      shop.settings.posDisplayLimit = next;
+    }
+
+    // Multi-business configuration
+    if (businessType !== undefined && BUSINESS_TYPE_KEYS.includes(businessType)) {
+      shop.businessType = businessType;
+    }
+    // Partial merge — only the module keys the client actually sent are
+    // changed, so a toggle for one module never resets the others.
+    if (enabledModules && typeof enabledModules === 'object') {
+      shop.settings.enabledModules = { ...(shop.settings.enabledModules?.toObject?.() || shop.settings.enabledModules || {}), ...enabledModules };
+    }
+    // Explicit opt-in only — never runs automatically when businessType
+    // changes, so the owner's own toggles are never silently overwritten.
+    if (applyRecommendedModules) {
+      shop.settings.enabledModules = getBusinessTypeDefaults(shop.businessType).modules;
+    }
+    // Full replace — the Unit Manager UI always sends its complete list.
+    if (Array.isArray(customUnits)) {
+      shop.settings.customUnits = customUnits
+        .filter((u) => u && u.key && u.label)
+        .map((u) => ({ key: String(u.key).trim(), label: String(u.label).trim(), labelBn: u.labelBn ? String(u.labelBn).trim() : '' }));
+    }
 
     await shop.save();
     res.json(shop);
@@ -366,6 +484,23 @@ const restoreShopBackup = async (req, res) => {
   }
 };
 
+// @desc    Add this shop's business-type default categories (skips any that
+//          already exist by name) — lets a shop "catch up" after switching
+//          business type without ever touching existing categories.
+// @route   POST /api/shops/seed-categories
+const restoreDefaultCategories = async (req, res) => {
+  try {
+    const shop = await Shop.findById(req.user.shop);
+    if (!shop) {
+      return res.status(404).json({ message: 'Shop not found' });
+    }
+    const result = await seedDefaultCategories(shop._id, shop.businessType);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getShops,
   getShop,
@@ -377,4 +512,5 @@ module.exports = {
   updateMyShopSettings,
   getShopBackup,
   restoreShopBackup,
+  restoreDefaultCategories,
 };

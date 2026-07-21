@@ -173,14 +173,12 @@ const SuperAdminLayout = () => {
                 <div className="user-avatar">{user?.name?.charAt(0)?.toUpperCase() || <BiUser />}</div>
                 <div className="d-none d-md-block text-start">
                   <div className="user-name">{user?.name || t('common.user')}</div>
-                  <div className="user-email">{user?.email || ''}</div>
                 </div>
               </button>
               {profileOpen && (
                 <div className="dropdown-menu-premium">
                   <div className="px-3 py-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{user?.name}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{user?.email}</div>
                   </div>
                   <div className="dropdown-divider-premium" />
                   <button className="dropdown-item-premium" onClick={handleLogout} style={{ color: 'var(--danger)' }}>

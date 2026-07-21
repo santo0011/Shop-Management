@@ -1,20 +1,48 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
+import Select from 'react-select';
 import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ProductDrawer from '../../../components/common/ProductDrawer';
 import ProductDetailsDrawer from './ProductDetailsDrawer';
 import ExpandableCard from '../../../components/common/ExpandableCard';
+import ConfirmModal from '../../../components/common/ConfirmModal';
 import Pagination from '../../../components/common/Pagination';
+import BulkImportProgressModal from '../../../components/common/BulkImportProgressModal';
+import useBusinessConfig from '../../../hooks/useBusinessConfig';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
-  BiError, BiRefresh, BiInfoCircle, BiLoader,
+  BiError, BiRefresh, BiInfoCircle,
   BiShow, BiCategory, BiBarcode, BiCart, BiPackage,
   BiCalendar, BiDollar, BiStore
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
+import { showToast } from '../../../utils/toast';
+
+// Optional business-type-driven columns for the Products bulk import — only
+// the ones whose module is enabled for this shop are parsed/validated/shown,
+// so a grocery shop's sheet stays lean while a garments or electronics shop
+// can bring in size/color/serial/warranty columns without a code change.
+const DYNAMIC_PRODUCT_FIELDS = [
+  { key: 'batchNumber', moduleKey: 'batch', type: 'text', labelKey: 'product.batchNumber' },
+  { key: 'size', moduleKey: 'size', type: 'text', labelKey: 'product.size' },
+  { key: 'color', moduleKey: 'color', type: 'text', labelKey: 'product.color' },
+  { key: 'brand', moduleKey: 'brand', type: 'text', labelKey: 'product.brand' },
+  { key: 'serialNumber', moduleKey: 'serialNumber', type: 'text', labelKey: 'product.serialNumber' },
+  { key: 'warranty', moduleKey: 'warranty', type: 'text', labelKey: 'product.warranty' },
+  { key: 'modelNumber', moduleKey: 'modelNumber', type: 'text', labelKey: 'product.modelNumber' },
+  { key: 'length', moduleKey: 'dimensions', type: 'number', labelKey: 'product.length' },
+  { key: 'width', moduleKey: 'dimensions', type: 'number', labelKey: 'product.width' },
+];
+
+// Reads a column by its camelCase key, tolerating "spaced" and "snake_case"
+// header variants (e.g. `serialNumber` also matches "serial number" / "serial_number").
+const readAliasedValue = (keys, camelKey) => {
+  const spaced = camelKey.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+  return keys[camelKey.toLowerCase()] ?? keys[spaced] ?? keys[spaced.replace(/ /g, '_')] ?? '';
+};
 
 // ─── Bulk Import Drawer ──────────────────────────────────────────────────────
 const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
@@ -29,12 +57,16 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importElapsedMs, setImportElapsedMs] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
 
-  const units = ['kg', 'gram', 'liter', 'ml', 'piece', 'packet', 'box', 'carton'];
+  const { units: unitOptions, modules } = useBusinessConfig();
+  const units = unitOptions.map((u) => u.value);
+  const activeDynamicFields = DYNAMIC_PRODUCT_FIELDS.filter((f) => modules[f.moduleKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +81,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     setDuplicates({});
     setShowPreview(false);
     setImportResult(null);
-    setImportProgress({ current: 0, total: 0 });
+    setImportProgress({ current: 0, total: 0, success: 0, failed: 0 });
+    setShowImportModal(false);
+    setImportElapsedMs(0);
     setActiveTab('excel');
   };
 
@@ -89,11 +123,18 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         rowErrors.push(t('productsPage.bulkImport.invalidUnit', { unit: row.unit, validUnits: units.join(', ') }));
       }
 
-      // Validate expiry date
-      if (row.expiryDate) {
+      // Validate expiry date (only meaningful for business types that use it)
+      if (modules.expiryDate && row.expiryDate) {
         const d = new Date(row.expiryDate);
         if (isNaN(d.getTime())) rowErrors.push(t('productsPage.bulkImport.invalidExpiryDate'));
       }
+
+      // Validate the business-type-driven optional numeric columns
+      activeDynamicFields.forEach((f) => {
+        if (f.type === 'number' && row[f.key] !== '' && row[f.key] !== undefined && isNaN(Number(row[f.key]))) {
+          rowErrors.push(t('productsPage.bulkImport.invalidNumberField', { field: t(f.labelKey) }));
+        }
+      });
 
       // Check duplicates by barcode or name
       if (row.barcode?.trim()) {
@@ -120,7 +161,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     setErrors(errorMap);
     setDuplicates(dupMap);
     return { errorMap, dupMap };
-  }, [existingProducts]);
+  }, [existingProducts, modules, activeDynamicFields]);
 
   // ─── Excel/CSV Import ───────────────────────────────────────────────────
   const handleFileUpload = (e) => {
@@ -145,7 +186,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
             acc[key.toLowerCase().trim()] = row[key];
             return acc;
           }, {});
-          return {
+          const base = {
             name: keys.name || keys['product name'] || keys['product_name'] || keys['productname'] || '',
             supplier: keys.supplier || keys['supplier name'] || keys['supplier_name'] || keys['suppliername'] || '',
             purchasePrice: parseFloat(keys.purchaseprice || keys['purchase price'] || keys['purchase_price'] || 0) || 0,
@@ -160,6 +201,8 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
             discount: parseFloat(keys.discount || 0) || 0,
             tax: parseFloat(keys.tax || 0) || 0,
           };
+          DYNAMIC_PRODUCT_FIELDS.forEach((f) => { base[f.key] = readAliasedValue(keys, f.key); });
+          return base;
         });
 
         setParsedRows(mapped);
@@ -173,29 +216,23 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   };
 
   // ─── Download Sample Template ───────────────────────────────────────────
+  const DYNAMIC_FIELD_SAMPLES = {
+    batchNumber: 'BATCH-001', size: 'M', color: 'Red', brand: 'Acme',
+    serialNumber: 'SN-12345', warranty: '1 Year', modelNumber: 'MDL-100',
+    length: 10, width: 5,
+  };
+
   const handleDownloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      {
-        name: 'Rice 25kg',
-        supplier: 'ABC Suppliers',
-        purchasePrice: 1200,
-        sellingPrice: 1400,
-        stock: 50,
-        unit: 'Bag',
-        barcode: '8901234567890',
-        expiryDate: '2027-12-31',
-      },
-      {
-        name: 'Coca Cola 500ml',
-        supplier: 'XYZ Foods',
-        purchasePrice: 25,
-        sellingPrice: 35,
-        stock: 200,
-        unit: 'Bottle',
-        barcode: '8901234567891',
-        expiryDate: '2027-06-30',
-      },
-    ]);
+    const baseRows = [
+      { name: 'Rice 25kg', supplier: 'ABC Suppliers', purchasePrice: 1200, sellingPrice: 1400, stock: 50, unit: 'Bag', barcode: '8901234567890', ...(modules.expiryDate ? { expiryDate: '2027-12-31' } : {}) },
+      { name: 'Coca Cola 500ml', supplier: 'XYZ Foods', purchasePrice: 25, sellingPrice: 35, stock: 200, unit: 'Bottle', barcode: '8901234567891', ...(modules.expiryDate ? { expiryDate: '2027-06-30' } : {}) },
+    ];
+    const rows = baseRows.map((r) => {
+      const extra = {};
+      activeDynamicFields.forEach((f) => { extra[f.key] = DYNAMIC_FIELD_SAMPLES[f.key]; });
+      return { ...r, ...extra };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Products');
     XLSX.writeFile(wb, 'product_import_template.xlsx');
@@ -214,7 +251,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     line.includes('|') ? line.split('|') :
                     line.split(',');
       const cleanParts = parts.map(p => p.trim());
-      return {
+      const row = {
         name: cleanParts[0] || '',
         supplier: cleanParts[1] || '',
         purchasePrice: parseFloat(cleanParts[2]) || 0,
@@ -229,6 +266,11 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         discount: parseFloat(cleanParts[11]) || 0,
         tax: parseFloat(cleanParts[12]) || 0,
       };
+      // Fixed trailing positions (13+), same order as DYNAMIC_PRODUCT_FIELDS —
+      // always parsed so a row keeps working if a module gets toggled on
+      // after the sheet was prepared; irrelevant columns are simply ignored.
+      DYNAMIC_PRODUCT_FIELDS.forEach((f, i) => { row[f.key] = cleanParts[13 + i] || ''; });
+      return row;
     });
 
     if (parsed.length === 0) {
@@ -250,6 +292,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
   // ─── Import All ─────────────────────────────────────────────────────────
   const handleImport = async () => {
+    // Prevent a second import from starting while one is already running.
+    if (importing) return;
+
     // Validate category is selected
     if (!selectedCategory) {
       Swal.fire({ icon: 'warning', title: t('productsPage.bulkImport.categoryRequiredTitle'), text: t('productsPage.bulkImport.categoryRequiredText'), confirmButtonColor: '#6C63FF' });
@@ -267,8 +312,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       return;
     }
 
+    const startedAt = Date.now();
     setImporting(true);
-    setImportProgress({ current: 0, total: validRows.length });
+    setShowImportModal(true);
+    setImportProgress({ current: 0, total: validRows.length, success: 0, failed: 0 });
     let imported = 0;
     let updated = 0;
     let skipped = 0;
@@ -277,7 +324,6 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
     for (let i = 0; i < validRows.length; i++) {
       const row = validRows[i];
-      setImportProgress({ current: i + 1, total: validRows.length });
 
       try {
         // Use the globally selected category for all products
@@ -300,22 +346,34 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           barcode: row.barcode || '',
           discount: Number(row.discount) || 0,
           tax: Number(row.tax) || 0,
-          expiryDate: row.expiryDate ? new Date(row.expiryDate) : undefined,
         };
 
+        if (modules.expiryDate && row.expiryDate) {
+          const d = new Date(row.expiryDate);
+          if (!isNaN(d.getTime())) payload.expiryDate = d;
+        }
+        activeDynamicFields.forEach((f) => {
+          const val = row[f.key];
+          if (val === '' || val === undefined || val === null) return;
+          payload[f.key] = f.type === 'number' ? Number(val) : val;
+        });
+
         if (existing && !skipDuplicates) {
-          await api.put(`/products/${existing._id}`, payload);
+          await api.put(`/products/${existing._id}`, payload, { _skipLoading: true });
           updated++;
         } else {
-          await api.post('/products', payload);
+          await api.post('/products', payload, { _skipLoading: true });
           imported++;
         }
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       } catch (err) {
         failed++;
         failedDetails.push(`${row.name}: ${err.response?.data?.message || err.message}`);
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       }
     }
 
+    setImportElapsedMs(Date.now() - startedAt);
     setImportResult({ total: validRows.length, imported, updated, skipped, failed, failedDetails });
     setImporting(false);
     onSuccess();
@@ -507,21 +565,6 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   </div>
                 )}
 
-                {/* Import Progress */}
-                {importing && (
-                  <div className="bulk-import-progress">
-                    <div className="bulk-import-progress-bar">
-                      <div
-                        className="bulk-import-progress-fill"
-                        style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-                      />
-                    </div>
-                    <span className="bulk-import-progress-text">
-                      <BiLoader className="spin" /> {t('productsPage.bulkImport.importingProgress', { current: importProgress.current, total: importProgress.total })}
-                    </span>
-                  </div>
-                )}
-
                 {/* Import Result */}
                 {importResult && (
                   <div className="bulk-import-result">
@@ -567,7 +610,8 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                             <th>{t('product.stock')}</th>
                             <th>{t('product.unit')}</th>
                             <th>{t('product.barcode')}</th>
-                            <th>{t('productsPage.bulkImport.colExpiry')}</th>
+                            {modules.expiryDate && <th>{t('productsPage.bulkImport.colExpiry')}</th>}
+                            {activeDynamicFields.map((f) => <th key={f.key}>{t(f.labelKey)}</th>)}
                             <th style={{ width: '70px' }}>{t('common.status')}</th>
                             <th style={{ width: '36px' }}></th>
                           </tr>
@@ -587,7 +631,10 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                                 <td style={{ fontSize: '0.78rem' }}>{row.stock}</td>
                                 <td style={{ fontSize: '0.78rem' }}>{row.unit || '-'}</td>
                                 <td style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>{row.barcode || '-'}</td>
-                                <td style={{ fontSize: '0.75rem' }}>{row.expiryDate || '-'}</td>
+                                {modules.expiryDate && <td style={{ fontSize: '0.75rem' }}>{row.expiryDate || '-'}</td>}
+                                {activeDynamicFields.map((f) => (
+                                  <td key={f.key} style={{ fontSize: '0.78rem' }}>{row[f.key] || '-'}</td>
+                                ))}
                                 <td>
                                   {status === 'error' && (
                                     <span className="bulk-import-status-badge status-error" title={errors[idx]?.join(', ')}>
@@ -665,8 +712,30 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           </div>
         </div>
       </div>
+
+      <BulkImportProgressModal
+        open={showImportModal}
+        phase={importing ? 'importing' : 'done'}
+        label={t('productsPage.bulkImportButton')}
+        current={importProgress.current}
+        total={importProgress.total}
+        success={importProgress.success}
+        failed={importProgress.failed}
+        elapsedMs={importElapsedMs}
+        onDismiss={() => setShowImportModal(false)}
+      />
     </>
   );
+};
+
+// A plain checkbox that also reflects a third "some, but not all" state —
+// React has no `indeterminate` JSX prop, so it's set imperatively on the DOM node.
+const SelectAllCheckbox = ({ checked, indeterminate, onChange, ...rest }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} {...rest} />;
 };
 
 // Fixed page size for the Products list — server-side pagination via ?page=&limit=.
@@ -675,6 +744,7 @@ const PRODUCTS_PER_PAGE = 10;
 // ─── Main Products Page ──────────────────────────────────────────────────────
 const Products = () => {
   const { t, i18n } = useTranslation();
+  const { modules } = useBusinessConfig();
   const location = useLocation();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -682,6 +752,7 @@ const Products = () => {
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -691,6 +762,9 @@ const Products = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
   const [viewProductId, setViewProductId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -698,10 +772,17 @@ const Products = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // A new search term invalidates the current page — always land back on page 1.
+  // A new search term or category invalidates the current page — always land
+  // back on page 1.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, selectedCategory]);
+
+  // Selection is page-scoped — navigating away from a page (or re-searching/
+  // re-filtering) clears it, so nothing gets silently selected out of view.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedSearch, selectedCategory]);
 
   // Deep-link: open a specific product's drawer when navigated here from Global Search.
   useEffect(() => {
@@ -721,8 +802,9 @@ const Products = () => {
     // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
+      const categoryParam = selectedCategory ? `&category=${selectedCategory}` : '';
       const { data } = await api.get(
-        `/products?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${PRODUCTS_PER_PAGE}`,
+        `/products?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${PRODUCTS_PER_PAGE}${categoryParam}`,
         { _skipLoading: true }
       );
       setProducts(data.products || []);
@@ -741,7 +823,7 @@ const Products = () => {
       if (silent) setSearching(false); else setLoading(false);
       isFirstLoad.current = false;
     }
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, selectedCategory]);
 
   const fetchCategories = async () => {
     try {
@@ -783,16 +865,142 @@ const Products = () => {
     }
   };
 
-  const units = [
-    { value: 'kg', label: t('units.kg') },
-    { value: 'gram', label: t('units.gram') },
-    { value: 'liter', label: t('units.liter') },
-    { value: 'ml', label: t('units.ml') },
-    { value: 'piece', label: t('units.piece') },
-    { value: 'packet', label: t('units.packet') },
-    { value: 'box', label: t('units.box') },
-    { value: 'carton', label: t('units.carton') },
-  ];
+  // Optimistically flips the badge, then persists — reverts on failure so
+  // the UI never shows a state the server didn't actually accept.
+  const handleToggleActive = async (product) => {
+    const nextActive = !(product.isActive !== false);
+    setProducts((prev) => prev.map((p) => (p._id === product._id ? { ...p, isActive: nextActive } : p)));
+    try {
+      await api.put(`/products/${product._id}`, { isActive: nextActive }, { _skipLoading: true });
+    } catch (err) {
+      setProducts((prev) => prev.map((p) => (p._id === product._id ? { ...p, isActive: !nextActive } : p)));
+      Swal.fire({
+        icon: 'error',
+        title: t('common.error'),
+        text: err.response?.data?.message || t('productsPage.statusUpdateFailed'),
+        confirmButtonColor: '#6C63FF',
+      });
+    }
+  };
+
+  // ─── Multi-select & Bulk Delete ─────────────────────────────────────────
+  const isSelected = (id) => selectedIds.has(id);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allOnPageSelected = products.length > 0 && products.every((p) => selectedIds.has(p._id));
+  const someOnPageSelected = products.some((p) => selectedIds.has(p._id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allOnPageSelected) return new Set();
+      const next = new Set(prev);
+      products.forEach((p) => next.add(p._id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { data } = await api.post('/products/bulk-delete', { ids });
+      setBulkConfirmOpen(false);
+      setSelectedIds(new Set());
+
+      if (data.blockedCount > 0) {
+        const lines = [];
+        if (data.deletedCount > 0) lines.push(`✅ ${t('productsPage.bulkDeleteSuccessLine', { count: data.deletedCount })}`);
+        lines.push(`⚠️ ${t('productsPage.bulkDeleteBlockedLine', { count: data.blockedCount })}`);
+        Swal.fire({
+          icon: data.deletedCount > 0 ? 'warning' : 'error',
+          title: t('productsPage.bulkDeleteSummaryTitle'),
+          html: `<div style="text-align:left; font-size:0.9rem; line-height:1.8;">${lines.map((l) => `<div>${l}</div>`).join('')}</div>`,
+          confirmButtonColor: '#6C63FF',
+        });
+      } else {
+        showToast.success(t('productsPage.bulkDeleteSuccessLine', { count: data.deletedCount }));
+      }
+
+      // Step back a page if this emptied the current page beyond page 1.
+      if (ids.length >= products.length && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchProducts();
+      }
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('productsPage.bulkDeleteFailed'));
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  // ─── Category Filter (react-select) ─────────────────────────────────────
+  const categoryOptions = useMemo(() => [
+    { value: '', label: t('productsPage.allCategories') },
+    ...categories.map((cat) => ({
+      value: cat._id,
+      label: i18n.language === 'bn' && cat.nameBn ? cat.nameBn : cat.name,
+    })),
+  ], [categories, t, i18n.language]);
+
+  const selectedCategoryOption = categoryOptions.find((o) => o.value === selectedCategory) || categoryOptions[0];
+
+  // Themed via CSS custom properties so it follows light/dark mode exactly
+  // like every other input on this page — no separate light/dark branches needed.
+  const categorySelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: '44px',
+      backgroundColor: 'var(--bg-input)',
+      borderWidth: '1.5px',
+      borderColor: state.isFocused ? 'var(--primary)' : 'var(--border-color)',
+      borderRadius: 'var(--border-radius-sm)',
+      boxShadow: state.isFocused ? '0 0 0 3px rgba(108, 99, 255, 0.12)' : 'none',
+      transition: 'all 150ms ease',
+      '&:hover': { borderColor: 'var(--primary)' },
+    }),
+    valueContainer: (base) => ({ ...base, paddingLeft: 30 }),
+    singleValue: (base) => ({ ...base, color: 'var(--text-primary)' }),
+    placeholder: (base) => ({ ...base, color: 'var(--text-muted)' }),
+    input: (base) => ({ ...base, color: 'var(--text-primary)' }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    dropdownIndicator: (base, state) => ({
+      ...base,
+      color: 'var(--text-muted)',
+      transition: 'transform 150ms ease',
+      transform: state.selectProps.menuIsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+    }),
+    clearIndicator: (base) => ({ ...base, color: 'var(--text-muted)', '&:hover': { color: 'var(--danger)' } }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: 'var(--bg-card)',
+      border: '1px solid var(--border-color)',
+      borderRadius: 'var(--border-radius-sm)',
+      boxShadow: 'var(--shadow-md)',
+      overflow: 'hidden',
+      zIndex: 20,
+      animation: 'productsCategoryMenuIn 120ms ease',
+    }),
+    menuList: (base) => ({ ...base, padding: 4 }),
+    option: (base, state) => ({
+      ...base,
+      borderRadius: 'var(--border-radius-sm)',
+      backgroundColor: state.isSelected
+        ? 'var(--primary)'
+        : state.isFocused
+          ? 'var(--bg-input)'
+          : 'transparent',
+      color: state.isSelected ? '#fff' : 'var(--text-primary)',
+      cursor: 'pointer',
+    }),
+  };
 
   return (
     <div>
@@ -814,17 +1022,78 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input
-            className="form-control"
-            placeholder={t('product.searchProductsPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Search + Category Filter */}
+      <div className="list-filters-card">
+        <div className="list-filter-field list-search-field">
+          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input
+              className="form-control list-filter-input"
+              placeholder={t('product.searchProductsPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
+        <div className="list-filter-field products-category-field">
+          <label className="list-filter-label"><BiCategory size={13} /> {t('product.category')}</label>
+          <div className="products-category-filter">
+            <BiCategory className="products-category-filter-icon" />
+            <Select
+              classNamePrefix="products-category-select"
+              options={categoryOptions}
+              value={selectedCategoryOption}
+              onChange={(opt) => setSelectedCategory(opt?.value || '')}
+              isSearchable
+              isClearable={!!selectedCategory}
+              placeholder={t('productsPage.allCategories')}
+              styles={categorySelectStyles}
+              aria-label={t('product.category')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Bulk Action Toolbar ─────────────────────────────────────────
+          Sticky so it stays reachable while scrolling a long list; only
+          rendered once at least one product is selected. */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-select-toolbar">
+          <span className="bulk-select-toolbar__count">
+            {t('productsPage.productsSelected', { count: selectedIds.size })}
+          </span>
+          <div className="bulk-select-toolbar__actions">
+            <button
+              type="button"
+              className="btn-premium btn-premium-secondary"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <BiX /> {t('productsPage.clearSelection')}
+            </button>
+            <button
+              type="button"
+              className="btn-premium btn-premium-danger"
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              <BiTrash /> {t('productsPage.deleteSelected')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only Select All bar (no table header on mobile cards) */}
+      <div className="bulk-select-mobile-bar">
+        <label className="bulk-select-checkbox">
+          <SelectAllCheckbox
+            checked={allOnPageSelected}
+            indeterminate={someOnPageSelected && !allOnPageSelected}
+            onChange={toggleSelectAll}
+            disabled={products.length === 0}
+          />
+          <span className="bulk-select-checkmark" />
+          <span>{t('productsPage.selectAllProducts')}</span>
+        </label>
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
@@ -833,6 +1102,17 @@ const Products = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
+                <th style={{ width: '44px' }}>
+                  <label className="bulk-select-checkbox" title={t('productsPage.selectAllProducts')}>
+                    <SelectAllCheckbox
+                      checked={allOnPageSelected}
+                      indeterminate={someOnPageSelected && !allOnPageSelected}
+                      onChange={toggleSelectAll}
+                      disabled={products.length === 0}
+                    />
+                    <span className="bulk-select-checkmark" />
+                  </label>
+                </th>
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('product.productName')}</th>
                 <th>{t('product.category')}</th>
@@ -845,19 +1125,25 @@ const Products = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
                     {t('empty.noProducts')}
                   </td>
                 </tr>
               ) : products.map((product, idx) => (
-                <tr key={product._id}>
+                <tr key={product._id} className={isSelected(product._id) ? 'bulk-select-row--selected' : ''}>
+                  <td>
+                    <label className="bulk-select-checkbox" title={t('productsPage.selectProduct')}>
+                      <input type="checkbox" checked={isSelected(product._id)} onChange={() => toggleSelect(product._id)} />
+                      <span className="bulk-select-checkmark" />
+                    </label>
+                  </td>
                   <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                     {(page - 1) * PRODUCTS_PER_PAGE + idx + 1}
                   </td>
@@ -873,11 +1159,14 @@ const Products = () => {
                     </span>
                   </td>
                   <td>
-                    {product.stock <= product.minStock ? (
-                      <span className="badge badge-danger">{t('product.lowStock')}</span>
-                    ) : (
-                      <span className="badge badge-success">{t('common.active')}</span>
-                    )}
+                    <button
+                      type="button"
+                      className={`badge badge-clickable ${product.isActive !== false ? 'badge-success' : 'badge-danger'}`}
+                      onClick={() => handleToggleActive(product)}
+                      title={t('productsPage.clickToToggleStatus')}
+                    >
+                      {product.isActive !== false ? t('common.active') : t('common.inactive')}
+                    </button>
                   </td>
                   <td>
                     <div className="d-flex gap-1">
@@ -913,6 +1202,13 @@ const Products = () => {
         ) : products.map((product) => (
           <ExpandableCard
             key={product._id}
+            className={isSelected(product._id) ? 'bulk-select-mobile-row--selected' : ''}
+            checkbox={
+              <label className="bulk-select-checkbox bulk-select-checkbox--mobile">
+                <input type="checkbox" checked={isSelected(product._id)} onChange={() => toggleSelect(product._id)} />
+                <span className="bulk-select-checkmark" />
+              </label>
+            }
             compact={
               <>
                 <div className="expandable-card__compact-row">
@@ -962,15 +1258,46 @@ const Products = () => {
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{product.minStock || 0}</span>
                 </div>
+                {modules.brand && product.brand && (
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">{t('product.brand')}</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{product.brand}</span>
+                  </div>
+                )}
+                {(modules.size || modules.color) && (product.size || product.color) && (
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">{t('product.size')}/{t('product.color')}</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{[product.size, product.color].filter(Boolean).join(' / ') || '-'}</span>
+                  </div>
+                )}
+                {modules.serialNumber && product.serialNumber && (
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">{t('product.serialNumber')}</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value expandable-card__row-value--mono">{product.serialNumber}</span>
+                  </div>
+                )}
+                {modules.expiryDate && product.expiryDate && (
+                  <div className="expandable-card__row">
+                    <span className="expandable-card__row-label">{t('product.expiryDate')}</span>
+                    <span className="expandable-card__row-dots" />
+                    <span className="expandable-card__row-value">{new Date(product.expiryDate).toLocaleDateString()}</span>
+                  </div>
+                )}
                 <div className="expandable-card__row">
                   <span className="expandable-card__row-label">{t('common.status')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">
-                    {product.stock <= product.minStock ? (
-                      <span className="badge badge-danger">{t('product.lowStock')}</span>
-                    ) : (
-                      <span className="badge badge-success">{t('common.active')}</span>
-                    )}
+                    <button
+                      type="button"
+                      className={`badge badge-clickable ${product.isActive !== false ? 'badge-success' : 'badge-danger'}`}
+                      onClick={(e) => { e.stopPropagation(); handleToggleActive(product); }}
+                      title={t('productsPage.clickToToggleStatus')}
+                    >
+                      {product.isActive !== false ? t('common.active') : t('common.inactive')}
+                    </button>
                   </span>
                 </div>
                 <div className="expandable-card__row">
@@ -1013,7 +1340,6 @@ const Products = () => {
         onSuccess={fetchProducts}
         editing={editing}
         categories={categories}
-        units={units}
         t={t}
       />
 
@@ -1061,6 +1387,18 @@ const Products = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmModal
+        open={bulkConfirmOpen}
+        onClose={() => !bulkDeleting && setBulkConfirmOpen(false)}
+        onConfirm={handleBulkDelete}
+        title={t('productsPage.bulkDeleteTitle')}
+        message={t('productsPage.bulkDeleteConfirm')}
+        confirmText={bulkDeleting ? t('common.deleting') : t('common.delete')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+      />
     </div>
   );
 };

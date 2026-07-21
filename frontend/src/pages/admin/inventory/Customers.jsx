@@ -13,8 +13,10 @@ import {
   BiLayer, BiGroup, BiCreditCard, BiTrendingUp, BiReceipt, BiHistory,
   BiStar, BiCrown, BiArrowBack, BiBook, BiTime,
   BiCheckCircle, BiErrorCircle,
+  BiUpload, BiDownload, BiFile, BiPaste, BiTable, BiError, BiRefresh, BiInfoCircle,
 } from 'react-icons/bi';
 import Swal from 'sweetalert2';
+import * as XLSX from 'xlsx';
 
 // ─── Helpers ───────────────────────────────────────────────────
 const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
@@ -175,7 +177,7 @@ const PaymentDrawer = ({ open, onClose, customer, onSuccess, t }) => {
                   style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px' }}
                 >
                   {paymentMethods.map((pm) => (
-                    <option key={pm} value={pm}>{t(`sale.${pm}`)}</option>
+                    <option key={pm} value={pm}>{t(`sale.${paymentMethodKey(pm)}`)}</option>
                   ))}
                 </select>
               </div>
@@ -868,6 +870,503 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
   );
 };
 
+// ─── Bulk Import Drawer ──────────────────────────────────────────────────────
+const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
+  const [activeTab, setActiveTab] = useState('excel'); // 'excel' | 'paste'
+  const [pasteData, setPasteData] = useState('');
+  const [parsedRows, setParsedRows] = useState([]);
+  const [errors, setErrors] = useState({});
+  const [duplicates, setDuplicates] = useState({});
+  const [existingCustomers, setExistingCustomers] = useState([]);
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // Reset state when drawer opens
+  useEffect(() => {
+    if (!open) return;
+    resetState();
+    loadExistingCustomers();
+  }, [open]);
+
+  const resetState = () => {
+    setPasteData('');
+    setParsedRows([]);
+    setErrors({});
+    setDuplicates({});
+    setShowPreview(false);
+    setImportResult(null);
+    setActiveTab('excel');
+  };
+
+  const loadExistingCustomers = async () => {
+    try {
+      const { data } = await api.get('/customers?limit=10000');
+      setExistingCustomers(data.customers || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ─── Detect Duplicates ──────────────────────────────────────────────────
+  const detectDuplicates = useCallback((rows) => {
+    const dupMap = {};
+    const errorMap = {};
+    rows.forEach((row, idx) => {
+      const rowErrors = [];
+      if (!row.name?.trim()) rowErrors.push(t('customersPage.nameRequired'));
+      if (!row.phone?.trim()) rowErrors.push(t('customersPage.phoneRequired'));
+
+      // Customer creation has no server-side duplicate check, so this
+      // client-side match (by phone or email) is the only guard.
+      const existing = existingCustomers.find(c =>
+        c.phone === row.phone?.trim() || (row.email && c.email?.toLowerCase() === row.email?.trim()?.toLowerCase())
+      );
+      if (existing) {
+        dupMap[idx] = existing;
+      }
+
+      if (rowErrors.length > 0) {
+        errorMap[idx] = rowErrors;
+      }
+    });
+    setErrors(errorMap);
+    setDuplicates(dupMap);
+    return { errorMap, dupMap };
+  }, [existingCustomers]);
+
+  // ─── Excel/CSV Import ───────────────────────────────────────────────────
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+        if (jsonData.length === 0) {
+          Swal.fire({ icon: 'warning', title: t('customersPage.bulkImport.emptyFileTitle'), text: t('customersPage.bulkImport.emptyFileText'), confirmButtonColor: '#6C63FF' });
+          return;
+        }
+
+        const mapped = jsonData.map(row => {
+          const keys = Object.keys(row).reduce((acc, key) => {
+            acc[key.toLowerCase().trim()] = row[key];
+            return acc;
+          }, {});
+          return {
+            name: keys.name || keys['customer name'] || keys['customer_name'] || '',
+            phone: String(keys.phone || keys['phone number'] || keys['phone_number'] || keys.mobile || ''),
+            email: keys.email || keys['e-mail'] || keys['email address'] || '',
+            address: keys.address || '',
+            nameBn: keys.namebn || keys['name_bn'] || keys['bangla name'] || keys['bangla_name'] || '',
+            openingBalance: parseFloat(keys.openingbalance || keys['opening balance'] || keys['opening_balance'] || keys.due || 0) || 0,
+          };
+        });
+
+        setParsedRows(mapped);
+        setShowPreview(true);
+        detectDuplicates(mapped);
+      } catch (err) {
+        Swal.fire({ icon: 'error', title: t('customersPage.bulkImport.parseErrorTitle'), text: t('customersPage.bulkImport.parseErrorText'), confirmButtonColor: '#6C63FF' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // ─── Download Sample Template ───────────────────────────────────────────
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { name: 'John Doe', phone: '01711111111', email: 'john@gmail.com', address: 'Dhaka', openingBalance: 0, nameBn: 'জন ডো' },
+      { name: 'Jane Smith', phone: '01822222222', email: 'jane@gmail.com', address: 'Kolkata', openingBalance: 500, nameBn: '' },
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+    XLSX.writeFile(wb, 'customer_import_template.xlsx');
+  };
+
+  // ─── Paste Import ───────────────────────────────────────────────────────
+  const handleParsePaste = () => {
+    if (!pasteData.trim()) {
+      Swal.fire({ icon: 'warning', title: t('customersPage.bulkImport.emptyDataTitle'), text: t('customersPage.bulkImport.emptyDataText'), confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    const lines = pasteData.split('\n').filter(line => line.trim());
+    const parsed = lines.map((line) => {
+      // Support comma, tab, or pipe separated
+      const parts = line.includes('\t') ? line.split('\t') :
+                    line.includes('|') ? line.split('|') :
+                    line.split(',');
+      const cleanParts = parts.map(p => p.trim());
+      return {
+        name: cleanParts[0] || '',
+        phone: cleanParts[1] || '',
+        email: cleanParts[2] || '',
+        address: cleanParts[3] || '',
+        openingBalance: parseFloat(cleanParts[4]) || 0,
+        nameBn: cleanParts[5] || '',
+      };
+    });
+
+    if (parsed.length === 0) {
+      Swal.fire({ icon: 'warning', title: t('customersPage.bulkImport.noDataTitle'), text: t('customersPage.bulkImport.noDataText'), confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    setParsedRows(parsed);
+    setShowPreview(true);
+    detectDuplicates(parsed);
+  };
+
+  // ─── Remove Row ─────────────────────────────────────────────────────────
+  const removeRow = (idx) => {
+    const updated = parsedRows.filter((_, i) => i !== idx);
+    setParsedRows(updated);
+    detectDuplicates(updated);
+  };
+
+  // ─── Import All ─────────────────────────────────────────────────────────
+  const handleImport = async () => {
+    const validRows = parsedRows.filter((row, idx) => {
+      if (errors[idx] && errors[idx].length > 0) return false;
+      if (skipDuplicates && duplicates[idx]) return false;
+      return true;
+    });
+
+    if (validRows.length === 0) {
+      Swal.fire({ icon: 'warning', title: t('customersPage.bulkImport.noValidRowsTitle'), text: t('customersPage.bulkImport.noValidRowsText'), confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    setImporting(true);
+    let imported = 0;
+    let updated = 0;
+    let failed = 0;
+    const failedDetails = [];
+
+    for (const row of validRows) {
+      try {
+        const existing = existingCustomers.find(c =>
+          c.phone === row.phone?.trim() || (row.email && c.email?.toLowerCase() === row.email.toLowerCase())
+        );
+
+        const payload = {
+          name: row.name,
+          nameBn: row.nameBn || '',
+          email: row.email || '',
+          phone: row.phone,
+          address: row.address || '',
+          openingBalance: Number(row.openingBalance) || 0,
+        };
+
+        if (existing && !skipDuplicates) {
+          await api.put(`/customers/${existing._id}`, payload);
+          updated++;
+        } else {
+          await api.post('/customers', payload);
+          imported++;
+        }
+      } catch (err) {
+        failed++;
+        failedDetails.push(`${row.name}: ${err.response?.data?.message || err.message}`);
+      }
+    }
+
+    setImportResult({ total: parsedRows.length, imported, updated, failed, failedDetails });
+    setImporting(false);
+    onSuccess();
+  };
+
+  const errorCount = Object.keys(errors).length;
+  const duplicateCount = Object.keys(duplicates).length;
+  const validCount = parsedRows.length - errorCount - (skipDuplicates ? duplicateCount : 0);
+
+  const getRowStatus = (idx) => {
+    const rowErrors = errors[idx];
+    const isDup = duplicates[idx];
+    if (rowErrors && rowErrors.length > 0) return 'error';
+    if (isDup && skipDuplicates) return 'duplicate-skip';
+    if (isDup) return 'duplicate-update';
+    return 'valid';
+  };
+
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+      <div className={`drawer ${open ? 'open' : ''}`} style={{ width: '640px', maxWidth: '100vw' }}>
+        <div className="drawer-header">
+          <h5><BiUpload className="me-2" />{t('customersPage.bulkImport.title')}</h5>
+          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        </div>
+        <div className="drawer-body" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
+          {/* Tabs */}
+          <div className="bulk-import-tabs">
+            <button
+              className={`bulk-import-tab ${activeTab === 'excel' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('excel'); setShowPreview(false); setParsedRows([]); }}
+            >
+              <BiFile /> {t('customersPage.bulkImport.tabExcel')}
+            </button>
+            <button
+              className={`bulk-import-tab ${activeTab === 'paste' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('paste'); setShowPreview(false); setParsedRows([]); }}
+            >
+              <BiPaste /> {t('customersPage.bulkImport.tabPaste')}
+            </button>
+          </div>
+
+          <div style={{ padding: '1.25rem', flex: 1, overflowY: 'auto' }}>
+            {/* ─── Tab 1: Excel/CSV ────────────────────────────────────────── */}
+            {activeTab === 'excel' && !showPreview && (
+              <div className="bulk-import-upload-area">
+                <div className="bulk-import-upload-box">
+                  <BiUpload size={48} />
+                  <h6>{t('customersPage.bulkImport.uploadTitle')}</h6>
+                  <p>{t('customersPage.bulkImport.uploadDesc')}</p>
+                  <div className="d-flex gap-2 justify-content-center flex-wrap">
+                    <button
+                      className="btn-premium btn-premium-primary"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <BiUpload /> {t('customersPage.bulkImport.selectFile')}
+                    </button>
+                    <button
+                      className="btn-premium btn-premium-secondary"
+                      onClick={handleDownloadTemplate}
+                    >
+                      <BiDownload /> {t('customersPage.bulkImport.downloadTemplate')}
+                    </button>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                  />
+                  <div className="bulk-import-format-info">
+                    <BiInfoCircle />
+                    <small>{t('customersPage.bulkImport.formatInfo')}</small>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Tab 2: Paste ────────────────────────────────────────────── */}
+            {activeTab === 'paste' && !showPreview && (
+              <div className="bulk-import-paste-area">
+                <div className="bulk-import-paste-header">
+                  <BiPaste size={28} />
+                  <h6>{t('customersPage.bulkImport.pasteTitle')}</h6>
+                </div>
+                <p className="bulk-import-paste-desc">
+                  {t('customersPage.bulkImport.pasteDesc')}
+                </p>
+                <div className="bulk-import-format-example">
+                  <strong>{t('customersPage.bulkImport.formatLabel')}</strong> {t('customersPage.bulkImport.formatExample')}
+                </div>
+                <textarea
+                  className="bulk-import-textarea"
+                  rows={8}
+                  value={pasteData}
+                  onChange={(e) => setPasteData(e.target.value)}
+                  placeholder={t('customersPage.bulkImport.pasteExample')}
+                />
+                <button
+                  className="btn-premium btn-premium-primary w-100 mt-2"
+                  onClick={handleParsePaste}
+                >
+                  <BiTable /> {t('customersPage.bulkImport.parsePreview')}
+                </button>
+              </div>
+            )}
+
+            {/* ─── Preview Table ───────────────────────────────────────────── */}
+            {showPreview && parsedRows.length > 0 && (
+              <div className="bulk-import-preview">
+                {/* Summary Stats */}
+                <div className="bulk-import-summary">
+                  <div className="bulk-import-stat">
+                    <span className="bulk-import-stat-value">{parsedRows.length}</span>
+                    <span className="bulk-import-stat-label">{t('customersPage.bulkImport.totalRows')}</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-valid">
+                    <span className="bulk-import-stat-value">{validCount}</span>
+                    <span className="bulk-import-stat-label">{t('customersPage.bulkImport.valid')}</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-error">
+                    <span className="bulk-import-stat-value">{errorCount}</span>
+                    <span className="bulk-import-stat-label">{t('customersPage.bulkImport.errors')}</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-dup">
+                    <span className="bulk-import-stat-value">{duplicateCount}</span>
+                    <span className="bulk-import-stat-label">{t('customersPage.bulkImport.duplicates')}</span>
+                  </div>
+                </div>
+
+                {/* Duplicate handling toggle */}
+                {duplicateCount > 0 && (
+                  <div className="bulk-import-dup-toggle">
+                    <label className="bulk-import-toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={skipDuplicates}
+                        onChange={(e) => setSkipDuplicates(e.target.checked)}
+                      />
+                      <span>{t('customersPage.bulkImport.skipDuplicates', { count: duplicateCount })}</span>
+                    </label>
+                    <span className="bulk-import-toggle-hint">
+                      {t('customersPage.bulkImport.skipDuplicatesHint')}
+                    </span>
+                  </div>
+                )}
+
+                {/* Import Result */}
+                {importResult && (
+                  <div className="bulk-import-result">
+                    <div className="bulk-import-result-icon">
+                      <BiCheck size={32} />
+                    </div>
+                    <h6>{t('customersPage.bulkImport.importComplete')}</h6>
+                    <div className="bulk-import-result-stats">
+                      <span>{t('customersPage.bulkImport.imported')} <strong>{importResult.imported}</strong></span>
+                      <span>{t('customersPage.bulkImport.updated')} <strong>{importResult.updated}</strong></span>
+                      <span>{t('customersPage.bulkImport.failed')} <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
+                    </div>
+                    {importResult.failedDetails.length > 0 && (
+                      <div className="bulk-import-result-failures">
+                        <small>{t('customersPage.bulkImport.failedRows')}</small>
+                        {importResult.failedDetails.map((detail, i) => (
+                          <div key={i} className="bulk-import-failure-item">{detail}</div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      className="btn-premium btn-premium-primary mt-3"
+                      onClick={() => { setShowPreview(false); setImportResult(null); setParsedRows([]); }}
+                    >
+                      <BiRefresh /> {t('customersPage.bulkImport.importMore')}
+                    </button>
+                  </div>
+                )}
+
+                {/* Preview Table (hidden when import complete) */}
+                {!importResult && (
+                  <>
+                    <div className="bulk-import-preview-scroll">
+                      <table className="bulk-import-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '40px' }}>#</th>
+                            <th>{t('common.name')}</th>
+                            <th>{t('auth.phone')}</th>
+                            <th>{t('auth.email')}</th>
+                            <th>{t('customersPage.address')}</th>
+                            <th style={{ width: '80px' }}>{t('common.status')}</th>
+                            <th style={{ width: '40px' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parsedRows.map((row, idx) => {
+                            const status = getRowStatus(idx);
+                            return (
+                              <tr key={idx} className={`bulk-import-row-${status}`}>
+                                <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{idx + 1}</td>
+                                <td>
+                                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{row.name || '-'}</div>
+                                  {row.nameBn && <small style={{ color: 'var(--text-muted)' }}>{row.nameBn}</small>}
+                                </td>
+                                <td style={{ fontSize: '0.85rem' }}>{row.phone || '-'}</td>
+                                <td style={{ fontSize: '0.85rem' }}>{row.email || '-'}</td>
+                                <td style={{ fontSize: '0.85rem', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.address || '-'}</td>
+                                <td>
+                                  {status === 'error' && (
+                                    <span className="bulk-import-status-badge status-error" title={errors[idx]?.join(', ')}>
+                                      <BiError /> {t('customersPage.bulkImport.statusError')}
+                                    </span>
+                                  )}
+                                  {status === 'duplicate-skip' && (
+                                    <span className="bulk-import-status-badge status-dup-skip" title={t('customersPage.bulkImport.duplicateOf', { name: duplicates[idx]?.name })}>
+                                      <BiX /> {t('customersPage.bulkImport.statusSkip')}
+                                    </span>
+                                  )}
+                                  {status === 'duplicate-update' && (
+                                    <span className="bulk-import-status-badge status-dup-update" title={t('customersPage.bulkImport.willUpdate', { name: duplicates[idx]?.name })}>
+                                      <BiRefresh /> {t('customersPage.bulkImport.statusUpdate')}
+                                    </span>
+                                  )}
+                                  {status === 'valid' && (
+                                    <span className="bulk-import-status-badge status-valid">
+                                      <BiCheck /> {t('customersPage.bulkImport.statusValid')}
+                                    </span>
+                                  )}
+                                </td>
+                                <td>
+                                  <button
+                                    className="bulk-import-remove-row"
+                                    onClick={() => removeRow(idx)}
+                                    title={t('customersPage.bulkImport.removeRow')}
+                                  >
+                                    <BiX />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Error Details */}
+                    {errorCount > 0 && (
+                      <div className="bulk-import-errors-section">
+                        <h6><BiError /> {t('customersPage.bulkImport.rowErrors')}</h6>
+                        {Object.entries(errors).map(([idx, errs]) => (
+                          <div key={idx} className="bulk-import-error-item">
+                            <strong>{t('customersPage.bulkImport.rowLabel', { num: parseInt(idx) + 1 })}</strong> {parsedRows[parseInt(idx)]?.name} — {errs.join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="bulk-import-actions">
+                      <button
+                        className="btn-premium btn-premium-secondary"
+                        onClick={() => { setShowPreview(false); setImportResult(null); }}
+                      >
+                        <BiX /> {t('common.cancel')}
+                      </button>
+                      <button
+                        className="btn-premium btn-premium-primary"
+                        onClick={handleImport}
+                        disabled={importing || validCount === 0}
+                      >
+                        {importing ? (
+                          <><span className="spinner-border spinner-border-sm" /> {t('customersPage.bulkImport.importing')}</>
+                        ) : (
+                          <><BiUpload /> {t('customersPage.bulkImport.importCustomer', { count: validCount })}</>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 // Fixed page size for the "All Customers" list — server-side pagination via ?page=&limit=.
 const CUSTOMERS_PER_PAGE = 10;
 
@@ -890,6 +1389,7 @@ const Customers = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
 
@@ -1054,17 +1554,25 @@ const Customers = () => {
           <h4 className="mb-1" style={{ fontWeight: 800 }}>{t('nav.customers')}</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>{t('customersPage.subtitle')}</p>
         </div>
-        <button className="btn-premium btn-premium-primary" onClick={handleAdd}>
-          <BiPlus /> {t('customersPage.addCustomer')}
-        </button>
+        <div className="d-flex gap-2">
+          <button className="btn-premium btn-premium-secondary" onClick={() => setBulkImportOpen(true)}>
+            <BiUpload /> {t('customersPage.bulkImportButton')}
+          </button>
+          <button className="btn-premium btn-premium-primary" onClick={handleAdd}>
+            <BiPlus /> {t('customersPage.addCustomer')}
+          </button>
+        </div>
       </div>
 
       {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input className="form-control" placeholder={t('customersPage.searchPlaceholder')}
-            value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="list-filters-card">
+        <div className="list-filter-field list-search-field">
+          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input className="form-control list-filter-input" placeholder={t('customersPage.searchPlaceholder')}
+              value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
       </div>
 
@@ -1447,6 +1955,14 @@ const Customers = () => {
         onEditFromView={(customer) => { setDrawerOpen(false); setViewing(null); setTimeout(() => { setEditing(customer); setDrawerOpen(true); }, 200); }}
         t={t}
         navigate={navigate}
+      />
+
+      {/* Bulk Import Drawer */}
+      <BulkImportDrawer
+        open={bulkImportOpen}
+        onClose={() => setBulkImportOpen(false)}
+        onSuccess={refreshAll}
+        t={t}
       />
 
       <PaymentDrawer

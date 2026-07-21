@@ -13,7 +13,7 @@ import { BiChevronDown } from 'react-icons/bi';
  *
  * The card auto-collapses on window resize > mobile breakpoint.
  */
-const ExpandableCard = ({ compact, expanded, actions }) => {
+const ExpandableCard = ({ compact, expanded, actions, checkbox, className }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const contentRef = useRef(null);
@@ -37,9 +37,14 @@ const ExpandableCard = ({ compact, expanded, actions }) => {
   }, [open]);
 
   return (
-    <div className={`expandable-card ${open ? 'expandable-card--open' : ''}`}>
+    <div className={`expandable-card ${open ? 'expandable-card--open' : ''} ${className || ''}`}>
       {/* Always-visible compact area */}
       <div className="expandable-card__compact" onClick={() => setOpen((prev) => !prev)}>
+        {checkbox && (
+          <div className="expandable-card__checkbox" onClick={(e) => e.stopPropagation()}>
+            {checkbox}
+          </div>
+        )}
         <div className="expandable-card__compact-body">
           {compact}
         </div>

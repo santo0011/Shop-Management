@@ -7,6 +7,7 @@ import {
   BiBarcode, BiHash, BiCheckCircle, BiErrorCircle,
 } from 'react-icons/bi';
 import api from '../../services/api';
+import ExpandableCard from '../../components/common/ExpandableCard';
 
 // ─── Helpers ───────────────────────────────────────────────────
 const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
@@ -139,7 +140,7 @@ const ProductLedgerPage = () => {
       </div>
 
       {/* ─── KPI grid ───────────────────────────────────────────── */}
-      <div className="ledger-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="ledger-kpi-grid">
         <KpiCard icon={BiCube} label={t('product.stock') || 'Current Stock'} value={currentStock} accent="#6C63FF" glow="rgba(108,99,255,0.12)" />
         <KpiCard icon={BiCart} label={t('productsPage.totalPurchased') || 'Total Purchased'} value={totalPurchased} accent="#00D9A6" glow="rgba(0,217,166,0.12)" />
         <KpiCard icon={BiPackage} label={t('productsPage.totalSold') || 'Total Sold'} value={soldQuantity} accent="#FFB545" glow="rgba(255,181,69,0.12)" />
@@ -162,40 +163,95 @@ const ProductLedgerPage = () => {
           <div className="ledger-empty-title">{t('empty.noPurchases') || 'No purchases found'}</div>
         </div>
       ) : (
-        <div className="table-container" style={{ marginBottom: '1.5rem' }}>
-          <div className="table-responsive">
-            <table className="table-custom mb-0">
-              <thead>
-                <tr>
-                  <th>{t('purchasesPage.purchaseNo') || 'Purchase No'}</th>
-                  <th>{t('purchasesPage.purchaseDate') || 'Date'}</th>
-                  <th>{t('common.quantity') || 'Qty'}</th>
-                  <th>{t('common.total')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {purchases.map((p) => {
-                  const productItems = (p.items || []).filter(
-                    i => String(i.product) === String(productId) || i.product?._id === productId
-                  );
-                  const qty = productItems.reduce((s, i) => s + (i.quantity || 0), 0);
-                  return (
-                    <tr key={p._id}>
-                      <td><span className="sales-invoice-badge">{p.purchaseNo}</span></td>
-                      <td>
-                        <div className="sales-date-cell">
-                          <span className="sales-date-text">{formatDate(p.purchaseDate || p.createdAt)}</span>
-                        </div>
-                      </td>
-                      <td><span className="sales-amount">{qty}</span></td>
-                      <td><span className="sales-amount">{formatCurrency(p.totalAmount)}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Desktop table */}
+          <div className="table-container desktop-table" style={{ marginBottom: '1.5rem' }}>
+            <div className="table-responsive">
+              <table className="table-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>{t('purchasesPage.purchaseNo') || 'Purchase No'}</th>
+                    <th>{t('purchasesPage.purchaseDate') || 'Date'}</th>
+                    <th>{t('common.quantity') || 'Qty'}</th>
+                    <th>{t('common.total')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map((p) => {
+                    const productItems = (p.items || []).filter(
+                      i => String(i.product) === String(productId) || i.product?._id === productId
+                    );
+                    const qty = productItems.reduce((s, i) => s + (i.quantity || 0), 0);
+                    return (
+                      <tr key={p._id}>
+                        <td><span className="sales-invoice-badge">{p.purchaseNo}</span></td>
+                        <td>
+                          <div className="sales-date-cell">
+                            <span className="sales-date-text">{formatDate(p.purchaseDate || p.createdAt)}</span>
+                          </div>
+                        </td>
+                        <td><span className="sales-amount">{qty}</span></td>
+                        <td><span className="sales-amount">{formatCurrency(p.totalAmount)}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile cards */}
+          <div className="mobile-cards" style={{ marginBottom: '1.5rem' }}>
+            {purchases.map((p) => {
+              const productItems = (p.items || []).filter(
+                i => String(i.product) === String(productId) || i.product?._id === productId
+              );
+              const qty = productItems.reduce((s, i) => s + (i.quantity || 0), 0);
+              return (
+                <ExpandableCard
+                  key={p._id}
+                  compact={
+                    <>
+                      <div className="expandable-card__compact-row">
+                        <span className="expandable-card__name">{p.purchaseNo}</span>
+                        <span className="expandable-card__price">{formatCurrency(p.totalAmount)}</span>
+                      </div>
+                      <div className="expandable-card__meta">
+                        <span className="expandable-card__meta-item">
+                          <BiCalendar />
+                          <span>{formatDate(p.purchaseDate || p.createdAt)}</span>
+                        </span>
+                        <span className="expandable-card__meta-item">
+                          <BiCube />
+                          <strong>{qty}</strong>
+                        </span>
+                      </div>
+                    </>
+                  }
+                  expanded={
+                    <div className="expandable-card__rows">
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('common.quantity') || 'Qty'}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{qty}</span>
+                      </div>
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('common.total')}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{formatCurrency(p.totalAmount)}</span>
+                      </div>
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('purchasesPage.purchaseDate') || 'Date'}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{formatDate(p.purchaseDate || p.createdAt)}</span>
+                      </div>
+                    </div>
+                  }
+                />
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* ─── Sales History Section ─────────────────────────────── */}
@@ -214,40 +270,95 @@ const ProductLedgerPage = () => {
           <div className="ledger-empty-title">{t('empty.noSales') || 'No sales found'}</div>
         </div>
       ) : (
-        <div className="table-container">
-          <div className="table-responsive">
-            <table className="table-custom mb-0">
-              <thead>
-                <tr>
-                  <th>{t('sale.invoice') || 'Invoice'}</th>
-                  <th>{t('common.date')}</th>
-                  <th>{t('common.quantity') || 'Qty'}</th>
-                  <th>{t('sale.total')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sales.map((s) => {
-                  const productItems = (s.items || []).filter(
-                    i => String(i.product) === String(productId) || i.product?._id === productId
-                  );
-                  const qty = productItems.reduce((si, i) => si + (i.quantity || 0), 0);
-                  return (
-                    <tr key={s._id}>
-                      <td><span className="sales-invoice-badge">{s.invoiceNo}</span></td>
-                      <td>
-                        <div className="sales-date-cell">
-                          <span className="sales-date-text">{formatDate(s.createdAt)}</span>
-                        </div>
-                      </td>
-                      <td><span className="sales-amount">{qty}</span></td>
-                      <td><span className="sales-amount">{formatCurrency(s.totalAmount)}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Desktop table */}
+          <div className="table-container desktop-table">
+            <div className="table-responsive">
+              <table className="table-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>{t('sale.invoice') || 'Invoice'}</th>
+                    <th>{t('common.date')}</th>
+                    <th>{t('common.quantity') || 'Qty'}</th>
+                    <th>{t('sale.total')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sales.map((s) => {
+                    const productItems = (s.items || []).filter(
+                      i => String(i.product) === String(productId) || i.product?._id === productId
+                    );
+                    const qty = productItems.reduce((si, i) => si + (i.quantity || 0), 0);
+                    return (
+                      <tr key={s._id}>
+                        <td><span className="sales-invoice-badge">{s.invoiceNo}</span></td>
+                        <td>
+                          <div className="sales-date-cell">
+                            <span className="sales-date-text">{formatDate(s.createdAt)}</span>
+                          </div>
+                        </td>
+                        <td><span className="sales-amount">{qty}</span></td>
+                        <td><span className="sales-amount">{formatCurrency(s.totalAmount)}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile cards */}
+          <div className="mobile-cards">
+            {sales.map((s) => {
+              const productItems = (s.items || []).filter(
+                i => String(i.product) === String(productId) || i.product?._id === productId
+              );
+              const qty = productItems.reduce((si, i) => si + (i.quantity || 0), 0);
+              return (
+                <ExpandableCard
+                  key={s._id}
+                  compact={
+                    <>
+                      <div className="expandable-card__compact-row">
+                        <span className="expandable-card__name">{s.invoiceNo}</span>
+                        <span className="expandable-card__price">{formatCurrency(s.totalAmount)}</span>
+                      </div>
+                      <div className="expandable-card__meta">
+                        <span className="expandable-card__meta-item">
+                          <BiCalendar />
+                          <span>{formatDate(s.createdAt)}</span>
+                        </span>
+                        <span className="expandable-card__meta-item">
+                          <BiCube />
+                          <strong>{qty}</strong>
+                        </span>
+                      </div>
+                    </>
+                  }
+                  expanded={
+                    <div className="expandable-card__rows">
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('common.quantity') || 'Qty'}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{qty}</span>
+                      </div>
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('sale.total')}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{formatCurrency(s.totalAmount)}</span>
+                      </div>
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('common.date')}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{formatDate(s.createdAt)}</span>
+                      </div>
+                    </div>
+                  }
+                />
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

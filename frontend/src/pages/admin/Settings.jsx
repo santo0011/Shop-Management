@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import Swal from 'sweetalert2';
 import { updateProfile } from '../../redux/slices/authSlice';
+import { setMyShop } from '../../redux/slices/shopSlice';
 import api from '../../services/api';
 import { showToast } from '../../utils/toast';
 import {
@@ -10,7 +11,9 @@ import {
   BiShieldQuarter, BiUserCircle, BiLockAlt, BiEnvelope, BiPhone, BiImage,
   BiHide, BiShow, BiChevronDown, BiPrinter, BiFile, BiGridSmall, BiLayout,
   BiCheck, BiNote, BiCopyright, BiBook, BiCodeAlt, BiExpandVertical, BiQr, BiCode, BiBookContent,
+  BiBriefcase, BiPlus, BiX, BiRefresh,
 } from 'react-icons/bi';
+import { MODULE_KEYS, GLOBAL_UNITS, BUSINESS_TYPE_KEYS, BUSINESS_TYPES, getBusinessTypeDefaults } from '../../config/businessTypes';
 
 const SectionHeader = ({ icon: Icon, title, description }) => (
   <div className="settings-card-header">
@@ -49,15 +52,26 @@ const PRINT_MODES = [
 
 const emptyAddress = { street: '', city: '', state: '', zipCode: '', country: '' };
 
+// Only keys the shop has actually saved a real boolean for should override
+// the business type's recommended defaults — a module that's `undefined`
+// (never touched, e.g. a shop that predates this feature) must fall through
+// to the default instead of being spread in as a false-y value.
+const mergeModules = (businessType, shopModules) => {
+  const explicit = Object.fromEntries(Object.entries(shopModules || {}).filter(([, v]) => v !== undefined));
+  return { ...getBusinessTypeDefaults(businessType).modules, ...explicit };
+};
+
 const Settings = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch();
 
   const SECTIONS = [
     { key: 'shop', label: t('settingsPage.shopInformation'), icon: BiStore, description: t('settingsPage.shopInfoDesc') },
+    { key: 'business', label: t('settingsPage.businessConfig'), icon: BiBriefcase, description: t('settingsPage.businessConfigDesc') },
     { key: 'tax', label: t('settingsPage.taxVat'), icon: BiTag, description: t('settingsPage.taxSectionDesc') },
     { key: 'invoice', label: t('settingsPage.invoicePrint'), icon: BiReceipt, description: 'Configure invoice prefix, receipt footer, paper size, design, and print preferences' },
     { key: 'barcode', label: t('settingsPage.barcodeSettings'), icon: BiBarcode, description: t('settingsPage.barcodeSectionDesc') },
+    { key: 'pos', label: t('settingsPage.posDisplaySettings'), icon: BiGridSmall, description: t('settingsPage.posDisplaySettingsDesc') },
     { key: 'backup', label: t('settingsPage.backupRestore'), icon: BiCloudDownload, description: t('settingsPage.backupSectionDesc') },
     { key: 'security', label: t('settingsPage.security'), icon: BiShieldQuarter, description: t('settingsPage.securitySectionDesc') },
     { key: 'profile', label: t('common.profile'), icon: BiUserCircle, description: t('settingsPage.profileSectionDesc') },
@@ -67,7 +81,6 @@ const Settings = () => {
   const [activeSection, setActiveSection] = useState('shop');
   const [mobileExpanded, setMobileExpanded] = useState(null);
   const [mobileInvoiceSub, setMobileInvoiceSub] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [shop, setShop] = useState(null);
@@ -91,6 +104,13 @@ const Settings = () => {
     showFooter: true,
   });
   const [barcodeForm, setBarcodeForm] = useState({ barcodePrefix: '', barcodeSymbology: 'CODE128', autoGenerateBarcode: false });
+  const [posDisplayForm, setPosDisplayForm] = useState({ desktop: 20, mobile: 10 });
+  const [businessTypeSelect, setBusinessTypeSelect] = useState('grocery');
+  const [businessTypeLocked, setBusinessTypeLocked] = useState(false);
+  const [enabledModules, setEnabledModules] = useState({});
+  const [customUnits, setCustomUnits] = useState([]);
+  const [newUnit, setNewUnit] = useState({ label: '', labelBn: '' });
+  const [savingModuleKey, setSavingModuleKey] = useState(null);
 
   const [profileData, setProfileData] = useState(null);
   const [profileForm, setProfileForm] = useState({ name: '', phone: '', avatar: '' });
@@ -106,8 +126,8 @@ const Settings = () => {
   const loadAll = async () => {
     try {
       const [{ data: shopData }, { data: profile }] = await Promise.all([
-        api.get('/shops/my'),
-        api.get('/auth/profile'),
+        api.get('/shops/my', { _skipLoading: true }),
+        api.get('/auth/profile', { _skipLoading: true }),
       ]);
       const s = shopData.shop || shopData;
       setShop(s);
@@ -147,12 +167,18 @@ const Settings = () => {
         barcodeSymbology: s.settings?.barcodeSymbology || 'CODE128',
         autoGenerateBarcode: !!s.settings?.autoGenerateBarcode,
       });
+      setPosDisplayForm({
+        desktop: s.settings?.posDisplayLimit?.desktop || 20,
+        mobile: s.settings?.posDisplayLimit?.mobile || 10,
+      });
+      setBusinessTypeSelect(s.businessType || 'grocery');
+      setBusinessTypeLocked((s.productCount || 0) > 0);
+      setEnabledModules(mergeModules(s.businessType, s.settings?.enabledModules));
+      setCustomUnits(s.settings?.customUnits || []);
       setProfileData(profile);
       setProfileForm({ name: profile.name || '', phone: profile.phone || '', avatar: profile.avatar || '' });
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -160,11 +186,21 @@ const Settings = () => {
   const saveShopSettings = async (fields, successMsg) => {
     setSaving(true);
     try {
-      const { data } = await api.put('/shops/settings', fields);
+      const { data } = await api.put('/shops/settings', fields, { _skipLoading: true });
       setShop(data);
+      dispatch(setMyShop(data));
       showToast.success(successMsg);
+      return data;
     } catch (err) {
-      showToast.error(err.response?.data?.message || t('settingsPage.failedToSaveSettings'));
+      if (err.response?.data?.code === 'BUSINESS_TYPE_LOCKED') {
+        // Defensive: keeps the UI in sync even if it hadn't already disabled
+        // the picker (e.g. a product was added in another tab moments ago).
+        setBusinessTypeLocked(true);
+        showToast.error(t('settingsPage.businessTypeLocked'));
+      } else {
+        showToast.error(err.response?.data?.message || t('settingsPage.failedToSaveSettings'));
+      }
+      return null;
     } finally {
       setSaving(false);
     }
@@ -180,8 +216,9 @@ const Settings = () => {
         phone: shopForm.phone,
         logo: shopForm.logo,
         address: shopForm.address,
-      });
+      }, { _skipLoading: true });
       setShop(data);
+      dispatch(setMyShop(data));
       showToast.success(t('settingsPage.shopInfoSaved'));
     } catch (err) {
       showToast.error(err.response?.data?.message || t('settingsPage.failedToSaveShopInfo'));
@@ -243,6 +280,75 @@ const Settings = () => {
     t('settingsPage.barcodeSettingsSaved')
   );
 
+  const handleSavePosDisplay = () => saveShopSettings(
+    { posDisplayLimit: { desktop: posDisplayForm.desktop, mobile: posDisplayForm.mobile } },
+    t('settingsPage.posDisplaySettingsSaved')
+  );
+
+  // ─── Business Configuration ────────────────────────────────────────────
+  // Relabels the shop only — never touches enabledModules, so previously
+  // customized toggles are never silently overwritten.
+  const handleSaveBusinessType = () => {
+    if (businessTypeLocked) {
+      showToast.error(t('settingsPage.businessTypeLocked'));
+      return;
+    }
+    return saveShopSettings(
+      { businessType: businessTypeSelect },
+      t('settingsPage.businessTypeSaved')
+    );
+  };
+
+  // Explicit, opt-in reset of every module toggle to this business type's
+  // recommended defaults.
+  const handleApplyRecommendedModules = async () => {
+    const data = await saveShopSettings(
+      { businessType: businessTypeSelect, applyRecommendedModules: true },
+      t('settingsPage.recommendedModulesApplied')
+    );
+    if (data) setEnabledModules(mergeModules(data.businessType, data.settings?.enabledModules));
+  };
+
+  const handleToggleModule = async (key) => {
+    const nextValue = !enabledModules[key];
+    setEnabledModules((prev) => ({ ...prev, [key]: nextValue }));
+    setSavingModuleKey(key);
+    const data = await saveShopSettings({ enabledModules: { [key]: nextValue } }, t('settingsPage.moduleUpdated'));
+    if (!data) {
+      // Revert on failure — saveShopSettings already surfaced the error toast.
+      setEnabledModules((prev) => ({ ...prev, [key]: !nextValue }));
+    }
+    setSavingModuleKey(null);
+  };
+
+  const slugifyUnitKey = (label) => label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+  const handleAddUnit = async () => {
+    const label = newUnit.label.trim();
+    if (!label) {
+      showToast.error(t('settingsPage.unitNameRequired'));
+      return;
+    }
+    const key = slugifyUnitKey(label);
+    const globalKeys = GLOBAL_UNITS.map((u) => u.key);
+    if (!key || globalKeys.includes(key) || customUnits.some((u) => u.key === key)) {
+      showToast.error(t('settingsPage.unitAlreadyExists'));
+      return;
+    }
+    const nextUnits = [...customUnits, { key, label, labelBn: newUnit.labelBn.trim() }];
+    const data = await saveShopSettings({ customUnits: nextUnits }, t('settingsPage.unitAdded'));
+    if (data) {
+      setCustomUnits(data.settings?.customUnits || nextUnits);
+      setNewUnit({ label: '', labelBn: '' });
+    }
+  };
+
+  const handleDeleteUnit = async (key) => {
+    const nextUnits = customUnits.filter((u) => u.key !== key);
+    const data = await saveShopSettings({ customUnits: nextUnits }, t('settingsPage.unitRemoved'));
+    if (data) setCustomUnits(data.settings?.customUnits || nextUnits);
+  };
+
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
@@ -250,7 +356,7 @@ const Settings = () => {
         name: profileForm.name,
         phone: profileForm.phone,
         avatar: profileForm.avatar,
-      });
+      }, { _skipLoading: true });
       dispatch(updateProfile(data));
       setProfileData(prev => ({ ...prev, ...data }));
       showToast.success(t('settingsPage.profileSaved'));
@@ -279,7 +385,7 @@ const Settings = () => {
       await api.put('/auth/update-password', {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
-      });
+      }, { _skipLoading: true });
       showToast.success(t('toast.updateSuccess', { item: t('auth.password') }));
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
@@ -293,7 +399,7 @@ const Settings = () => {
   const handleDownloadBackup = async () => {
     setDownloadingBackup(true);
     try {
-      const { data } = await api.get('/shops/backup');
+      const { data } = await api.get('/shops/backup', { _skipLoading: true });
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -347,7 +453,7 @@ const Settings = () => {
       setRestoring(true);
       try {
         const { products, categories, suppliers, customers } = restoreFile.data || {};
-        const { data } = await api.post('/shops/restore', { products, categories, suppliers, customers });
+        const { data } = await api.post('/shops/restore', { products, categories, suppliers, customers }, { _skipLoading: true });
         showToast.success(
           t('settingsPage.restoreSuccess', {
             products: data.products.restored,
@@ -382,7 +488,7 @@ const Settings = () => {
     }).then(async (result) => {
       if (!result.isConfirmed) return;
       try {
-        await api.post('/auth/logout');
+        await api.post('/auth/logout', {}, { _skipLoading: true });
       } catch (err) {
         // Still clear the local session even if the server call fails.
       } finally {
@@ -407,17 +513,13 @@ const Settings = () => {
     tax: { label: t('settingsPage.saveTaxSettings'), onSave: handleSaveTax },
     invoice: { label: t('settingsPage.saveInvoiceSettings'), onSave: handleSaveInvoice },
     barcode: { label: t('settingsPage.saveBarcodeSettings'), onSave: handleSaveBarcode },
+    pos: { label: t('settingsPage.savePosDisplaySettings'), onSave: handleSavePosDisplay },
     profile: { label: t('settingsPage.saveProfile'), onSave: handleSaveProfile },
     password: { label: t('settingsPage.updatePassword'), onSave: handleChangePassword },
   };
 
-  if (loading) {
-    return (
-      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '50vh' }}>
-        <span className="spinner-border" style={{ color: 'var(--primary)' }} />
-      </div>
-    );
-  }
+  // No full-page blocking loader — like Reports/Sales, the page shell
+  // renders immediately and sections fill in once loadAll() resolves.
 
   // ─── Mobile Invoice Sub-Section Accordion ─────────────────────────────
   const INVOICE_SUB_SECTIONS = [
@@ -665,6 +767,119 @@ const Settings = () => {
               </div>
             </div>
           </div>
+        );
+
+      case 'business':
+        return (
+          <>
+            <div className="settings-card">
+              <SectionHeader icon={BiBriefcase} title={t('settingsPage.businessType')} description={t('settingsPage.businessTypeDesc')} />
+              <div className="p-4">
+                {businessTypeLocked && (
+                  <div className="d-flex align-items-start gap-2" style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: 'var(--border-radius-md)',
+                    background: 'var(--glow-danger)',
+                    color: 'var(--danger)',
+                    fontWeight: 500,
+                    fontSize: '0.8rem',
+                    marginBottom: '0.85rem',
+                  }}>
+                    <BiLockAlt style={{ flexShrink: 0, marginTop: '2px' }} /> {t('settingsPage.businessTypeLocked')}
+                  </div>
+                )}
+                <div className="mb-3">
+                  <label className="form-label">{t('manageShopsPage.businessType')}</label>
+                  <select
+                    className="form-select"
+                    style={{ maxWidth: '360px' }}
+                    value={businessTypeSelect}
+                    onChange={(e) => setBusinessTypeSelect(e.target.value)}
+                    disabled={businessTypeLocked}
+                  >
+                    {BUSINESS_TYPE_KEYS.map((key) => (
+                      <option key={key} value={key}>{t(BUSINESS_TYPES[key].i18nKey)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="d-flex gap-2 flex-wrap">
+                  <button type="button" className="btn-premium btn-premium-primary" onClick={handleSaveBusinessType} disabled={saving || businessTypeLocked}>
+                    <BiSave /> {t('settingsPage.saveBusinessType')}
+                  </button>
+                  <button type="button" className="btn-premium btn-premium-secondary" onClick={handleApplyRecommendedModules} disabled={saving}>
+                    <BiRefresh /> {t('settingsPage.applyRecommendedModules')}
+                  </button>
+                </div>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block', marginTop: '0.5rem' }}>
+                  {t('settingsPage.applyRecommendedModulesHint')}
+                </small>
+              </div>
+            </div>
+
+            <div className="settings-card mt-3">
+              <SectionHeader icon={BiCheck} title={t('settingsPage.optionalModules')} description={t('settingsPage.optionalModulesDesc')} />
+              <div className="p-4">
+                <div className="d-flex flex-wrap gap-3">
+                  {MODULE_KEYS.map((key) => (
+                    <label key={key} className="printer-settings-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={!!enabledModules[key]}
+                        disabled={savingModuleKey === key}
+                        onChange={() => handleToggleModule(key)}
+                      />
+                      <span>{t(`settingsPage.module.${key}`)}</span>
+                    </label>
+                  ))}
+                </div>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block', marginTop: '0.75rem' }}>
+                  {t('settingsPage.optionalModulesHint')}
+                </small>
+              </div>
+            </div>
+
+            <div className="settings-card mt-3">
+              <SectionHeader icon={BiGridSmall} title={t('settingsPage.unitManager')} description={t('settingsPage.unitManagerDesc')} />
+              <div className="p-4">
+                <div className="mb-2" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('settingsPage.defaultUnits')}</div>
+                <div className="d-flex flex-wrap gap-2 mb-3">
+                  {GLOBAL_UNITS.map((u) => (
+                    <span key={u.key} className="badge" style={{ background: 'var(--bg-input)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      {t(u.i18nKey)}
+                    </span>
+                  ))}
+                </div>
+                {customUnits.length > 0 && (
+                  <>
+                    <div className="mb-2" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('settingsPage.customUnits')}</div>
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      {customUnits.map((u) => (
+                        <span key={u.key} className="badge d-flex align-items-center gap-1" style={{ background: 'var(--glow-primary)', color: 'var(--primary)', fontWeight: 600 }}>
+                          {u.label}
+                          <button type="button" onClick={() => handleDeleteUnit(u.key)} style={{ background: 'none', border: 'none', color: 'inherit', display: 'flex', padding: 0, cursor: 'pointer' }} title={t('common.delete')}>
+                            <BiX size={14} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <hr style={{ borderColor: 'var(--border-color)' }} />
+                <label className="form-label">{t('settingsPage.addCustomUnit')}</label>
+                <div className="settings-field-row">
+                  <div className="mb-3">
+                    <input className="form-control" placeholder={t('settingsPage.unitNamePlaceholder')} value={newUnit.label} onChange={(e) => setNewUnit({ ...newUnit, label: e.target.value })} />
+                  </div>
+                  <div className="mb-3">
+                    <input className="form-control" placeholder={t('settingsPage.unitNameBnPlaceholder')} value={newUnit.labelBn} onChange={(e) => setNewUnit({ ...newUnit, labelBn: e.target.value })} />
+                  </div>
+                </div>
+                <button type="button" className="btn-premium btn-premium-primary" onClick={handleAddUnit} disabled={saving}>
+                  <BiPlus /> {t('settingsPage.addUnit')}
+                </button>
+              </div>
+            </div>
+          </>
         );
 
       case 'tax':
@@ -919,6 +1134,48 @@ const Settings = () => {
               </div>
               <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>
                 {t('settingsPage.barcodeHint')}
+              </small>
+            </div>
+          </div>
+        );
+
+      case 'pos':
+        return (
+          <div className="settings-card">
+            <SectionHeader icon={BiGridSmall} title={t('settingsPage.posDisplaySettings')} description={t('settingsPage.posDisplaySettingsDesc')} />
+            <div className="p-4">
+              <div className="mb-4">
+                <label className="form-label">{t('settingsPage.posDesktopProductsPerCategory')}</label>
+                <div className="d-flex gap-2 flex-wrap">
+                  {[5, 10, 15, 20, 25, 30].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`btn-premium btn-premium-sm ${posDisplayForm.desktop === val ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
+                      onClick={() => setPosDisplayForm({ ...posDisplayForm, desktop: val })}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-2">
+                <label className="form-label">{t('settingsPage.posMobileProductsPerCategory')}</label>
+                <div className="d-flex gap-2 flex-wrap">
+                  {[5, 10, 15, 20].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`btn-premium btn-premium-sm ${posDisplayForm.mobile === val ? 'btn-premium-primary' : 'btn-premium-secondary'}`}
+                      onClick={() => setPosDisplayForm({ ...posDisplayForm, mobile: val })}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block' }}>
+                {t('settingsPage.posDisplaySettingsHint')}
               </small>
             </div>
           </div>

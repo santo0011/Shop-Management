@@ -7,6 +7,7 @@ import {
   BiCheckCircle, BiErrorCircle,
 } from 'react-icons/bi';
 import api from '../../services/api';
+import ExpandableCard from '../../components/common/ExpandableCard';
 
 // ─── Helpers ───────────────────────────────────────────────────
 const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
@@ -78,7 +79,7 @@ const SupplierLedgerPage = () => {
   const totalPurchases = purchases.length;
 
   return (
-    <div>
+    <div className="supplier-ledger-page">
       {/* ─── Page titlebar with Back button ────────────────────── */}
       <div className="ledger-titlebar">
         <button className="btn-premium btn-premium-secondary" onClick={handleBack}>
@@ -92,24 +93,31 @@ const SupplierLedgerPage = () => {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap', flex: '1 1 320px' }}>
           <div className="ledger-avatar">{(supplier.name || '?').charAt(0).toUpperCase()}</div>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: '0 0 2px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-primary)' }}>
-              {supplier.name}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h2 style={{ margin: '0 0 2px', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+                {supplier.name}
+              </h2>
+              <span className={`ledger-status-badge ledger-mobile-status ${supplier.isActive !== false ? 'is-active' : 'is-inactive'}`}>
+                {supplier.isActive !== false ? <BiCheckCircle size={12} /> : <BiErrorCircle size={12} />}
+                {supplier.isActive !== false ? t('common.active') : t('common.inactive')}
+              </span>
+            </div>
             {supplier.company && (
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
                 <BiBuilding size={13} /> {supplier.company}
               </p>
             )}
-            <p style={{ margin: '2px 0 0', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              {t('suppliersPage.subtitle')}
+            <p className="ledger-header-subtitle" style={{ margin: '2px 0 0', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              {t('suppliersPage.ledgerSubtitle') || 'Complete purchase history & running balance'}
             </p>
 
+            {/* Desktop pill row — hidden on mobile in favor of the stat tiles below */}
             <div className="ledger-header-meta">
               {supplier.phone && (
                 <span className="ledger-meta-chip"><BiPhone size={13} /> {supplier.phone}</span>
               )}
               {supplier.createdAt && (
-                <span className="ledger-meta-chip"><BiCalendar size={13} /> Created: {formatDate(supplier.createdAt)}</span>
+                <span className="ledger-meta-chip"><BiCalendar size={13} /> {t('suppliersPage.created')}: {formatDate(supplier.createdAt)}</span>
               )}
               <span className="ledger-meta-chip"><BiCart size={13} /> {t('suppliersPage.totalPurchases') || 'Total Purchases'}: {totalPurchases}</span>
               <span className={`ledger-meta-chip is-due-highlight ${currentDue > 0 ? '' : 'is-clear'}`}>
@@ -117,8 +125,32 @@ const SupplierLedgerPage = () => {
               </span>
               <span className={`ledger-status-badge ${supplier.isActive !== false ? 'is-active' : 'is-inactive'}`}>
                 {supplier.isActive !== false ? <BiCheckCircle size={12} /> : <BiErrorCircle size={12} />}
-                {supplier.isActive !== false ? 'Active' : 'Inactive'}
+                {supplier.isActive !== false ? t('common.active') : t('common.inactive')}
               </span>
+            </div>
+
+            {/* Mobile-only stat tiles — same style as the Supplier Details drawer's summary cards */}
+            <div className="ledger-mobile-stats">
+              {supplier.phone && (
+                <div className="ledger-mobile-stat" style={{ '--stat-accent': '#6C63FF' }}>
+                  <span className="ledger-mobile-stat__label">{t('auth.phone')}</span>
+                  <span className="ledger-mobile-stat__value">{supplier.phone}</span>
+                </div>
+              )}
+              {supplier.createdAt && (
+                <div className="ledger-mobile-stat" style={{ '--stat-accent': 'var(--text-muted)' }}>
+                  <span className="ledger-mobile-stat__label">{t('suppliersPage.created')}</span>
+                  <span className="ledger-mobile-stat__value">{formatDate(supplier.createdAt)}</span>
+                </div>
+              )}
+              <div className="ledger-mobile-stat" style={{ '--stat-accent': '#00D9A6' }}>
+                <span className="ledger-mobile-stat__label">{t('suppliersPage.totalPurchases') || 'Total Purchases'}</span>
+                <span className="ledger-mobile-stat__value">{totalPurchases}</span>
+              </div>
+              <div className="ledger-mobile-stat" style={{ '--stat-accent': currentDue > 0 ? 'var(--danger)' : 'var(--secondary)' }}>
+                <span className="ledger-mobile-stat__label">{t('suppliersPage.currentDue') || 'Current Due'}</span>
+                <span className="ledger-mobile-stat__value" style={{ color: currentDue > 0 ? 'var(--danger)' : 'var(--text-primary)' }}>{formatCurrency(currentDue)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -149,51 +181,109 @@ const SupplierLedgerPage = () => {
           <div className="ledger-empty-hint">{t('empty.noPurchases')}</div>
         </div>
       ) : (
-        <div className="table-container">
-          <div className="table-responsive">
-            <table className="table-custom mb-0">
-              <thead>
-                <tr>
-                  <th>{t('purchasesPage.purchaseNo') || 'Purchase No'}</th>
-                  <th>{t('purchasesPage.purchaseDate') || 'Date'}</th>
-                  <th>{t('common.total')}</th>
-                  <th>{t('sale.paidAmount') || 'Paid'}</th>
-                  <th>{t('purchasesPage.dueAmount') || 'Due'}</th>
-                  <th>{t('purchasesPage.paymentStatus') || 'Status'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {purchases.map((p) => {
-                  const st = statusMeta[p.paymentStatus] || statusMeta.unpaid;
-                  return (
-                    <tr key={p._id}>
-                      <td>
-                        <span className="sales-invoice-badge">{p.purchaseNo}</span>
-                      </td>
-                      <td>
-                        <div className="sales-date-cell">
-                          <span className="sales-date-text">{formatDate(p.purchaseDate || p.createdAt)}</span>
-                        </div>
-                      </td>
-                      <td><span className="sales-amount">{formatCurrency(p.totalAmount)}</span></td>
-                      <td><span className="sales-amount" style={{ color: 'var(--secondary)' }}>{formatCurrency(p.paidAmount)}</span></td>
-                      <td>
-                        <span className="sales-amount" style={{ color: p.dueAmount > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
-                          {formatCurrency(p.dueAmount)}
+        <>
+          {/* ─── Desktop Table ──────────────────────────────────── */}
+          <div className="table-container desktop-table">
+            <div className="table-responsive">
+              <table className="table-custom mb-0">
+                <thead>
+                  <tr>
+                    <th>{t('purchasesPage.purchaseNo') || 'Purchase No'}</th>
+                    <th>{t('purchasesPage.purchaseDate') || 'Date'}</th>
+                    <th>{t('common.total')}</th>
+                    <th>{t('sale.paidAmount') || 'Paid'}</th>
+                    <th>{t('purchasesPage.dueAmount') || 'Due'}</th>
+                    <th>{t('purchasesPage.paymentStatus') || 'Status'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map((p) => {
+                    const st = statusMeta[p.paymentStatus] || statusMeta.unpaid;
+                    return (
+                      <tr key={p._id}>
+                        <td>
+                          <span className="sales-invoice-badge">{p.purchaseNo}</span>
+                        </td>
+                        <td>
+                          <div className="sales-date-cell">
+                            <span className="sales-date-text">{formatDate(p.purchaseDate || p.createdAt)}</span>
+                          </div>
+                        </td>
+                        <td><span className="sales-amount">{formatCurrency(p.totalAmount)}</span></td>
+                        <td><span className="sales-amount" style={{ color: 'var(--secondary)' }}>{formatCurrency(p.paidAmount)}</span></td>
+                        <td>
+                          <span className="sales-amount" style={{ color: p.dueAmount > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                            {formatCurrency(p.dueAmount)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>
+                            {st.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ─── Mobile Cards ───────────────────────────────────── */}
+          <div className="mobile-cards">
+            {purchases.map((p) => {
+              const st = statusMeta[p.paymentStatus] || statusMeta.unpaid;
+              return (
+                <ExpandableCard
+                  key={p._id}
+                  compact={
+                    <>
+                      <div className="expandable-card__compact-row">
+                        <span className="expandable-card__name">{p.purchaseNo}</span>
+                        <span className="expandable-card__price">{formatCurrency(p.totalAmount)}</span>
+                      </div>
+                      <div className="expandable-card__meta">
+                        <span className="expandable-card__meta-item">
+                          <BiCalendar />
+                          <span>{formatDate(p.purchaseDate || p.createdAt)}</span>
                         </span>
-                      </td>
-                      <td>
-                        <span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>
+                        <span className="expandable-card__stock" style={{ color: st.color }}>
                           {st.label}
                         </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    </>
+                  }
+                  expanded={
+                    <div className="expandable-card__rows">
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('common.total')}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{formatCurrency(p.totalAmount)}</span>
+                      </div>
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('sale.paidAmount') || 'Paid'}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value" style={{ color: 'var(--secondary)' }}>{formatCurrency(p.paidAmount)}</span>
+                      </div>
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('purchasesPage.dueAmount') || 'Due'}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value" style={{ color: p.dueAmount > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                          {formatCurrency(p.dueAmount)}
+                        </span>
+                      </div>
+                      <div className="expandable-card__row">
+                        <span className="expandable-card__row-label">{t('purchasesPage.purchaseDate') || 'Date'}</span>
+                        <span className="expandable-card__row-dots" />
+                        <span className="expandable-card__row-value">{formatDate(p.purchaseDate || p.createdAt)}</span>
+                      </div>
+                    </div>
+                  }
+                />
+              );
+            })}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

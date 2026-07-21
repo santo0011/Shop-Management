@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
@@ -100,6 +101,7 @@ const getSales = async (req, res) => {
       Sale.find(query)
         .populate('customer', 'name phone')
         .populate('items.product', 'name nameBn unit')
+        .populate('returns.processedBy', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -117,7 +119,8 @@ const getSale = async (req, res) => {
   try {
     const sale = await Sale.findOne({ _id: req.params.id, shop: req.user.shop })
       .populate('customer', 'name phone')
-      .populate('items.product', 'name nameBn unit sellingPrice');
+      .populate('items.product', 'name nameBn unit sellingPrice')
+      .populate('returns.processedBy', 'name');
     if (!sale) return res.status(404).json({ message: 'Sale not found' });
     res.json({ sale });
   } catch (error) {
@@ -143,10 +146,16 @@ const createSale = async (req, res) => {
     const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
     req.body.invoiceNo = `${shopPrefix}-${dateStr}-${(count + 1).toString().padStart(4, '0')}`;
 
-    // Calculate totals
+    // Calculate totals — Subtotal → Tax → Discount → Grand Total → Round Off
+    // (always down) → Final Payable. The floored Payable is what's actually
+    // stored as totalAmount, so every downstream consumer (due/paid
+    // calculations, invoice printing, reports, ledgers) automatically uses
+    // the rounded figure without needing its own rounding logic.
     const subtotal = req.body.items.reduce((sum, item) => sum + (item.total || item.price * item.quantity), 0);
     req.body.subtotal = subtotal;
-    req.body.totalAmount = Math.max(0, subtotal - (req.body.discount || 0) + (req.body.tax || 0));
+    const rawGrandTotal = Math.max(0, subtotal - (req.body.discount || 0) + (req.body.tax || 0));
+    req.body.totalAmount = Math.floor(rawGrandTotal);
+    req.body.roundOff = req.body.totalAmount - rawGrandTotal; // always <= 0
 
     // Set paid and due amounts — dueAmount is always derived from the SAME
     // clamped paidAmount so `Due = Grand Total - Paid Amount` holds exactly,
@@ -240,11 +249,36 @@ const updateSalePayment = async (req, res) => {
 // ─── Get Top Selling Products ──────────────────────────────────────────────
 const getTopSellingProducts = async (req, res) => {
   try {
-    const { limit = 20 } = req.query;
+    const { limit, category } = req.query;
+    // A missing/blank/non-numeric/zero limit must never silently collapse
+    // the Mongo aggregation's $limit to 0 (or NaN) — always fall back to a
+    // sane default instead.
+    const limitNum = Math.max(1, parseInt(limit, 10) || 20);
 
-    const topProducts = await Sale.aggregate([
+    const pipeline = [
       { $match: { shop: req.user.shop } },
       { $unwind: '$items' },
+    ];
+
+    // Restrict candidates to one category's products BEFORE grouping/limiting,
+    // so "top N in category X" reflects that category's own sales ranking —
+    // not just whichever of the global top N happen to belong to it.
+    if (category) {
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'items.product',
+            foreignField: '_id',
+            as: 'itemProduct',
+          },
+        },
+        { $unwind: '$itemProduct' },
+        { $match: { 'itemProduct.category': new mongoose.Types.ObjectId(category) } },
+      );
+    }
+
+    pipeline.push(
       {
         $group: {
           _id: '$items.product',
@@ -260,7 +294,7 @@ const getTopSellingProducts = async (req, res) => {
         },
       },
       { $sort: { netQuantity: -1 } },
-      { $limit: parseInt(limit) },
+      { $limit: limitNum },
       {
         $lookup: {
           from: 'products',
@@ -285,9 +319,129 @@ const getTopSellingProducts = async (req, res) => {
           lastSold: 1,
         },
       },
-    ]);
+    );
+
+    const topProducts = await Sale.aggregate(pipeline);
+
+    // Sales history alone can easily fall short of the requested count (a
+    // brand-new shop, a category nothing's been sold from yet, etc.) — a
+    // category/Top-Selling view must never look empty just because nothing
+    // has sold. Backfill the remainder with the shop's other active
+    // products (same category, if one was requested), so up to `limitNum`
+    // products always show whenever that many actually exist.
+    if (topProducts.length < limitNum) {
+      const excludeIds = topProducts.map((p) => p._id);
+      const fallbackQuery = { shop: req.user.shop, isActive: true, _id: { $nin: excludeIds } };
+      if (category) fallbackQuery.category = category;
+
+      const fallbackProducts = await Product.find(fallbackQuery)
+        .select('name nameBn sellingPrice stock unit barcode category')
+        .sort({ name: 1 })
+        .limit(limitNum - topProducts.length);
+
+      topProducts.push(...fallbackProducts.map((p) => ({
+        _id: p._id,
+        name: p.name,
+        nameBn: p.nameBn,
+        sellingPrice: p.sellingPrice,
+        stock: p.stock,
+        unit: p.unit,
+        barcode: p.barcode,
+        category: p.category,
+        totalSold: 0,
+        totalRevenue: 0,
+        lastSold: null,
+      })));
+    }
 
     res.json(topProducts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ─── Get Categories Ranked by Total Quantity Sold ───────────────────────────
+// Same all-time, returns-aware ranking basis as getTopSellingProducts above
+// (net quantity = sold - returned, no date-range restriction) — just grouped
+// one level up, by each product's category instead of the product itself.
+// Used to order the POS category filter chips by real sales volume.
+const getTopSellingCategories = async (req, res) => {
+  try {
+    const topCategories = await Sale.aggregate([
+      { $match: { shop: req.user.shop } },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'items.product',
+          foreignField: '_id',
+          as: 'product',
+        },
+      },
+      { $unwind: '$product' },
+      {
+        $group: {
+          _id: '$product.category',
+          totalQuantity: { $sum: '$items.quantity' },
+          totalReturned: { $sum: { $ifNull: ['$items.returnedQty', 0] } },
+        },
+      },
+      {
+        $addFields: {
+          netQuantity: { $subtract: ['$totalQuantity', '$totalReturned'] },
+        },
+      },
+      { $sort: { netQuantity: -1 } },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'category',
+        },
+      },
+      { $unwind: '$category' },
+      {
+        $project: {
+          _id: '$category._id',
+          name: '$category.name',
+          nameBn: '$category.nameBn',
+          totalQuantity: '$netQuantity',
+        },
+      },
+    ]);
+
+    res.json(topCategories);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ─── Get Sold Quantity Per Product (all products, not just the top N) ──────
+// Same net-quantity basis as getTopSellingProducts (sold - returned, all-
+// time) but unlimited and with a minimal projection — used to show a live
+// "Sold: N" count on every product card in POS, not only the ones that make
+// the Top Selling list.
+const getProductSoldCounts = async (req, res) => {
+  try {
+    const soldCounts = await Sale.aggregate([
+      { $match: { shop: req.user.shop } },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.product',
+          totalQuantity: { $sum: '$items.quantity' },
+          totalReturned: { $sum: { $ifNull: ['$items.returnedQty', 0] } },
+        },
+      },
+      {
+        $project: {
+          totalSold: { $subtract: ['$totalQuantity', '$totalReturned'] },
+        },
+      },
+    ]);
+
+    res.json(soldCounts);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -398,9 +552,11 @@ const processReturn = async (req, res) => {
     const prevPaidAmount = sale.paidAmount || 0;
     const prevDueAmount = sale.dueAmount || 0;
 
-    // Update sale totals
+    // Update sale totals — re-floor totalAmount so a return can never leave
+    // behind a fractional payable/due amount (refundAmt itself, tracked in
+    // sale.returns for the record, is unaffected).
     sale.paidAmount = Math.max(0, (sale.paidAmount || 0) - totalRefund);
-    sale.totalAmount = Math.max(0, (sale.totalAmount || 0) - totalRefund);
+    sale.totalAmount = Math.floor(Math.max(0, (sale.totalAmount || 0) - totalRefund));
 
     // Recalculate due amount
     sale.dueAmount = Math.max(0, sale.totalAmount - sale.paidAmount);
@@ -441,7 +597,8 @@ const processReturn = async (req, res) => {
     // Populate and return
     const updatedSale = await Sale.findById(sale._id)
       .populate('customer', 'name phone')
-      .populate('items.product', 'name nameBn unit');
+      .populate('items.product', 'name nameBn unit')
+      .populate('returns.processedBy', 'name');
 
     res.json({ sale: updatedSale });
   } catch (error) {
@@ -449,4 +606,4 @@ const processReturn = async (req, res) => {
   }
 };
 
-module.exports = { getSales, getSale, createSale, updateSalePayment, getTopSellingProducts, getRecentSales, getSalesStats, deleteSale, processReturn };
+module.exports = { getSales, getSale, createSale, updateSalePayment, getTopSellingProducts, getTopSellingCategories, getProductSoldCounts, getRecentSales, getSalesStats, deleteSale, processReturn };

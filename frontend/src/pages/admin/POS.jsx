@@ -10,7 +10,7 @@ import {
   BiDollar, BiShoppingBag, BiTag, BiCrown, BiCheckCircle,
   BiErrorCircle, BiWallet, BiFile, BiGridSmall, BiLayout,
   BiStore, BiQr, BiIdCard, BiUserCircle,
-  BiNote, BiChevronRight
+  BiNote
 } from 'react-icons/bi';
 import PrintPreview from '../../components/common/PrintPreview';
 
@@ -49,18 +49,23 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
     { key: 'mobile_banking', icon: <BiBookmark size={18} />, label: t('sale.mobileBanking'), color: '#FF6B9D' },
   ];
   const includesPreviousDue = data.includePreviousDue && data.previousDueAmount > 0;
+  // Required calculation/display order: Subtotal → Tax → Discount →
+  // Grand Total → Round Off → Final Payable.
   const summaryCards = [
     { key: 'totalItems', icon: <BiShoppingBag size={16} />, label: t('posPage.confirmSale.totalItems'), value: t('posPage.confirmSale.itemsCount', { count: data.totalItems }), color: '#6C63FF' },
     { key: 'subtotal', icon: <BiDollar size={16} />, label: t('sale.subtotal'), value: `₹${data.subtotal.toFixed(2)}`, color: '#17A2B8' },
+    { key: 'tax', icon: <BiFile size={16} />, label: t('sale.tax'), value: `₹${data.tax.toFixed(2)}`, color: '#6C63FF' },
     { key: 'discount', icon: <BiTag size={16} />, label: t('sale.discount'), value: `-₹${data.discount.toFixed(2)}`, color: data.discount > 0 ? '#FF6B6B' : '#9a9ab0' },
-    { key: 'grandTotal', icon: <BiCrown size={16} />, label: t('posPage.totals.grandTotal'), value: `₹${data.grandTotal.toFixed(2)}`, color: '#6C63FF', highlight: !includesPreviousDue },
+    { key: 'grandTotal', icon: <BiCrown size={16} />, label: t('posPage.totals.grandTotal'), value: `₹${data.grandTotal.toFixed(2)}`, color: '#6C63FF' },
+    { key: 'roundOff', icon: <BiRefresh size={16} />, label: t('posPage.totals.roundOff'), value: `${data.roundOff < 0 ? '-' : ''}₹${Math.abs(data.roundOff).toFixed(2)}`, color: '#9a9ab0' },
+    { key: 'payableAmount', icon: <BiCrown size={16} />, label: t('posPage.totals.payable'), value: `₹${data.payableAmount.toFixed(2)}`, color: '#6C63FF', highlight: !includesPreviousDue },
     ...(includesPreviousDue ? [
       { key: 'previousDue', icon: <BiErrorCircle size={16} />, label: t('posPage.previousDue.title'), value: `₹${data.previousDueAmount.toFixed(2)}`, color: '#F39C12' },
       { key: 'totalPayable', icon: <BiCrown size={16} />, label: t('posPage.previousDue.totalPayable'), value: `₹${data.totalPayable.toFixed(2)}`, color: '#6C63FF', highlight: true },
     ] : []),
     { key: 'paidAmount', icon: <BiCheckCircle size={16} />, label: t('sale.paidAmount'), value: `₹${data.paidAmount.toFixed(2)}`, color: '#2ecc71' },
     { key: 'dueAmount', icon: <BiErrorCircle size={16} />, label: t('sale.dueAmount'), value: `₹${data.dueAmount.toFixed(2)}`, color: data.dueAmount > 0 ? '#FF6B6B' : '#2ecc71' },
-    { key: 'paymentMethod', icon: <BiWallet size={16} />, label: t('sale.paymentMethod'), value: selectedPayment.toUpperCase(), badge: true, color: '#6C63FF' },
+    { key: 'paymentMethod', icon: <BiWallet size={16} />, label: t('sale.paymentMethod'), value: (paymentMethods.find((pm) => pm.key === selectedPayment)?.label || selectedPayment).toUpperCase(), badge: true, color: '#6C63FF' },
   ];
   return (
     <div className="confirm-sale-overlay" onClick={onCancel}>
@@ -87,9 +92,25 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
 };
 
 const POS = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isBn = i18n.language === 'bn';
   const [products, setProducts] = useState([]);
   const [topSelling, setTopSelling] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categorySalesRank, setCategorySalesRank] = useState({}); // { [categoryId]: totalQuantitySold }
+  const [productSoldCounts, setProductSoldCounts] = useState({}); // { [productId]: totalSold }
+  const [selectedCategory, setSelectedCategory] = useState('');
+  // Category browsing: shows only the shop's configured "products per
+  // category" limit (Settings → POS Settings), ranked by total quantity
+  // sold — no infinite scroll, no loading everything. `categoryProducts`
+  // also doubles as "whatever was last shown", kept on screen while a
+  // not-yet-cached category loads in the background (see categoryCache below).
+  const [categoryProducts, setCategoryProducts] = useState([]);
+  // Per-category cache — { [categoryId]: products[] } — a category that's
+  // already been visited is applied instantly on the same render, exactly
+  // like Top Selling (which never re-fetches on click either). Reset
+  // whenever the configured display limit changes or after a new sale.
+  const categoryCache = useRef({});
   const [recentSales, setRecentSales] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState('');
@@ -170,26 +191,151 @@ const POS = () => {
 
   useEffect(() => { searchRef.current?.focus(); }, []);
 
+  // Tracks whether we're currently at a mobile viewport, so the POS Display
+  // Settings' desktop/mobile product limits are applied to the right one —
+  // matches the same 991.98px breakpoint the layout itself switches at.
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 991.98px)').matches
+  );
   useEffect(() => {
-    loadTopSelling();
+    const mql = window.matchMedia('(max-width: 991.98px)');
+    const handler = (e) => setIsMobileViewport(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  // Number(...) strips out missing/null/undefined/non-numeric values (NaN
+  // and 0 are both falsy) so a bad or absent setting always falls back to a
+  // safe default instead of quietly asking the backend for 0 products.
+  const desktopProductLimit = Number(shopInfo?.settings?.posDisplayLimit?.desktop) || 20;
+  const mobileProductLimit = Number(shopInfo?.settings?.posDisplayLimit?.mobile) || 10;
+  const activeProductLimit = isMobileViewport ? mobileProductLimit : desktopProductLimit;
+
+  useEffect(() => {
     loadRecentSales();
+    loadCategorySalesRank();
+    loadProductSoldCounts();
     api.get('/customers?limit=50', { _skipLoading: true }).then(({ data }) => setCustomers(data.customers || [])).catch(() => {});
     api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
+    api.get('/categories', { _skipLoading: true }).then(({ data }) => setCategories(Array.isArray(data) ? data : data.categories || [])).catch(() => {});
   }, []);
+
+  // Re-fetches Top Selling whenever the applicable display limit changes —
+  // on first load (once shopInfo's configured limit arrives) and whenever
+  // the viewport crosses the desktop/mobile breakpoint.
+  useEffect(() => {
+    loadTopSelling(activeProductLimit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProductLimit]);
 
   useEffect(() => {
     if (!search.trim()) { setShowTopSelling(true); setProducts([]); return; }
     setShowTopSelling(false);
     const timer = setTimeout(() => searchProducts(), 200);
     return () => clearTimeout(timer);
-  }, [search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, selectedCategory]);
 
-  const loadTopSelling = async () => { try { const { data } = await api.get('/sales/top-selling?limit=20', { _skipLoading: true }); setTopSelling(Array.isArray(data) ? data : []); } catch (err) { console.error(err); } };
+  // A stale-limit cache is worse than no cache — every previously-visited
+  // category's list was fetched for the old count, so a limit change
+  // (POS Display Settings edit, or crossing the desktop/mobile breakpoint)
+  // invalidates all of it at once.
+  const lastCachedLimitRef = useRef(activeProductLimit);
+  useEffect(() => {
+    if (lastCachedLimitRef.current !== activeProductLimit) {
+      categoryCache.current = {};
+      lastCachedLimitRef.current = activeProductLimit;
+    }
+  }, [activeProductLimit]);
+
+  // Shared by both the category-switch effect and the post-sale refresh —
+  // fetches one category's top-sellers and populates the cache.
+  const fetchCategoryProducts = useCallback(async (categoryId, limit) => {
+    try {
+      const { data } = await api.get(`/sales/top-selling?limit=${limit}&category=${categoryId}`, { _skipLoading: true });
+      const list = Array.isArray(data) ? data : [];
+      categoryCache.current[categoryId] = list;
+      return list;
+    } catch (err) {
+      return null;
+    }
+  }, []);
+
+  // Loads the selected category's products whenever a category becomes
+  // selected, the search box is cleared while a category is still selected,
+  // or the configured display limit changes — always just the top N
+  // (ranked by total quantity sold), never the full category and never
+  // paginated further.
+  //
+  // Cache-first, exactly like Top Selling: a cache hit is applied on this
+  // same render via categoryCache (read directly below, in the display
+  // variables) — no fetch, no spinner, no flicker. A cache miss keeps
+  // whatever's already on screen and fetches quietly in the background,
+  // swapping the result in once it lands.
+  useEffect(() => {
+    if (!showTopSelling || !selectedCategory) return undefined;
+    if (categoryCache.current[selectedCategory]) return undefined;
+
+    let cancelled = false;
+    fetchCategoryProducts(selectedCategory, activeProductLimit).then((list) => {
+      if (cancelled || list === null) return;
+      setCategoryProducts(list);
+    });
+    return () => { cancelled = true; };
+  }, [selectedCategory, showTopSelling, activeProductLimit, fetchCategoryProducts]);
+
+  const isCategoryBrowsing = showTopSelling && !!selectedCategory;
+  // Prefer the cache (zero-latency) — falls back to categoryProducts (the
+  // last thing shown, updated by the background fetch above) only while the
+  // currently-selected category hasn't been cached yet.
+  const cachedSelectedCategoryProducts = selectedCategory ? categoryCache.current[selectedCategory] : undefined;
+  const effectiveCategoryProducts = cachedSelectedCategoryProducts || categoryProducts;
+  const hasResolvedSelectedCategory = !!cachedSelectedCategoryProducts;
+
+  // Guards against a stale response clobbering a fresher one: on mount this
+  // fires once with the default limit (before shopInfo's real setting has
+  // loaded) and again moments later with the configured limit — network
+  // timing doesn't guarantee the second call resolves last, so only the
+  // response matching the most recently *issued* request is ever applied.
+  const topSellingRequestRef = useRef(0);
+  const loadTopSelling = async (limit = 20) => {
+    const requestId = ++topSellingRequestRef.current;
+    try {
+      const { data } = await api.get(`/sales/top-selling?limit=${limit}`, { _skipLoading: true });
+      if (requestId !== topSellingRequestRef.current) return;
+      setTopSelling(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
   const loadRecentSales = async () => { try { const { data } = await api.get('/sales/recent?limit=5', { _skipLoading: true }); setRecentSales(data.sales || []); } catch (err) { console.error(err); } };
+  // Powers the category chip ordering — same net-quantity-sold basis as Top
+  // Selling Products, just grouped by category. Re-fetched after every sale/
+  // return so the chip order always reflects current sales standing.
+  const loadCategorySalesRank = async () => {
+    try {
+      const { data } = await api.get('/sales/top-categories', { _skipLoading: true });
+      const rank = {};
+      (Array.isArray(data) ? data : []).forEach((c) => { rank[c._id] = c.totalQuantity; });
+      setCategorySalesRank(rank);
+    } catch (err) { console.error(err); }
+  };
+  // Powers the "Sold: N" count on every product card — net quantity sold
+  // (returns already subtracted), for every product, not only the Top
+  // Selling subset. Re-fetched after every sale so it's always current.
+  const loadProductSoldCounts = async () => {
+    try {
+      const { data } = await api.get('/sales/product-sold-counts', { _skipLoading: true });
+      const counts = {};
+      (Array.isArray(data) ? data : []).forEach((p) => { counts[p._id] = p.totalSold; });
+      setProductSoldCounts(counts);
+    } catch (err) { console.error(err); }
+  };
   const searchProducts = async () => {
     setSearching(true);
     try {
-      const { data } = await api.get(`/products/search?q=${search}`, { _skipLoading: true });
+      const categoryParam = selectedCategory ? `&category=${selectedCategory}` : '';
+      const { data } = await api.get(`/products/search?q=${search}${categoryParam}`, { _skipLoading: true });
       setProducts(Array.isArray(data) ? data : data.products || []);
     } catch (err) {
       console.error(err);
@@ -256,24 +402,33 @@ const POS = () => {
   const taxableAmount = subtotal - totalDiscount;
   const tax = taxableAmount > 0 ? taxableAmount * (taxRate / 100) : 0;
   const grandTotal = subtotal + tax - totalDiscount;
+  // Round Off — always rounds DOWN to the nearest whole currency unit, per
+  // the required calculation order (Subtotal → Tax → Discount → Grand Total
+  // → Round Off → Final Payable). This floored value is the "Payable"
+  // amount used everywhere below (due, change, payment clamping) and is
+  // what actually gets sent to/stored by the backend as totalAmount.
+  const payableAmount = Math.floor(grandTotal);
+  const roundOff = payableAmount - grandTotal; // always <= 0
   // Current-bill due — formula is unchanged regardless of the previous-due
   // toggle, since paying against the current bill is always allocated first.
-  const dueAmount = Math.max(0, grandTotal - Number(paidAmount || 0));
-  const change = Math.max(0, Number(paidAmount || 0) - grandTotal);
+  const dueAmount = Math.max(0, payableAmount - Number(paidAmount || 0));
+  const change = Math.max(0, Number(paidAmount || 0) - payableAmount);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const hasPreviousDue = !!(previousDue && previousDue.dueAmount > 0);
   const previousDueAmount = hasPreviousDue ? previousDue.dueAmount : 0;
   // The amount the cashier is actually being asked to collect right now —
   // the current bill alone, or current bill + previous due once opted in.
-  const totalPayable = includePreviousDue && hasPreviousDue ? grandTotal + previousDueAmount : grandTotal;
+  const totalPayable = includePreviousDue && hasPreviousDue ? payableAmount + previousDueAmount : payableAmount;
   // Any amount paid beyond the current bill is applied to the previous due
   // (current bill is always settled first), capped so it never exceeds it.
   const paidTowardPreviousDue = includePreviousDue && hasPreviousDue
-    ? Math.min(Math.max(0, Number(paidAmount || 0) - grandTotal), previousDueAmount)
+    ? Math.min(Math.max(0, Number(paidAmount || 0) - payableAmount), previousDueAmount)
     : 0;
 
-  useEffect(() => { if ((paidAmount === 0 || paidAmount === '') && grandTotal > 0) setPaidAmount(grandTotal); }, [grandTotal]);
+  // Paid Amount is intentionally never auto-filled as the bill total changes —
+  // it stays exactly what the cashier typed (or empty) until they either type
+  // something themselves or click "Exact" (see pos-paid-exact-btn below).
   useEffect(() => { try { localStorage.setItem('pos_last_payment', paymentMethod); } catch {} }, [paymentMethod]);
 
   const isPaidOverTotal = paidAmount !== '' && Number(paidAmount) > totalPayable;
@@ -289,7 +444,7 @@ const POS = () => {
       showToast.error(t('posPage.validation.customerRequiredForDue'));
       return;
     }
-    setConfirmData({ totalItems, subtotal, discount: totalDiscount, grandTotal, paidAmount, dueAmount, paymentMethod, tax, taxRate, taxName, extraDiscount, customerNote, includePreviousDue, previousDueAmount, totalPayable });
+    setConfirmData({ totalItems, subtotal, discount: totalDiscount, grandTotal, roundOff, payableAmount, paidAmount, dueAmount, paymentMethod, tax, taxRate, taxName, extraDiscount, customerNote, includePreviousDue, previousDueAmount, totalPayable });
     setShowConfirmModal(true);
   };
 
@@ -302,24 +457,29 @@ const POS = () => {
     setLoading(true);
     try {
       // The amount actually entered/confirmed by the cashier — clamped to
-      // [0, grandTotal] so it can never manufacture a fake full payment
-      // (previously this was force-raised to grandTotal, which made every
-      // sale look fully paid and silently erased the due amount). The current
-      // bill is always settled first; anything paid beyond it is a separate
-      // payment against the previous due (see paidTowardPreviousDue below) —
-      // the sale itself never knows about the customer's older invoices.
-      const confirmedPaidAmount = Math.min(Math.max(0, Number(paidAmount) || 0), grandTotal);
+      // [0, payableAmount] (the rounded-down total) so it can never
+      // manufacture a fake full payment (previously this was force-raised to
+      // the total, which made every sale look fully paid and silently erased
+      // the due amount). The current bill is always settled first; anything
+      // paid beyond it is a separate payment against the previous due (see
+      // paidTowardPreviousDue below) — the sale itself never knows about the
+      // customer's older invoices.
+      const confirmedPaidAmount = Math.min(Math.max(0, Number(paidAmount) || 0), payableAmount);
       const previousDuePayment = paidTowardPreviousDue; // snapshot before cart/customer reset
       const targetCustomerId = customer;
       const payload = {
         customer: customer || null,
         items: cart.map(item => ({ product: item.product._id, quantity: item.quantity, unit: item.product.unit, price: item.price, discount: item.discount, tax: item.product.tax || 0, total: item.total })),
-        subtotal, discount: totalDiscount, tax, totalAmount: grandTotal, paidAmount: confirmedPaidAmount, dueAmount: Math.max(0, grandTotal - confirmedPaidAmount), paymentMethod: selectedPayment, posType: 'pos', notes: customerNote,
+        // subtotal/discount/tax are sent as the raw (pre-round) figures — the
+        // backend independently derives Grand Total from these and floors it
+        // to get totalAmount/roundOff, so the stored Round Off always matches
+        // exactly what was shown here at checkout.
+        subtotal, discount: totalDiscount, tax, totalAmount: payableAmount, paidAmount: confirmedPaidAmount, dueAmount: Math.max(0, payableAmount - confirmedPaidAmount), paymentMethod: selectedPayment, posType: 'pos', notes: customerNote,
       };
       const { data } = await api.post('/sales', payload);
       const saleDetail = await api.get(`/sales/${data._id || data.sale}`);
       const saleData = saleDetail.data.sale || saleDetail.data;
-      setLastSale({ ...saleData, invoiceNo: data.invoiceNo || saleData.invoiceNo, totalAmount: data.totalAmount || saleData.totalAmount || grandTotal, paidAmount: data.paidAmount || saleData.paidAmount || paidAmount, dueAmount: data.dueAmount || saleData.dueAmount || dueAmount, paymentMethod: selectedPayment, notes: customerNote });
+      setLastSale({ ...saleData, invoiceNo: data.invoiceNo || saleData.invoiceNo, totalAmount: data.totalAmount || saleData.totalAmount || payableAmount, roundOff: data.roundOff ?? saleData.roundOff ?? roundOff, paidAmount: data.paidAmount || saleData.paidAmount || paidAmount, dueAmount: data.dueAmount || saleData.dueAmount || dueAmount, paymentMethod: selectedPayment, notes: customerNote });
 
       // The current sale is safely recorded at this point. If the cashier chose
       // to also settle some/all of the previous due, record that as a normal
@@ -340,8 +500,20 @@ const POS = () => {
       setShowConfirmModal(false);
       setShowInvoice(true);
       resetCartFieldsForNextSale();
-      loadTopSelling();
+      loadTopSelling(activeProductLimit);
       loadRecentSales();
+      loadCategorySalesRank();
+      loadProductSoldCounts();
+      // Quantity-sold rankings just shifted — every cached category list is
+      // now potentially stale. Drop the cache and, if a category is
+      // currently open, quietly refresh it in place (same no-spinner swap
+      // as any other cache miss).
+      categoryCache.current = {};
+      if (selectedCategory) {
+        fetchCategoryProducts(selectedCategory, activeProductLimit).then((list) => {
+          if (list !== null) setCategoryProducts(list);
+        });
+      }
       showToast.success(t('posPage.toast.invoiceGenerated', { invoiceNo: data.invoiceNo || '' }));
     } catch (err) { showToast.error(err.response?.data?.message || t('posPage.toast.checkoutFailed')); }
     finally { setLoading(false); }
@@ -367,12 +539,24 @@ const POS = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cart]);
 
-  const displayProducts = showTopSelling ? topSelling : products;
-  const desktopDisplayLimit = showTopSelling ? 12 : 30;
-  const topSellingSlice = topSelling.slice(0, 5);
-  const hasMoreTopSelling = topSelling.length > 5;
-  const mobileListProducts = showTopSelling ? topSellingSlice : products;
+  // "showTopSelling" really just means "the search box is empty" — within
+  // that, a selected category shows that category's top sellers (up to the
+  // configured display limit), and no category selected shows the overall
+  // Top Selling list (same limit). Search always searches everything and
+  // ignores the display limit entirely.
+  const isActualTopSelling = showTopSelling && !selectedCategory;
+  const displayProducts = !showTopSelling ? products : (isCategoryBrowsing ? effectiveCategoryProducts : topSelling);
+  // No artificial cap — both topSelling and categoryProducts are already
+  // fetched at exactly the configured limit, ranked by quantity sold.
+  const desktopDisplayLimit = !showTopSelling ? 30 : displayProducts.length;
+  const mobileListProducts = displayProducts;
   const showMobileList = mobileListProducts.length > 0;
+  // Chip order: highest total quantity sold first; categories with no sales
+  // yet (0, i.e. absent from the rank map) fall to the end, in their
+  // original list order among themselves.
+  const sortedCategories = [...categories].sort(
+    (a, b) => (categorySalesRank[b._id] || 0) - (categorySalesRank[a._id] || 0)
+  );
 
   return (
     <div className="pos-modern">
@@ -388,12 +572,36 @@ const POS = () => {
             <small className="pos-kbd-hint"><span className="pos-kbd-f1"><kbd>F1</kbd> {t('posPage.search.shortcutSearch')} </span><kbd>F8</kbd> {t('posPage.search.shortcutBill')}</small>
           </div>
         </div>
-        {showTopSelling && topSelling.length > 0 && <div className="pos-section-header"><BiTrendingUp /> {t('dashboard.topSellingProducts')}</div>}
+        {categories.length > 0 && (
+          <div className="pos-category-filter">
+            <button
+              type="button"
+              className={`pos-category-chip ${!selectedCategory ? 'active' : ''}`}
+              onClick={() => setSelectedCategory('')}
+            >
+              {t('posPage.category.topSelling')}
+            </button>
+            {sortedCategories.map((cat) => (
+              <button
+                key={cat._id}
+                type="button"
+                className={`pos-category-chip ${selectedCategory === cat._id ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(cat._id)}
+              >
+                {isBn && cat.nameBn ? cat.nameBn : cat.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* {showTopSelling && displayProducts.length > 0 && (
+          <div className="pos-section-header"><BiTrendingUp /> {t('dashboard.topSellingProducts')}</div>
+        )} */}
         {showMobileList && (
           <div className="pos-top-selling-mobile">
             <div className="pos-top-selling-mobile-list">
               {mobileListProducts.map((product, idx) => {
                 const isOutOfStock = product.stock <= 0;
+                const soldQty = productSoldCounts[product._id] ?? product.totalSold ?? 0;
                 return (
                   <div key={product._id} className={`pos-top-selling-mobile-item ${isOutOfStock ? 'pos-product-out-of-stock' : ''}`} onClick={() => !isOutOfStock && addToCart(product)}>
                     <div className="pos-top-selling-mobile-rank">{showTopSelling ? idx + 1 : <BiPackage size={11} />}</div>
@@ -404,6 +612,10 @@ const POS = () => {
                           <span className="pos-top-selling-mobile-stat-label">{t('common.price')}</span>
                           <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--price">₹{product.sellingPrice || 0}</span>
                         </div>
+                        <div className="pos-top-selling-mobile-stat">
+                          <span className="pos-top-selling-mobile-stat-label">{t('posPage.product.sold')}</span>
+                          <span className="pos-top-selling-mobile-stat-value pos-top-selling-mobile-stat-value--sold">{soldQty}</span>
+                        </div>
                       </div>
                     </div>
                     <button className="pos-top-selling-mobile-add" disabled={isOutOfStock} onClick={(e) => { e.stopPropagation(); !isOutOfStock && addToCart(product); }}><BiPlus /></button>
@@ -411,18 +623,22 @@ const POS = () => {
                 );
               })}
             </div>
-            {showTopSelling && hasMoreTopSelling && (
-              <button className="pos-top-selling-mobile-view-all">
-                {t('posPage.product.viewAllMore', { count: topSelling.length - 5 })} <BiChevronRight />
-              </button>
-            )}
           </div>
         )}
         <div className="pos-product-grid">
           {!showTopSelling && products.length === 0 && search && <div className="pos-empty-state"><BiPackage size={48} /><p>{t('product.noProductsFoundFor', { query: search })}</p></div>}
+          {/* No spinner here on purpose — a category switch behaves exactly
+              like Top Selling: cached data (or the previous category's list)
+              stays on screen with zero loading UI while a background fetch
+              (if any) quietly resolves. The "no products" message only ever
+              shows once we've definitively confirmed it's actually empty. */}
+          {isCategoryBrowsing && hasResolvedSelectedCategory && effectiveCategoryProducts.length === 0 && (
+            <div className="pos-empty-state"><BiPackage size={48} /><p>{t('posPage.category.noProductsInCategory')}</p></div>
+          )}
           {displayProducts.slice(0, desktopDisplayLimit).map(product => {
             const isOutOfStock = product.stock <= 0;
             const isLowStock = product.stock > 0 && product.stock <= 10;
+            const soldQty = productSoldCounts[product._id] ?? product.totalSold ?? 0;
             return (
               <div key={product._id} className={`pos-product-card ${isOutOfStock ? 'pos-product-out-of-stock' : ''}`} onClick={() => !isOutOfStock && addToCart(product)}>
                 <div className="pos-product-icon"><BiPackage /></div>
@@ -431,6 +647,7 @@ const POS = () => {
                   <div className="pos-product-price">₹{product.sellingPrice}</div>
                   <div className="pos-product-stock">
                     {isOutOfStock ? <span className="stock-badge out-of-stock">{t('product.outOfStock')}</span> : isLowStock ? <span className="stock-badge low-stock">{product.stock} {product.unit || t('product.piece')}</span> : <span className="stock-badge in-stock">{product.stock} {product.unit || t('product.piece')}</span>}
+                    <span className="pos-product-sold-count">{t('posPage.product.soldCount', { count: soldQty })}</span>
                   </div>
                 </div>
                 <button className="pos-add-btn" disabled={isOutOfStock} onClick={(e) => { e.stopPropagation(); addToCart(product); }}><BiPlus /></button>
@@ -696,19 +913,24 @@ const POS = () => {
                 <span className="pos-summary-label">{t('sale.subtotal')}</span>
                 <span className="pos-summary-value">₹{subtotal.toFixed(2)}</span>
               </div>
-              <div className="pos-summary-card pos-summary-discount">
-                <span className="pos-summary-label">{t('sale.discount')}</span>
-                <span className="pos-summary-value">-₹{totalDiscount.toFixed(2)}</span>
-              </div>
               <div className="pos-summary-card pos-summary-tax">
                 <span className="pos-summary-label">{taxName}</span>
                 <span className="pos-summary-value">₹{tax.toFixed(2)}</span>
               </div>
+              <div className="pos-summary-card pos-summary-discount">
+                <span className="pos-summary-label">{t('sale.discount')}</span>
+                <span className="pos-summary-value">-₹{totalDiscount.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="pos-round-off-row">
+              <span>{t('posPage.totals.roundOff')}</span>
+              <span>{roundOff < 0 ? '-' : ''}₹{Math.abs(roundOff).toFixed(2)}</span>
             </div>
 
             <div className="pos-grand-total">
-              <span>{t('posPage.totals.grandTotal')}</span>
-              <span className="pos-grand-total-amount">₹{grandTotal.toFixed(2)}</span>
+              <span>{t('posPage.totals.payable')}</span>
+              <span className="pos-grand-total-amount">₹{payableAmount.toFixed(2)}</span>
             </div>
           </div>
 

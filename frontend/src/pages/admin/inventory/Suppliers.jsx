@@ -4,15 +4,18 @@ import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import SupplierDetailsDrawer from './SupplierDetailsDrawer';
+import ConfirmModal from '../../../components/common/ConfirmModal';
 import Pagination from '../../../components/common/Pagination';
+import BulkImportProgressModal from '../../../components/common/BulkImportProgressModal';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
   BiError, BiMessageSquare, BiRefresh, BiInfoCircle,
-  BiPhone, BiEnvelope, BiMapPin, BiBuilding, BiDollar,
+  BiPhone, BiMapPin, BiBuilding, BiDollar,
   BiCalendar, BiUser, BiShow
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
+import { showToast } from '../../../utils/toast';
 
 const emptyForm = { name: '', nameBn: '', company: '', email: '', phone: '', address: '' };
 const REQUIRED_FIELDS = ['name', 'phone'];
@@ -183,6 +186,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   const [existingSuppliers, setExistingSuppliers] = useState([]);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importElapsedMs, setImportElapsedMs] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
@@ -202,6 +208,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     setDuplicates({});
     setShowPreview(false);
     setImportResult(null);
+    setImportProgress({ current: 0, total: 0, success: 0, failed: 0 });
+    setShowImportModal(false);
+    setImportElapsedMs(0);
     setActiveTab('excel');
   };
 
@@ -357,6 +366,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
   // ─── Import All ─────────────────────────────────────────────────────────
   const handleImport = async () => {
+    // Prevent a second import from starting while one is already running.
+    if (importing) return;
+
     const validRows = parsedRows.filter((row, idx) => {
       if (errors[idx] && errors[idx].length > 0) return false;
       if (skipDuplicates && duplicates[idx]) return false;
@@ -368,13 +380,17 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       return;
     }
 
+    const startedAt = Date.now();
     setImporting(true);
+    setShowImportModal(true);
+    setImportProgress({ current: 0, total: validRows.length, success: 0, failed: 0 });
     let imported = 0;
     let updated = 0;
     let failed = 0;
     const failedDetails = [];
 
-    for (const row of validRows) {
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
       try {
         // Check if duplicate (update existing)
         const existing = existingSuppliers.find(s =>
@@ -392,19 +408,22 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
         if (existing && !skipDuplicates) {
           // Update existing
-          await api.put(`/suppliers/${existing._id}`, payload);
+          await api.put(`/suppliers/${existing._id}`, payload, { _skipLoading: true });
           updated++;
         } else {
           // Create new
-          await api.post('/suppliers', payload);
+          await api.post('/suppliers', payload, { _skipLoading: true });
           imported++;
         }
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       } catch (err) {
         failed++;
         failedDetails.push(`${row.name}: ${err.response?.data?.message || err.message}`);
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       }
     }
 
+    setImportElapsedMs(Date.now() - startedAt);
     setImportResult({ total: parsedRows.length, imported, updated, failed, failedDetails });
     setImporting(false);
     onSuccess();
@@ -693,8 +712,30 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           </div>
         </div>
       </div>
+
+      <BulkImportProgressModal
+        open={showImportModal}
+        phase={importing ? 'importing' : 'done'}
+        label={t('suppliersPage.bulkImportButton') || 'Suppliers'}
+        current={importProgress.current}
+        total={importProgress.total}
+        success={importProgress.success}
+        failed={importProgress.failed}
+        elapsedMs={importElapsedMs}
+        onDismiss={() => setShowImportModal(false)}
+      />
     </>
   );
+};
+
+// A plain checkbox that also reflects a third "some, but not all" state —
+// React has no `indeterminate` JSX prop, so it's set imperatively on the DOM node.
+const SelectAllCheckbox = ({ checked, indeterminate, onChange, ...rest }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} {...rest} />;
 };
 
 // Fixed page size for the Suppliers list — server-side pagination via ?page=&limit=.
@@ -716,6 +757,9 @@ const Suppliers = () => {
   const [editing, setEditing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [viewDetailsId, setViewDetailsId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -727,6 +771,12 @@ const Suppliers = () => {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch]);
+
+  // Selection is page-scoped — navigating away from a page (or re-searching)
+  // clears it, so nothing gets silently selected out of view.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedSearch]);
 
   const fetchSuppliers = useCallback(async () => {
     const silent = !isFirstLoad.current;
@@ -779,6 +829,64 @@ const Suppliers = () => {
     }
   };
 
+  // ─── Multi-select & Bulk Delete ─────────────────────────────────────────
+  const isSelected = (id) => selectedIds.has(id);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allOnPageSelected = suppliers.length > 0 && suppliers.every((s) => selectedIds.has(s._id));
+  const someOnPageSelected = suppliers.some((s) => selectedIds.has(s._id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allOnPageSelected) return new Set();
+      const next = new Set(prev);
+      suppliers.forEach((s) => next.add(s._id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { data } = await api.post('/suppliers/bulk-delete', { ids });
+      setBulkConfirmOpen(false);
+      setSelectedIds(new Set());
+
+      if (data.blockedCount > 0) {
+        const lines = [];
+        if (data.deletedCount > 0) lines.push(`✅ ${t('suppliersPage.bulkDeleteSuccessLine', { count: data.deletedCount })}`);
+        lines.push(`⚠️ ${t('suppliersPage.bulkDeleteBlockedLine', { count: data.blockedCount })}`);
+        Swal.fire({
+          icon: data.deletedCount > 0 ? 'warning' : 'error',
+          title: t('suppliersPage.bulkDeleteSummaryTitle'),
+          html: `<div style="text-align:left; font-size:0.9rem; line-height:1.8;">${lines.map((l) => `<div>${l}</div>`).join('')}</div>`,
+          confirmButtonColor: '#6C63FF',
+        });
+      } else {
+        showToast.success(t('suppliersPage.bulkDeleteSuccessLine', { count: data.deletedCount }));
+      }
+
+      // Step back a page if this emptied the current page beyond page 1.
+      if (ids.length >= suppliers.length && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchSuppliers();
+      }
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('suppliersPage.bulkDeleteFailed'));
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <div>
       {/* Page Header */}
@@ -789,7 +897,7 @@ const Suppliers = () => {
             {t('suppliersPage.subtitle')}
           </p>
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 flex-wrap suppliers-header-actions">
           <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
             <BiUpload /> {t('suppliersPage.bulkImportButton')}
           </button>
@@ -800,16 +908,60 @@ const Suppliers = () => {
       </div>
 
       {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input
-            className="form-control"
-            placeholder={t('suppliersPage.searchPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="list-filters-card">
+        <div className="list-filter-field list-search-field">
+          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input
+              className="form-control list-filter-input"
+              placeholder={t('suppliersPage.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
+      </div>
+
+      {/* ─── Bulk Action Toolbar ─────────────────────────────────────────
+          Sticky so it stays reachable while scrolling a long list; only
+          rendered once at least one supplier is selected. */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-select-toolbar">
+          <span className="bulk-select-toolbar__count">
+            {t('suppliersPage.suppliersSelected', { count: selectedIds.size })}
+          </span>
+          <div className="bulk-select-toolbar__actions">
+            <button
+              type="button"
+              className="btn-premium btn-premium-secondary"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <BiX /> {t('suppliersPage.clearSelection')}
+            </button>
+            <button
+              type="button"
+              className="btn-premium btn-premium-danger"
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              <BiTrash /> {t('suppliersPage.deleteSelected')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only Select All bar (no table header on mobile cards) */}
+      <div className="bulk-select-mobile-bar">
+        <label className="bulk-select-checkbox">
+          <SelectAllCheckbox
+            checked={allOnPageSelected}
+            indeterminate={someOnPageSelected && !allOnPageSelected}
+            onChange={toggleSelectAll}
+            disabled={suppliers.length === 0}
+          />
+          <span className="bulk-select-checkmark" />
+          <span>{t('suppliersPage.selectAllSuppliers')}</span>
+        </label>
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
@@ -818,6 +970,17 @@ const Suppliers = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
+                <th style={{ width: '44px' }}>
+                  <label className="bulk-select-checkbox" title={t('suppliersPage.selectAllSuppliers')}>
+                    <SelectAllCheckbox
+                      checked={allOnPageSelected}
+                      indeterminate={someOnPageSelected && !allOnPageSelected}
+                      onChange={toggleSelectAll}
+                      disabled={suppliers.length === 0}
+                    />
+                    <span className="bulk-select-checkmark" />
+                  </label>
+                </th>
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
@@ -829,19 +992,25 @@ const Suppliers = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
                     {t('empty.noSuppliers')}
                   </td>
                 </tr>
               ) : suppliers.map((supplier, idx) => (
-                <tr key={supplier._id}>
+                <tr key={supplier._id} className={isSelected(supplier._id) ? 'bulk-select-row--selected' : ''}>
+                  <td>
+                    <label className="bulk-select-checkbox" title={t('suppliersPage.selectSupplier')}>
+                      <input type="checkbox" checked={isSelected(supplier._id)} onChange={() => toggleSelect(supplier._id)} />
+                      <span className="bulk-select-checkmark" />
+                    </label>
+                  </td>
                   <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                     {(page - 1) * SUPPLIERS_PER_PAGE + idx + 1}
                   </td>
@@ -890,6 +1059,13 @@ const Suppliers = () => {
         ) : suppliers.map((supplier) => (
           <ExpandableCard
             key={supplier._id}
+            className={isSelected(supplier._id) ? 'bulk-select-mobile-row--selected' : ''}
+            checkbox={
+              <label className="bulk-select-checkbox bulk-select-checkbox--mobile">
+                <input type="checkbox" checked={isSelected(supplier._id)} onChange={() => toggleSelect(supplier._id)} />
+                <span className="bulk-select-checkmark" />
+              </label>
+            }
             compact={
               <>
                 <div className="expandable-card__compact-row">
@@ -901,12 +1077,6 @@ const Suppliers = () => {
                     <BiPhone />
                     <strong>{supplier.phone}</strong>
                   </span>
-                  {supplier.email && (
-                    <span className="expandable-card__meta-item">
-                      <BiEnvelope />
-                      <span>{supplier.email}</span>
-                    </span>
-                  )}
                 </div>
               </>
             }
@@ -1022,6 +1192,18 @@ const Suppliers = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmModal
+        open={bulkConfirmOpen}
+        onClose={() => !bulkDeleting && setBulkConfirmOpen(false)}
+        onConfirm={handleBulkDelete}
+        title={t('suppliersPage.bulkDeleteTitle')}
+        message={t('suppliersPage.bulkDeleteConfirm')}
+        confirmText={bulkDeleting ? t('common.deleting') : t('common.delete')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+      />
     </div>
   );
 };

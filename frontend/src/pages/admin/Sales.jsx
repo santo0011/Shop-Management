@@ -56,6 +56,13 @@ const PAYMENT_ICONS = {
   cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦',
 };
 
+// Translated display label for a payment/refund method key — showing the
+// raw stored value (e.g. "MOBILE_BANKING") would bypass the rename to "Other".
+const getPaymentMethodLabels = (t) => ({
+  cash: t('sale.cash'), card: t('sale.card'), upi: t('sale.upi'),
+  mobile_banking: t('sale.mobileBanking'), due: t('common.due'),
+});
+
 const getStatusOptions = (t) => [
   { key: '', label: t('salesPage.status.all') },
   { key: 'paid', label: t('common.paid') },
@@ -104,10 +111,12 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
   const { t } = useTranslation();
   const statusStyles = getStatusStyles(t);
   const returnStyles = getReturnStyles(t);
+  const paymentMethodLabels = getPaymentMethodLabels(t);
 
   const st = sale ? (statusStyles[sale.paymentStatus] || statusStyles.paid) : null;
   const rs = sale ? (returnStyles[sale.returnStatus] || returnStyles.none) : null;
   const pmtIcon = sale ? (PAYMENT_ICONS[sale.paymentMethod] || '💵') : null;
+  const pmtLabel = sale ? (paymentMethodLabels[sale.paymentMethod] || sale.paymentMethod || t('sale.cash')).toUpperCase() : '';
   const allReturns = sale?.returns || [];
   const totalRefunded = allReturns.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
 
@@ -175,7 +184,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                     <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(255,181,69,0.1)', color: '#F39C12' }}><BiCreditCard size={18} /></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
                       <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.payment')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {sale.paymentMethod ? sale.paymentMethod.toUpperCase() : t('sale.cash').toUpperCase()}</span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {pmtLabel}</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                         {t('common.paid')}: <strong style={{ color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
                         {sale.dueAmount > 0 && <> | {t('common.due')}: <strong style={{ color: '#FF6B6B' }}>₹{Number(sale.dueAmount).toFixed(2)}</strong></>}
@@ -221,18 +230,31 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
                     <span>{t('sale.subtotal')}</span><span>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
                   </div>
-                  {Number(sale.discount || 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#e74c3c' }}>
-                      <span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span>
-                    </div>
-                  )}
                   {Number(sale.tax || 0) > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
                       <span>{t('sale.tax')}</span><span>₹{Number(sale.tax).toFixed(2)}</span>
                     </div>
                   )}
+                  {Number(sale.discount || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#e74c3c' }}>
+                      <span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {/* sale.totalAmount is already the floored Final Payable amount
+                      (rounded down once at sale creation) — reconstruct the
+                      pre-round Grand Total from the stored roundOff delta so
+                      this preview shows the full Subtotal → Tax → Discount →
+                      Grand Total → Round Off → Payable breakdown. */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                    <span>{t('salesPage.invoice.grandTotal')}</span><span>₹{(Number(sale.totalAmount ?? sale.grandTotal ?? 0) - Number(sale.roundOff || 0)).toFixed(2)}</span>
+                  </div>
+                  {Number(sale.roundOff || 0) !== 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      <span>{t('posPage.totals.roundOff')}</span><span>-₹{Math.abs(Number(sale.roundOff)).toFixed(2)}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))', fontSize: '0.9rem', color: '#fff', fontWeight: 700, boxShadow: '0 2px 10px rgba(108,99,255,0.2)' }}>
-                    <span>{t('salesPage.invoice.grandTotal')}</span><span style={{ fontSize: '1.05rem', fontWeight: 800 }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                    <span>{t('posPage.totals.payable')}</span><span style={{ fontSize: '1.05rem', fontWeight: 800 }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#2ecc71', fontWeight: 600 }}>
                     <span>{t('common.paid')}</span><span>₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
@@ -258,10 +280,15 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                   </div>
                   {allReturns.map((ret, rIdx) => (
                     <div key={rIdx} style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'rgba(108,99,255,0.04)', border: '1px solid rgba(108,99,255,0.1)', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(108,99,255,0.1)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(108,99,255,0.1)', flexWrap: 'wrap', gap: 4 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}><BiTime size={12} /> {formatDate(ret.returnDate)}</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 4 }}>{ret.refundMethod?.toUpperCase()}</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 4 }}>{(paymentMethodLabels[ret.refundMethod] || ret.refundMethod || '').toUpperCase()}</span>
                       </div>
+                      {ret.processedBy?.name && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+                          <BiUserCircle size={12} /> {t('salesPage.returnDrawer.returnedBy')}: <strong style={{ color: 'var(--text-secondary)' }}>{ret.processedBy.name}</strong>
+                        </div>
+                      )}
                       {ret.items.map((ritem, riIdx) => (
                         <div key={riIdx} style={{ padding: '4px 0', borderBottom: riIdx < ret.items.length - 1 ? '1px solid var(--border-light)' : 'none' }}>
                           <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{ritem.productName || t('salesPage.invoice.item')}</span>
@@ -478,20 +505,20 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                         </div>
                         {item.maxReturnable > 0 && (
                           <>
-                            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 6, minWidth: 0 }}>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                                 <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.qtyToReturn')}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
-                                  <button onClick={() => handleQtyChange(idx, item.returnQty - 1)} disabled={item.returnQty <= 0} style={{ width: 30, height: 30, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                                  <input type="number" value={item.returnQty} onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 0)} min="0" max={item.maxReturnable} style={{ flex: 1, border: 'none', outline: 'none', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', width: 50, padding: '4px 0', MozAppearance: 'textfield' }} />
-                                  <button onClick={() => handleQtyChange(idx, item.returnQty + 1)} disabled={item.returnQty >= item.maxReturnable} style={{ width: 30, height: 30, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)', minWidth: 0 }}>
+                                  <button onClick={() => handleQtyChange(idx, item.returnQty - 1)} disabled={item.returnQty <= 0} style={{ width: 30, height: 30, flexShrink: 0, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                                  <input type="number" value={item.returnQty} onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 0)} min="0" max={item.maxReturnable} style={{ flex: 1, border: 'none', outline: 'none', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', width: 50, minWidth: 0, padding: '4px 0', MozAppearance: 'textfield' }} />
+                                  <button onClick={() => handleQtyChange(idx, item.returnQty + 1)} disabled={item.returnQty >= item.maxReturnable} style={{ width: 30, height: 30, flexShrink: 0, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                 </div>
                               </div>
-                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                                 <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundAmount')}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
-                                  <span style={{ padding: '0 6px 0 10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-input)', lineHeight: '30px', borderRight: '1px solid var(--border-color)' }}>₹</span>
-                                  <input type="number" value={item.refundAmount} onChange={(e) => { const n = [...returnItems]; n[idx].refundAmount = Math.max(0, Number(e.target.value)); setReturnItems(n); }} min="0" style={{ flex: 1, border: 'none', outline: 'none', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', minWidth: 0, MozAppearance: 'textfield' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)', minWidth: 0 }}>
+                                  <span style={{ padding: '0 6px 0 10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-input)', lineHeight: '30px', borderRight: '1px solid var(--border-color)', flexShrink: 0 }}>₹</span>
+                                  <input type="number" value={item.refundAmount} onChange={(e) => { const n = [...returnItems]; const maxRefund = n[idx].returnQty * n[idx].price; n[idx].refundAmount = Math.max(0, Math.min(Number(e.target.value) || 0, maxRefund)); setReturnItems(n); }} min="0" max={item.returnQty * item.price} style={{ flex: 1, border: 'none', outline: 'none', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', minWidth: 0, width: '100%', MozAppearance: 'textfield' }} />
                                 </div>
                               </div>
                             </div>

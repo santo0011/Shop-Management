@@ -1173,6 +1173,39 @@ select:-webkit-autofill {
 .badge-warning { background: rgba(255, 181, 69, 0.12); color: var(--warning); }
 .badge-info { background: rgba(23, 162, 184, 0.12); color: var(--info); }
 
+/* Clickable badge (e.g. Products Status column) — a real <button>, styled
+   to read clearly as an interactive control: a border in the badge's own
+   color plus a soft shadow, on top of the usual .badge-success/.badge-danger
+   colors, with hover/press feedback. */
+.badge-clickable {
+  font: inherit;
+  letter-spacing: inherit;
+  border: 1.5px solid currentColor;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: filter var(--transition-base), transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.badge-clickable:hover {
+  filter: brightness(0.94);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+}
+
+.badge-clickable:active {
+  transform: scale(0.96);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.badge-clickable:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.badge-clickable:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 /* ==========================================
    MODALS
    ========================================== */
@@ -1454,6 +1487,102 @@ select:-webkit-autofill {
 .search-box input {
   padding-left: 38px;
   padding-right: 12px;
+}
+
+/* ─── Shared list-page filter card (Products, Categories, Suppliers,
+   Customers, Purchases) — a labeled search field, optionally alongside
+   other filter fields (e.g. Products' category select). ─────────── */
+.list-filters-card {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.list-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  /* A flex item's default min-width is "auto" (its content's intrinsic
+     size), which can silently block shrinking and force the whole card to
+     overflow horizontally on narrow screens. Zero it on the item itself
+     (not just the width-capped subclass alongside it) so it always shrinks
+     to fit, no matter which fields are present. */
+  min-width: 0;
+}
+
+.list-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.list-search-field {
+  flex: 1 1 320px;
+  min-width: 0;
+  max-width: 400px;
+}
+
+.products-category-field {
+  flex: 1 1 240px;
+  min-width: 0;
+  max-width: 300px;
+}
+
+/* Matches the react-select control's 44px height exactly, so multiple
+   fields on the same row line up perfectly. */
+.list-filter-input {
+  height: 44px;
+  min-height: 44px;
+}
+
+.products-category-filter {
+  position: relative;
+}
+
+.products-category-filter-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  color: var(--text-muted);
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+@keyframes productsCategoryMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 767.98px matches the breakpoint used for "mobile" elsewhere in this app
+   (table/card switch, ledger pages, POS) — wider than the old 575.98px cutoff
+   so tablets and large phones also get the full-width stacked treatment
+   instead of being stuck in a cramped desktop-style row. */
+@media (max-width: 767.98px) {
+  .list-filters-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.85rem 1rem;
+    gap: 0.85rem;
+  }
+
+  .list-search-field,
+  .products-category-field {
+    max-width: 100%;
+  }
 }
 
 /* Subtle "table is refreshing" indicator (thin progress bar), used instead of
@@ -1752,6 +1881,12 @@ select:-webkit-autofill {
   gap: 0.25rem;
 }
 
+.expandable-card__checkbox {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
 .expandable-card__compact-row {
   display: flex;
   align-items: center;
@@ -1911,12 +2046,6 @@ select:-webkit-autofill {
   border-top: 1px solid var(--border-light);
 }
 
-.expandable-card__actions .btn-action {
-  width: 38px;
-  height: 38px;
-  font-size: 1.15rem;
-}
-
 /* Hide table on mobile, show cards */
 @media (max-width: 991.98px) {
   .desktop-table {
@@ -1961,16 +2090,23 @@ select:-webkit-autofill {
   .expandable-card__row-value {
     font-size: 0.75rem !important;
   }
-  /* Reduce action button size on mobile cards */
-  .expandable-card__actions .btn-action {
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 0.95rem !important;
-  }
   /* Reduce section headings within mobile-cards */
   .mobile-cards h5 {
     font-size: 0.85rem !important;
     margin-bottom: 0.5rem !important;
+  }
+
+  /* Touch-friendly View/Edit/Delete (etc.) action icons on mobile — a single
+     rule for every table across the project (Products, Customers, Suppliers,
+     Categories, Sales, Purchases, Reports, ...), since they all share the
+     .btn-action class. This used to be two conflicting rules (an unscoped
+     38px one and a `!important` 32px one that quietly won), which is why
+     mobile icon sizes had drifted smaller than desktop and inconsistent
+     between pages. Desktop is untouched — .btn-action stays 34px there. */
+  .btn-action {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 1.3rem !important;
   }
 }
 
@@ -2296,9 +2432,7 @@ select:-webkit-autofill {
 .pos-modern {
   display: flex;
   gap: 16px;
-  height: calc(100vh - var(--header-height) - 3rem);
   min-height: 600px;
-  overflow: hidden;
   position: relative;
 }
 
@@ -2309,7 +2443,6 @@ select:-webkit-autofill {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  overflow: hidden;
   min-width: 0;
 }
 
@@ -2321,7 +2454,6 @@ select:-webkit-autofill {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  overflow: hidden;
 }
 
 /* ─── Search Section ────────────────────────────────────── */
@@ -2344,6 +2476,67 @@ select:-webkit-autofill {
   display: flex;
   align-items: center;
   gap: 3px;
+}
+
+/* ─── Category Filter (chips row, directly under the search box) ──── */
+.pos-category-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  scrollbar-width: thin;
+}
+
+.pos-category-filter::-webkit-scrollbar {
+  height: 4px;
+}
+
+.pos-category-filter::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.pos-category-chip {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.pos-category-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pos-category-chip.active {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+@media (max-width: 575.98px) {
+  .pos-category-filter {
+    padding: 6px 8px;
+  }
+
+  .pos-category-chip {
+    padding: 5px 12px;
+    font-size: 0.72rem;
+  }
 }
 
 .pos-kbd-hint kbd {
@@ -2522,7 +2715,6 @@ select:-webkit-autofill {
 /* ─── Product Grid ──────────────────────────────────────── */
 .pos-product-grid {
   flex: 1;
-  overflow-y: auto;
   padding: 12px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -2566,6 +2758,13 @@ select:-webkit-autofill {
   box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.15);
   transform: translateY(-2px);
   background: var(--bg-card);
+}
+
+/* Desktop-only card border — tablets/phones keep the default subtle border. */
+@media (min-width: 992px) {
+  .pos-product-card {
+    border-color: #8B5E3C;
+  }
 }
 
 .pos-product-card:active {
@@ -2634,6 +2833,16 @@ select:-webkit-autofill {
 .stock-badge.out-of-stock {
   background: rgba(255, 107, 107, 0.12);
   color: var(--danger);
+}
+
+/* Sits inline next to the stock badge — same row, no added card height.
+   Matches .pos-top-selling-mobile-stat-value--sold's color on mobile. */
+.pos-product-sold-count {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--warning);
 }
 
 .pos-add-btn {
@@ -2723,7 +2932,6 @@ select:-webkit-autofill {
 /* ─── Cart Items ────────────────────────────────────────── */
 .pos-cart-items {
   flex: 1;
-  overflow-y: auto;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -2894,8 +3102,6 @@ select:-webkit-autofill {
   border-top: 1px solid var(--border-color);
   padding: 12px 14px 14px;
   background: var(--bg-primary);
-  overflow-y: auto;
-  max-height: 55%;
 }
 
 /* ─── Summary Cards ─────────────────────────────────────── */
@@ -2977,6 +3183,18 @@ select:-webkit-autofill {
     text-overflow: ellipsis;
     width: 100%;
   }
+}
+
+/* ─── Round Off (between the summary cards and the final Payable) ──── */
+.pos-round-off-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 12px;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 /* ─── Grand Total ───────────────────────────────────────── */
@@ -4445,27 +4663,17 @@ select:-webkit-autofill {
 @media (max-width: 991.98px) {
   .pos-modern {
     flex-direction: column;
-    height: auto;
     min-height: auto;
     gap: 12px;
   }
-  
-  .pos-products-panel {
-    height: 50vh;
-    min-height: 300px;
-  }
-  
+
   .pos-cart-panel {
     width: 100%;
     min-width: 0;
   }
-  
+
   .pos-product-grid {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  }
-  
-  .pos-checkout-section {
-    max-height: none;
   }
 }
 
@@ -4565,15 +4773,9 @@ select:-webkit-autofill {
   }
   
   .pos-modern {
-    height: auto;
     gap: 8px;
   }
-  
-  .pos-products-panel {
-    height: 45vh;
-    min-height: 250px;
-  }
-  
+
   .pos-product-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
@@ -5163,6 +5365,255 @@ select:-webkit-autofill {
   font-size: 0.75rem;
   color: var(--text-secondary);
   padding: 2px 0;
+}
+
+/* ==========================================================
+   BULK IMPORT PROGRESS MODAL (bip-*) — shared by Products,
+   Categories, and Suppliers bulk import
+   ========================================================== */
+.bip-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 26, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: bipFadeIn 0.2s ease;
+}
+
+@keyframes bipFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.bip-modal {
+  width: 100%;
+  max-width: 380px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 1.75rem 1.5rem 1.5rem;
+  text-align: center;
+  animation: bipPopIn 0.28s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+@keyframes bipPopIn {
+  from { opacity: 0; transform: scale(0.92) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ─── Importing phase ───────────────────────────────────── */
+.bip-icon-ring {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bip-icon-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  opacity: 0.35;
+  animation: bipPulse 1.8s ease-out infinite;
+}
+
+@keyframes bipPulse {
+  0% { transform: scale(0.85); opacity: 0.45; }
+  70% { transform: scale(1.55); opacity: 0; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+.bip-icon-circle {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(108, 99, 255, 0.35);
+}
+
+.bip-title {
+  margin: 0 0 2px;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.bip-subtitle {
+  margin: 0 0 1.1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.bip-progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--bg-input);
+  overflow: hidden;
+  position: relative;
+}
+
+.bip-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: var(--gradient-primary);
+  background-size: 200% 100%;
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: bipShimmer 1.6s linear infinite;
+}
+
+@keyframes bipShimmer {
+  0% { background-position: 0% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.bip-progress-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.bip-progress-pct {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.bip-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  gap: 8px;
+  margin-top: 1.1rem;
+}
+
+.bip-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.6rem 0.4rem;
+  border-radius: 12px;
+  background: var(--bg-input);
+}
+
+.bip-stat-value {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.bip-stat-value--success { color: var(--secondary); }
+.bip-stat-value--danger { color: var(--danger); }
+
+.bip-stat-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Done phase ────────────────────────────────────────── */
+.bip-success-icon {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  background: rgba(0, 217, 166, 0.14);
+  color: var(--secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: bipCheckPop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes bipCheckPop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.bip-summary-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin: 0.9rem 0 0.5rem;
+}
+
+.bip-summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.bip-summary-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.bip-summary-value--success { color: var(--secondary); }
+.bip-summary-value--danger { color: var(--danger); }
+
+.bip-summary-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.bip-failed-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0.3rem 0 1rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--danger);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.bip-done-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 575.98px) {
+  .bip-modal {
+    padding: 1.5rem 1.1rem 1.25rem;
+  }
+  .bip-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .bip-summary-grid {
+    gap: 0.9rem;
+  }
 }
 
 /* ─── Responsive ────────────────────────────────────────── */
@@ -11228,6 +11679,23 @@ select:-webkit-autofill {
   text-overflow: ellipsis;
 }
 
+/* Mobile only — drop the icon, keep title + value, tighten padding. */
+@media (max-width: 767.98px) {
+  .ledger-kpi-card {
+    padding: 0.75rem 0.85rem;
+    gap: 0;
+  }
+  .ledger-kpi-icon {
+    display: none;
+  }
+  .ledger-kpi-value {
+    font-size: 1.05rem;
+  }
+  .ledger-kpi-label {
+    font-size: 0.68rem;
+  }
+}
+
 /* ─── Sticky filter bar ──────────────────────────────────── */
 .ledger-filter-bar {
   position: sticky;
@@ -11570,6 +12038,73 @@ select:-webkit-autofill {
   }
   .ledger-kpi-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  /* Drop the generic page subtitle here — it's redundant clutter once
+     you're already looking at one specific customer/supplier's ledger. */
+  .ledger-header-subtitle {
+    display: none;
+  }
+  /* The desktop pill row is replaced on mobile by the stat-tile grid
+     below; the status badge moves up next to the name instead.
+     Scoped to the Supplier Ledger page only — Customer/Product Ledger
+     still use the plain pill row and must keep it visible. */
+  .supplier-ledger-page .ledger-header-meta {
+    display: none;
+  }
+  .ledger-mobile-status {
+    display: inline-flex;
+  }
+}
+
+/* ─── Mobile stat tiles (Supplier Ledger) ─────────────────────
+   Hidden by default (desktop); same visual language as the Supplier
+   Details drawer's summary cards — label on top, bold value below,
+   a colored top border per stat. */
+.ledger-mobile-status {
+  display: none;
+}
+
+.ledger-mobile-stats {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .ledger-mobile-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .ledger-mobile-stat {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-top: 3px solid var(--stat-accent, var(--primary));
+    border-radius: 12px;
+    padding: 0.65rem 0.8rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .ledger-mobile-stat__label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ledger-mobile-stat__value {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -12200,6 +12735,7 @@ select:-webkit-autofill {
 }
 
 .supplier-summary-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -12207,6 +12743,8 @@ select:-webkit-autofill {
   border-radius: 14px;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
+  border-top: 3px solid var(--summary-accent, var(--primary));
+  overflow: hidden;
   transition: all 0.2s ease;
 }
 
@@ -12546,9 +13084,47 @@ select:-webkit-autofill {
 @media (max-width: 575.98px) {
   .supplier-details-hero {
     flex-wrap: wrap;
+    padding: 0.9rem 1rem;
   }
+  .supplier-details-hero-status {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+  .supplier-ledger-btn {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0;
+    margin-top: 12px;
+  }
+  /* Single-column, label-left/value-right list rows instead of a
+     3-up grid — avoids an orphan third card and keeps long labels
+     (e.g. "Total Purchase Amount") from being squeezed. */
   .supplier-summary-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .supplier-summary-card {
+    padding: 0.65rem 0.9rem;
+  }
+  .supplier-summary-info {
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+  }
+  .supplier-summary-label {
+    white-space: normal;
+    flex: 1;
+    min-width: 0;
+  }
+  .supplier-summary-value {
+    flex-shrink: 0;
+  }
+  .supplier-info-row {
+    padding: 0.6rem 0.85rem;
   }
   .supplier-list-item-amounts {
     flex-wrap: wrap;
@@ -13190,6 +13766,12 @@ select:-webkit-autofill {
   .product-info-two-col {
     grid-template-columns: 1fr;
   }
+  .product-info-label {
+    font-size: 0.68rem;
+  }
+  .product-info-value {
+    font-size: 0.74rem;
+  }
 }
 
 /* ==========================================================
@@ -13458,5 +14040,246 @@ select:-webkit-autofill {
 @media (max-width: 575.98px) {
   .pd-price-row {
     flex-wrap: wrap;
+  }
+  .pd-tab-btn {
+    font-size: 0.68rem;
+  }
+  .pd-tab-btn svg {
+    display: none;
+  }
+}
+
+/* ==========================================================
+   CATEGORIES — Multi-select & Bulk Delete
+   ========================================================== */
+
+.bulk-select-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+}
+
+.bulk-select-checkbox input[type="checkbox"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.bulk-select-checkmark {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  /* Darker/higher-contrast than the default --border-color so the unchecked
+     box stays clearly visible against the card background — checked,
+     hover, focus and disabled states are untouched. */
+  border: 2px solid var(--text-muted);
+  background: var(--bg-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--transition-base), border-color var(--transition-base);
+}
+
+.bulk-select-checkmark::after {
+  content: '';
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform 0.15s ease;
+  margin-bottom: 1px;
+}
+
+.bulk-select-checkbox input[type="checkbox"]:checked + .bulk-select-checkmark {
+  background: var(--gradient-primary);
+  border-color: transparent;
+}
+
+.bulk-select-checkbox input[type="checkbox"]:checked + .bulk-select-checkmark::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.bulk-select-checkbox input[type="checkbox"]:indeterminate + .bulk-select-checkmark {
+  background: var(--gradient-primary);
+  border-color: transparent;
+}
+
+.bulk-select-checkbox input[type="checkbox"]:indeterminate + .bulk-select-checkmark::after {
+  width: 8px;
+  height: 2px;
+  border: none;
+  background: #fff;
+  transform: none;
+  margin-bottom: 0;
+}
+
+.bulk-select-checkbox input[type="checkbox"]:focus-visible + .bulk-select-checkmark {
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
+}
+
+.bulk-select-checkbox input[type="checkbox"]:disabled + .bulk-select-checkmark {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Larger, touch-friendly hit target on mobile — a 20px box is too small to
+   reliably tap, so the label's padded hit area is bumped up considerably
+   even though the visible checkmark only grows a little. */
+.bulk-select-checkbox--mobile {
+  padding: 14px;
+  margin: -14px;
+}
+
+.bulk-select-checkbox--mobile .bulk-select-checkmark {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+/* Selected desktop row highlight */
+.bulk-select-row--selected {
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+/* ─── Bulk Action Toolbar ──────────────────────────────────── */
+.bulk-select-toolbar {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid rgba(var(--primary-rgb), 0.25);
+  box-shadow: var(--shadow-md);
+  animation: bulkSelectToolbarIn 0.2s ease;
+}
+
+@keyframes bulkSelectToolbarIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bulk-select-toolbar__count {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.bulk-select-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ─── Mobile "select all" bar (no table header exists on mobile) ──── */
+.bulk-select-mobile-bar {
+  display: none;
+  align-items: center;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.75rem;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+}
+
+.bulk-select-mobile-bar .bulk-select-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ─── Mobile card selection wrapper ────────────────────────── */
+.bulk-select-mobile-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  max-width: 100%;
+}
+
+.bulk-select-mobile-row__card {
+  flex: 1;
+  min-width: 0;
+}
+
+.bulk-select-mobile-row .bulk-select-checkbox {
+  margin-top: 14px;
+}
+
+.bulk-select-mobile-row--selected .bulk-select-mobile-row__card .expandable-card,
+.expandable-card.bulk-select-mobile-row--selected {
+  border-color: rgba(var(--primary-rgb), 0.35);
+  box-shadow: 0 0 0 1px rgba(var(--primary-rgb), 0.15);
+}
+
+@media (max-width: 991.98px) {
+  .bulk-select-mobile-bar {
+    display: flex;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .bulk-select-toolbar__actions .btn-premium {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+
+  .bulk-select-toolbar__actions .btn-premium svg {
+    font-size: 0.85rem;
+  }
+
+  .bulk-select-toolbar {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .bulk-select-toolbar__count {
+    font-size: 0.78rem;
+  }
+
+  .suppliers-header-actions .btn-premium {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .bulk-select-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-select-toolbar__actions .btn-premium {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .suppliers-header-actions {
+    width: 100%;
+  }
+
+  .suppliers-header-actions .btn-premium {
+    flex: 1;
+    justify-content: center;
   }
 }

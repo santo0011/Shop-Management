@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { getSales, getSale, createSale, updateSalePayment, getTopSellingProducts, getRecentSales, getSalesStats, deleteSale, processReturn } = require('../controllers/saleController');
+const { getSales, getSale, createSale, updateSalePayment, getTopSellingProducts, getTopSellingCategories, getProductSoldCounts, getRecentSales, getSalesStats, deleteSale, processReturn } = require('../controllers/saleController');
 const { protect } = require('../middlewares/auth');
 
 router.get('/top-selling', protect, getTopSellingProducts);
+router.get('/top-categories', protect, getTopSellingCategories);
+router.get('/product-sold-counts', protect, getProductSoldCounts);
 router.get('/recent', protect, getRecentSales);
 router.get('/stats', protect, getSalesStats);
 router.get('/', protect, getSales);

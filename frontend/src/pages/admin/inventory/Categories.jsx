@@ -4,12 +4,14 @@ import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import CategoryDetailsDrawer from './CategoryDetailsDrawer';
+import ConfirmModal from '../../../components/common/ConfirmModal';
 import Pagination from '../../../components/common/Pagination';
+import BulkImportProgressModal from '../../../components/common/BulkImportProgressModal';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
   BiError, BiRefresh, BiInfoCircle, BiCategory,
-  BiCalendar, BiMessageSquare, BiCheckCircle
+  BiCalendar, BiMessageSquare, BiCheckCircle,
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
 import { showToast } from '../../../utils/toast';
@@ -153,6 +155,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   const [existingCategories, setExistingCategories] = useState([]);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importElapsedMs, setImportElapsedMs] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
@@ -170,6 +175,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     setDuplicates({});
     setShowPreview(false);
     setImportResult(null);
+    setImportProgress({ current: 0, total: 0, success: 0, failed: 0 });
+    setShowImportModal(false);
+    setImportElapsedMs(0);
     setActiveTab('excel');
   };
 
@@ -297,6 +305,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
   // ─── Import All ─────────────────────────────────────────────────────────
   const handleImport = async () => {
+    // Prevent a second import from starting while one is already running.
+    if (importing) return;
+
     const validRows = parsedRows.filter((row, idx) => {
       if (errors[idx] && errors[idx].length > 0) return false;
       if (skipDuplicates && duplicates[idx]) return false;
@@ -308,13 +319,17 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       return;
     }
 
+    const startedAt = Date.now();
     setImporting(true);
+    setShowImportModal(true);
+    setImportProgress({ current: 0, total: validRows.length, success: 0, failed: 0 });
     let imported = 0;
     let updated = 0;
     let failed = 0;
     const failedDetails = [];
 
-    for (const row of validRows) {
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
       try {
         const existing = existingCategories.find(s =>
           s.name?.toLowerCase() === row.name?.trim()?.toLowerCase()
@@ -326,18 +341,21 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         };
 
         if (existing && !skipDuplicates) {
-          await api.put(`/categories/${existing._id}`, payload);
+          await api.put(`/categories/${existing._id}`, payload, { _skipLoading: true });
           updated++;
         } else {
-          await api.post('/categories', payload);
+          await api.post('/categories', payload, { _skipLoading: true });
           imported++;
         }
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       } catch (err) {
         failed++;
         failedDetails.push(`${row.name}: ${err.response?.data?.message || err.message}`);
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       }
     }
 
+    setImportElapsedMs(Date.now() - startedAt);
     setImportResult({ total: parsedRows.length, imported, updated, failed, failedDetails });
     setImporting(false);
     onSuccess();
@@ -619,8 +637,30 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           </div>
         </div>
       </div>
+
+      <BulkImportProgressModal
+        open={showImportModal}
+        phase={importing ? 'importing' : 'done'}
+        label={t('categoriesPage.bulkImportButton') || 'Categories'}
+        current={importProgress.current}
+        total={importProgress.total}
+        success={importProgress.success}
+        failed={importProgress.failed}
+        elapsedMs={importElapsedMs}
+        onDismiss={() => setShowImportModal(false)}
+      />
     </>
   );
+};
+
+// A plain checkbox that also reflects a third "some, but not all" state —
+// React has no `indeterminate` JSX prop, so it's set imperatively on the DOM node.
+const SelectAllCheckbox = ({ checked, indeterminate, onChange, ...rest }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} {...rest} />;
 };
 
 // Fixed page size for the Categories list — server-side pagination via ?page=&limit=.
@@ -643,6 +683,10 @@ const Categories = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
   const [viewCategoryId, setViewCategoryId] = useState(null);
+  const [restoringDefaults, setRestoringDefaults] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -654,6 +698,12 @@ const Categories = () => {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch]);
+
+  // Selection is page-scoped — navigating away from a page (or re-searching)
+  // clears it, so nothing gets silently selected out of view.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedSearch]);
 
   const fetchCategories = useCallback(async () => {
     const silent = !isFirstLoad.current;
@@ -690,6 +740,25 @@ const Categories = () => {
     setDrawerOpen(true);
   };
 
+  // Additive-only — adds any of this shop's business-type default categories
+  // that don't already exist by name; never touches existing ones.
+  const handleRestoreDefaults = async () => {
+    setRestoringDefaults(true);
+    try {
+      const { data } = await api.post('/shops/seed-categories', {}, { _skipLoading: true });
+      if (data.created > 0) {
+        showToast.success(t('categoriesPage.restoreDefaultsSuccess', { count: data.created }));
+        fetchCategories();
+      } else {
+        showToast.success(t('categoriesPage.restoreDefaultsNoneNeeded'));
+      }
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('categoriesPage.restoreDefaultsFailed'));
+    } finally {
+      setRestoringDefaults(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       await api.delete(`/categories/${id}`);
@@ -709,6 +778,64 @@ const Categories = () => {
     }
   };
 
+  // ─── Multi-select & Bulk Delete ─────────────────────────────────────────
+  const isSelected = (id) => selectedIds.has(id);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allOnPageSelected = categories.length > 0 && categories.every((c) => selectedIds.has(c._id));
+  const someOnPageSelected = categories.some((c) => selectedIds.has(c._id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allOnPageSelected) return new Set();
+      const next = new Set(prev);
+      categories.forEach((c) => next.add(c._id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { data } = await api.post('/categories/bulk-delete', { ids });
+      setBulkConfirmOpen(false);
+      setSelectedIds(new Set());
+
+      if (data.blockedCount > 0) {
+        const lines = [];
+        if (data.deletedCount > 0) lines.push(`✅ ${t('categoriesPage.bulkDeleteSuccessLine', { count: data.deletedCount })}`);
+        lines.push(`⚠️ ${t('categoriesPage.bulkDeleteBlockedLine', { count: data.blockedCount })}`);
+        Swal.fire({
+          icon: data.deletedCount > 0 ? 'warning' : 'error',
+          title: t('categoriesPage.bulkDeleteSummaryTitle'),
+          html: `<div style="text-align:left; font-size:0.9rem; line-height:1.8;">${lines.map((l) => `<div>${l}</div>`).join('')}</div>`,
+          confirmButtonColor: '#6C63FF',
+        });
+      } else {
+        showToast.success(t('categoriesPage.bulkDeleteSuccessLine', { count: data.deletedCount }));
+      }
+
+      // Step back a page if this emptied the current page beyond page 1.
+      if (ids.length >= categories.length && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchCategories();
+      }
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('categoriesPage.bulkDeleteFailed'));
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <div>
       {/* Page Header */}
@@ -719,7 +846,10 @@ const Categories = () => {
             {t('categoriesPage.subtitle')}
           </p>
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 flex-wrap">
+          <button className="btn-premium btn-premium-secondary" onClick={handleRestoreDefaults} disabled={restoringDefaults} data-tooltip={t('categoriesPage.restoreDefaultsHint')}>
+            {restoringDefaults ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('categoriesPage.restoreDefaultsButton')}
+          </button>
           <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
             <BiUpload /> {t('categoriesPage.bulkImportButton')}
           </button>
@@ -730,16 +860,60 @@ const Categories = () => {
       </div>
 
       {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input
-            className="form-control"
-            placeholder={t('categoriesPage.searchPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="list-filters-card">
+        <div className="list-filter-field list-search-field">
+          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input
+              className="form-control list-filter-input"
+              placeholder={t('categoriesPage.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
+      </div>
+
+      {/* ─── Bulk Action Toolbar ─────────────────────────────────────────
+          Sticky so it stays reachable while scrolling a long list; only
+          rendered once at least one category is selected. */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-select-toolbar">
+          <span className="bulk-select-toolbar__count">
+            {t('categoriesPage.categoriesSelected', { count: selectedIds.size })}
+          </span>
+          <div className="bulk-select-toolbar__actions">
+            <button
+              type="button"
+              className="btn-premium btn-premium-secondary"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <BiX /> {t('categoriesPage.clearSelection')}
+            </button>
+            <button
+              type="button"
+              className="btn-premium btn-premium-danger"
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              <BiTrash /> {t('categoriesPage.deleteSelected')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only Select All bar (no table header on mobile cards) */}
+      <div className="bulk-select-mobile-bar">
+        <label className="bulk-select-checkbox">
+          <SelectAllCheckbox
+            checked={allOnPageSelected}
+            indeterminate={someOnPageSelected && !allOnPageSelected}
+            onChange={toggleSelectAll}
+            disabled={categories.length === 0}
+          />
+          <span className="bulk-select-checkmark" />
+          <span>{t('categoriesPage.selectAllCategories')}</span>
+        </label>
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
@@ -748,6 +922,17 @@ const Categories = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
+                <th style={{ width: '44px' }}>
+                  <label className="bulk-select-checkbox" title={t('categoriesPage.selectAllCategories')}>
+                    <SelectAllCheckbox
+                      checked={allOnPageSelected}
+                      indeterminate={someOnPageSelected && !allOnPageSelected}
+                      onChange={toggleSelectAll}
+                      disabled={categories.length === 0}
+                    />
+                    <span className="bulk-select-checkmark" />
+                  </label>
+                </th>
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('product.productName')} (EN)</th>
                 <th>{t('product.productName')} (BN)</th>
@@ -757,19 +942,25 @@ const Categories = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : categories.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
                     {t('categoriesPage.noCategoriesFound')}
                   </td>
                 </tr>
               ) : categories.map((category, idx) => (
-                <tr key={category._id}>
+                <tr key={category._id} className={isSelected(category._id) ? 'bulk-select-row--selected' : ''}>
+                  <td>
+                    <label className="bulk-select-checkbox" title={t('categoriesPage.selectCategory')}>
+                      <input type="checkbox" checked={isSelected(category._id)} onChange={() => toggleSelect(category._id)} />
+                      <span className="bulk-select-checkmark" />
+                    </label>
+                  </td>
                   <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                     {(page - 1) * CATEGORIES_PER_PAGE + idx + 1}
                   </td>
@@ -811,6 +1002,13 @@ const Categories = () => {
         ) : categories.map((category) => (
           <ExpandableCard
             key={category._id}
+            className={isSelected(category._id) ? 'bulk-select-mobile-row--selected' : ''}
+            checkbox={
+              <label className="bulk-select-checkbox bulk-select-checkbox--mobile">
+                <input type="checkbox" checked={isSelected(category._id)} onChange={() => toggleSelect(category._id)} />
+                <span className="bulk-select-checkmark" />
+              </label>
+            }
             compact={
               <>
                 <div className="expandable-card__compact-row">
@@ -932,6 +1130,18 @@ const Categories = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmModal
+        open={bulkConfirmOpen}
+        onClose={() => !bulkDeleting && setBulkConfirmOpen(false)}
+        onConfirm={handleBulkDelete}
+        title={t('categoriesPage.bulkDeleteTitle')}
+        message={t('categoriesPage.bulkDeleteConfirm')}
+        confirmText={bulkDeleting ? t('common.deleting') : t('common.delete')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+      />
     </div>
   );
 };

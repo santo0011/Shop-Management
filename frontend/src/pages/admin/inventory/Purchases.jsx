@@ -251,17 +251,6 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const setFieldRef = (rowKey, field) => (el) => { fieldRefs.current[`${rowKey}::${field}`] = el; };
   const focusField = (rowKey, field) => { fieldRefs.current[`${rowKey}::${field}`]?.focus(); };
 
-  const units = [
-    { value: 'kg', label: t('units.kg') },
-    { value: 'gram', label: t('units.gram') },
-    { value: 'liter', label: t('units.liter') },
-    { value: 'ml', label: t('units.ml') },
-    { value: 'piece', label: t('units.piece') },
-    { value: 'packet', label: t('units.packet') },
-    { value: 'box', label: t('units.box') },
-    { value: 'carton', label: t('units.carton') },
-  ];
-
   useEffect(() => {
     if (!open) return;
     setErrors({});
@@ -745,10 +734,24 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                   type="number"
                   className="purchase-summary-paid-input"
                   value={paidAmount}
-                  onChange={(e) => setPaidAmount(e.target.value)}
+                  min="0"
+                  max={grandTotal}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (e.target.value !== '' && val > grandTotal) {
+                      setPaidAmount(String(grandTotal));
+                    } else {
+                      setPaidAmount(e.target.value);
+                    }
+                  }}
                 />
               )}
             </div>
+            {Number(paidAmount || 0) > grandTotal && (
+              <div className="purchase-summary-row" style={{ color: 'var(--danger, #e5484d)', fontSize: '0.8rem' }}>
+                <span>{t('common.paymentExceedsRemaining')}</span>
+              </div>
+            )}
             <div className="purchase-summary-divider" />
             <div className={`purchase-summary-row purchase-summary-row--due ${currentDue > 0 ? 'purchase-summary-row--due-warning' : ''}`}>
               <span className="purchase-summary-row__label purchase-summary-row__label--due">{t('purchasesPage.currentDue')}</span>
@@ -786,7 +789,6 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         onSuccess={handleProductCreated}
         editing={null}
         categories={categories}
-        units={units}
         t={t}
         initialName={productDrawer.initialName}
       />
@@ -1483,15 +1485,18 @@ const Purchases = () => {
       </div>
 
       {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input
-            className="form-control"
-            placeholder={t('purchasesPage.searchPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="list-filters-card">
+        <div className="list-filter-field list-search-field">
+          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input
+              className="form-control list-filter-input"
+              placeholder={t('purchasesPage.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import api from '../../services/api';
-import { BiSearch, BiPlus, BiStore, BiX, BiUser, BiPhone, BiEnvelope, BiMap, BiLock, BiCheck, BiShow, BiEdit, BiTrash, BiCalendar } from 'react-icons/bi';
+import { BiSearch, BiPlus, BiStore, BiX, BiUser, BiPhone, BiEnvelope, BiMap, BiLock, BiCheck, BiShow, BiEdit, BiTrash, BiCalendar, BiBriefcase } from 'react-icons/bi';
+import { BUSINESS_TYPE_KEYS, BUSINESS_TYPES } from '../../config/businessTypes';
 
 const REQUIRED_SHOP_FIELDS = ['shopName', 'ownerName', 'phone', 'email', 'password'];
 
@@ -37,6 +38,7 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
     phone: '',
     password: '',
     address: '',
+    businessType: 'grocery',
   });
 
   const handleChange = (e) => {
@@ -74,8 +76,9 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
         phone: form.phone,
         password: form.password,
         address: form.address,
+        businessType: form.businessType,
       }, { _skipLoading: true });
-      setForm({ shopName: '', ownerName: '', email: '', phone: '', password: '', address: '' });
+      setForm({ shopName: '', ownerName: '', email: '', phone: '', password: '', address: '', businessType: 'grocery' });
       setErrors({});
       onSuccess();
       onClose();
@@ -133,6 +136,15 @@ const AddShopDrawer = ({ open, onClose, onSuccess }) => {
               <label className="form-label"><BiStore style={{ marginRight: '6px' }} />{t('manageShopsPage.shopName')} <span style={{color: 'var(--danger)'}}>*</span></label>
               <input {...field('shopName')} />
               {errors.shopName && <div className="invalid-feedback-premium">{errors.shopName}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label"><BiBriefcase style={{ marginRight: '6px' }} />{t('manageShopsPage.businessType')} <span style={{color: 'var(--danger)'}}>*</span></label>
+              <select className="form-select" name="businessType" value={form.businessType} onChange={handleChange}>
+                {BUSINESS_TYPE_KEYS.map((key) => (
+                  <option key={key} value={key}>{t(BUSINESS_TYPES[key].i18nKey)}</option>
+                ))}
+              </select>
+              <small style={{ color: 'var(--text-muted)' }}>{t('manageShopsPage.businessTypeHint')}</small>
             </div>
             <div className="form-group">
               <label className="form-label"><BiUser style={{ marginRight: '6px' }} />{t('manageShopsPage.ownerName')} <span style={{color: 'var(--danger)'}}>*</span></label>
@@ -467,6 +479,7 @@ const ManageShops = () => {
               {[
                 { key: 'shop', icon: BiStore, color: 'var(--primary)', glow: 'var(--glow-primary)', title: t('manageShopsPage.shopInformation'), rows: [
                   { icon: BiStore, label: t('manageShopsPage.shopName'), value: viewShopData.name },
+                  { icon: BiBriefcase, label: t('manageShopsPage.businessType'), value: t(BUSINESS_TYPES[viewShopData.businessType]?.i18nKey || BUSINESS_TYPES.grocery.i18nKey) },
                   { icon: BiPhone, label: t('auth.phone'), value: viewShopData.phone || t('common.notAvailable') },
                   { icon: BiEnvelope, label: t('auth.email'), value: viewShopData.email || t('common.notAvailable') },
                 ]},
@@ -585,13 +598,26 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [errors, setErrors] = useState({});
+  const [businessTypeLocked, setBusinessTypeLocked] = useState(false);
   const [form, setForm] = useState({
     shopName: '',
     ownerName: '',
     email: '',
     phone: '',
     address: '',
+    businessType: 'grocery',
   });
+
+  // The shop row passed in from the list doesn't include productCount —
+  // fetch the live detail on open so the Business Type picker can be locked
+  // upfront instead of only failing after a submit attempt.
+  useEffect(() => {
+    if (!open || !shop?._id) return;
+    setBusinessTypeLocked(false);
+    api.get(`/shops/${shop._id}`, { _skipLoading: true })
+      .then(({ data }) => setBusinessTypeLocked((data.productCount || 0) > 0))
+      .catch(() => {});
+  }, [open, shop?._id]);
 
   // Convert address object to a comma-separated string for the textarea
   const formatAddress = (addr) => {
@@ -648,6 +674,7 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
         email: shop.email || '',
         phone: shop.phone || '',
         address: formatAddress(shop.address),
+        businessType: shop.businessType || 'grocery',
       });
       setErrors({});
       setError(null);
@@ -693,10 +720,18 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
         email: form.email,
         phone: form.phone,
         address: form.address,
+        businessType: form.businessType,
       }, { _skipLoading: true });
       onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || t('manageShopsPage.updateShopFailed'));
+      if (err.response?.data?.code === 'BUSINESS_TYPE_LOCKED') {
+        // Defensive: keeps the UI in sync even if it hadn't already disabled
+        // the picker (e.g. a product was added moments before this submit).
+        setBusinessTypeLocked(true);
+        setError(t('manageShopsPage.businessTypeLocked'));
+      } else {
+        setError(err.response?.data?.message || t('manageShopsPage.updateShopFailed'));
+      }
     } finally {
       setLoading(false);
     }
@@ -737,6 +772,25 @@ const EditShopDrawer = ({ open, shop, onClose, onSuccess }) => {
               <label className="form-label"><BiStore style={{ marginRight: '6px' }} />{t('manageShopsPage.shopName')} <span style={{color: 'var(--danger)'}}>*</span></label>
               <input {...field('shopName')} />
               {errors.shopName && <div className="invalid-feedback-premium">{errors.shopName}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label"><BiBriefcase style={{ marginRight: '6px' }} />{t('manageShopsPage.businessType')} <span style={{color: 'var(--danger)'}}>*</span></label>
+              <select className="form-select" name="businessType" value={form.businessType} onChange={handleChange} disabled={businessTypeLocked}>
+                {BUSINESS_TYPE_KEYS.map((key) => (
+                  <option key={key} value={key}>{t(BUSINESS_TYPES[key].i18nKey)}</option>
+                ))}
+              </select>
+              {businessTypeLocked && (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '6px',
+                  padding: '0.5rem 0.7rem', marginTop: '0.4rem',
+                  borderRadius: 'var(--border-radius-sm)',
+                  background: 'var(--glow-danger)', color: 'var(--danger)',
+                  fontSize: '0.75rem', fontWeight: 500,
+                }}>
+                  <BiLock style={{ flexShrink: 0, marginTop: '2px' }} /> {t('manageShopsPage.businessTypeLocked')}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label"><BiUser style={{ marginRight: '6px' }} />{t('manageShopsPage.ownerName')} <span style={{color: 'var(--danger)'}}>*</span></label>

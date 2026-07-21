@@ -5,7 +5,9 @@ import {
   BiX, BiPackage, BiDollar, BiCube, BiCategory,
   BiBarcode, BiCalendar, BiTime, BiInfoCircle,
   BiCheckCircle, BiHash, BiTag, BiBook, BiTrendingUp, BiTrendingDown,
+  BiPurchaseTag, BiPalette, BiBadgeCheck, BiRuler,
 } from 'react-icons/bi';
+import useBusinessConfig from '../../../hooks/useBusinessConfig';
 
 // ─── Helpers ───────────────────────────────────────────────────
 const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
@@ -31,6 +33,7 @@ const ProductDetailsDrawer = ({ open, productId, onClose, t, i18n }) => {
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const navigate = useNavigate();
+  const { modules } = useBusinessConfig();
 
   const isBn = i18n?.language === 'bn';
 
@@ -259,6 +262,30 @@ const ProductDetailsDrawer = ({ open, productId, onClose, t, i18n }) => {
                   )}
                   {product.tax > 0 && (
                     <InfoRow icon={BiTag} label={t('sale.tax') || 'Tax / VAT'} value={`${product.tax}%`} />
+                  )}
+                  {modules.batch && product.batchNumber && (
+                    <InfoRow icon={BiHash} label={t('product.batchNumber') || 'Batch Number'} value={product.batchNumber} />
+                  )}
+                  {modules.brand && product.brand && (
+                    <InfoRow icon={BiPurchaseTag} label={t('product.brand') || 'Brand'} value={product.brand} />
+                  )}
+                  {modules.size && product.size && (
+                    <InfoRow icon={BiRuler} label={t('product.size') || 'Size'} value={product.size} />
+                  )}
+                  {modules.color && product.color && (
+                    <InfoRow icon={BiPalette} label={t('product.color') || 'Color'} value={product.color} />
+                  )}
+                  {modules.serialNumber && product.serialNumber && (
+                    <InfoRow icon={BiHash} label={t('product.serialNumber') || 'Serial Number'} value={product.serialNumber} />
+                  )}
+                  {modules.modelNumber && product.modelNumber && (
+                    <InfoRow icon={BiTag} label={t('product.modelNumber') || 'Model Number'} value={product.modelNumber} />
+                  )}
+                  {modules.warranty && product.warranty && (
+                    <InfoRow icon={BiBadgeCheck} label={t('product.warranty') || 'Warranty'} value={product.warranty} />
+                  )}
+                  {modules.dimensions && (product.length || product.width) && (
+                    <InfoRow icon={BiRuler} label={`${t('product.length') || 'Length'} / ${t('product.width') || 'Width'}`} value={`${product.length || '-'} / ${product.width || '-'}`} />
                   )}
                   {displayDescription && (
                     <InfoRow icon={BiInfoCircle} label={t('common.description') || 'Description'} value={displayDescription} />
