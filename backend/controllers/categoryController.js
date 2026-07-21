@@ -3,10 +3,43 @@ const Product = require('../models/Product');
 
 const getCategories = async (req, res) => {
   try {
-    const categories = await Category.find({ shop: req.user.shop })
-      .populate('parent', 'name nameBn')
-      .sort({ name: 1 });
-    res.json(categories);
+    const { search, page: pageParam, limit: limitParam } = req.query;
+
+    const query = { shop: req.user.shop };
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { nameBn: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const baseQuery = Category.find(query).populate('parent', 'name nameBn').sort({ name: 1 });
+
+    // Pagination is opt-in via ?page=/&limit= — existing callers (the
+    // product/purchase "category" dropdowns, and bulk-import duplicate
+    // checks) call this with neither and rely on getting the full list
+    // back as a bare array. Only requests that ask for a page get the
+    // {categories, page, pages, total} envelope.
+    if (!pageParam && !limitParam) {
+      const categories = await baseQuery;
+      return res.json(categories);
+    }
+
+    const page = parseInt(pageParam) || 1;
+    const limit = parseInt(limitParam) || 10;
+    const skip = (page - 1) * limit;
+
+    const [categories, total] = await Promise.all([
+      baseQuery.skip(skip).limit(limit),
+      Category.countDocuments(query),
+    ]);
+
+    res.json({
+      categories,
+      page,
+      pages: Math.ceil(total / limit) || 1,
+      total,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

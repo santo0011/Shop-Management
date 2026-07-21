@@ -6,6 +6,7 @@ import ExpandableCard from '../../../components/common/ExpandableCard';
 import StatCard from '../../../components/common/StatCard';
 import PrintPreview from '../../../components/common/PrintPreview';
 import CustomerDueDetailsDrawer from './CustomerDueDetailsDrawer';
+import Pagination from '../../../components/common/Pagination';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow, BiPhone,
   BiEnvelope, BiMapPin, BiDollar, BiCalendar, BiUser, BiWallet, BiAward,
@@ -867,6 +868,9 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
   );
 };
 
+// Fixed page size for the "All Customers" list — server-side pagination via ?page=&limit=.
+const CUSTOMERS_PER_PAGE = 10;
+
 // ═══════════════════════════════════════════════════════════════════
 //  MAIN CUSTOMERS PAGE
 // ═══════════════════════════════════════════════════════════════════
@@ -881,6 +885,10 @@ const Customers = () => {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
@@ -909,13 +917,24 @@ const Customers = () => {
     const silent = !isFirstLoad.current;
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/customers?search=${search}`, { _skipLoading: true });
-      setCustomers(data.customers);
+      const { data } = await api.get(
+        `/customers?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${CUSTOMERS_PER_PAGE}`,
+        { _skipLoading: true }
+      );
+      setCustomers(data.customers || []);
+      setTotalCount(data.total || 0);
+      const pages = Math.max(1, data.pages || 1);
+      setTotalPages(pages);
+      // Self-correct if the current page no longer exists — e.g. the last
+      // customer on the last page was just deleted.
+      if (page > pages) {
+        setPage(pages);
+      }
     } catch (err) { console.error(err); } finally {
       if (silent) setSearching(false); else setLoading(false);
       isFirstLoad.current = false;
     }
-  }, [search]);
+  }, [debouncedSearch, page]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -945,12 +964,28 @@ const Customers = () => {
     fetchTopData();
   }, [fetchCustomers, fetchStats, fetchDueData, fetchTopData]);
 
-  useEffect(() => { refreshAll(); }, []);
+  // The customers list already has its own mount/page/search-driven effect
+  // below — only fetch the other three here, or the list would double-fetch
+  // on mount.
+  useEffect(() => {
+    fetchStats();
+    fetchDueData();
+    fetchTopData();
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchCustomers(), 300);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
-  }, [search, fetchCustomers]);
+  }, [search]);
+
+  // A new search term invalidates the current page — always land back on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
   // Deep-link
   useEffect(() => {
@@ -970,7 +1005,14 @@ const Customers = () => {
   const handleDelete = async (id) => {
     try {
       await api.delete(`/customers/${id}`);
-      refreshAll();
+      // Deleting the only customer on a page beyond the first would otherwise
+      // fetch that now-empty page first — step back a page up front instead.
+      if (customers.length === 1 && page > 1) {
+        setPage(page - 1);
+        fetchStats(); fetchDueData(); fetchTopData();
+      } else {
+        refreshAll();
+      }
       Swal.fire({
         title: t('customersPage.deletedTitle'), text: t('customersPage.deletedText'),
         icon: 'success', timer: 1500, showConfirmButton: false,
@@ -1063,6 +1105,7 @@ const Customers = () => {
               <table className="table-custom mb-0">
                 <thead>
                   <tr>
+                    <th style={{ width: '56px' }}>{t('common.sl')}</th>
                     <th>{t('auth.name')}</th>
                     <th>{t('auth.phone')}</th>
                     <th>{t('customersPage.totalPurchase')}</th>
@@ -1073,16 +1116,19 @@ const Customers = () => {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                    <tr><td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                       <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                     </td></tr>
                   ) : customers.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                    <tr><td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                       <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>👥</div>
                       {t('customersPage.noCustomersFound')}
                     </td></tr>
-                  ) : customers.map((customer) => (
+                  ) : customers.map((customer, idx) => (
                     <tr key={customer._id}>
+                      <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                        {(page - 1) * CUSTOMERS_PER_PAGE + idx + 1}
+                      </td>
                       <td>
                         <div style={{ fontWeight: 600 }}>{customer.name}</div>
                         {customer.nameBn && <small style={{ color: 'var(--text-muted)' }}>{customer.nameBn}</small>}
@@ -1178,6 +1224,15 @@ const Customers = () => {
               />
             ))}
           </div>
+
+          {/* Pagination — shared between desktop table and mobile cards */}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={CUSTOMERS_PER_PAGE}
+            onPageChange={setPage}
+          />
         </>
       )}
 

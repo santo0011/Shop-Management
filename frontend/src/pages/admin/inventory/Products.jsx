@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 import ProductDrawer from '../../../components/common/ProductDrawer';
 import ProductDetailsDrawer from './ProductDetailsDrawer';
 import ExpandableCard from '../../../components/common/ExpandableCard';
+import Pagination from '../../../components/common/Pagination';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
@@ -668,6 +669,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   );
 };
 
+// Fixed page size for the Products list — server-side pagination via ?page=&limit=.
+const PRODUCTS_PER_PAGE = 10;
+
 // ─── Main Products Page ──────────────────────────────────────────────────────
 const Products = () => {
   const { t, i18n } = useTranslation();
@@ -677,6 +681,10 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -686,9 +694,14 @@ const Products = () => {
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, []);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // A new search term invalidates the current page — always land back on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   // Deep-link: open a specific product's drawer when navigated here from Global Search.
   useEffect(() => {
@@ -701,22 +714,34 @@ const Products = () => {
       .catch((err) => console.error(err));
   }, [location.state]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     // Only the very first load shows the full-page loader; searches/refreshes
     // stay silent and use the inline search spinner + table indicator instead.
     const silent = !isFirstLoad.current;
     // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/products?search=${search}`, { _skipLoading: true });
-      setProducts(data.products);
+      const { data } = await api.get(
+        `/products?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${PRODUCTS_PER_PAGE}`,
+        { _skipLoading: true }
+      );
+      setProducts(data.products || []);
+      setTotalCount(data.total || 0);
+      const pages = Math.max(1, data.pages || 1);
+      setTotalPages(pages);
+      // Self-correct if the current page no longer exists — e.g. the last
+      // product on the last page was just deleted, or a filter now returns
+      // fewer pages. Triggers a refetch of the new last page automatically.
+      if (page > pages) {
+        setPage(pages);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       if (silent) setSearching(false); else setLoading(false);
       isFirstLoad.current = false;
     }
-  };
+  }, [debouncedSearch, page]);
 
   const fetchCategories = async () => {
     try {
@@ -728,9 +753,12 @@ const Products = () => {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchProducts(), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleEdit = (product) => {
     setEditing(product);
@@ -741,7 +769,15 @@ const Products = () => {
     try {
       await api.delete(`/products/${id}`);
       setDeleteConfirm(null);
-      fetchProducts();
+      // Deleting the only product on a page beyond the first would otherwise
+      // fetch that now-empty page first and flash an empty table before the
+      // self-correction in fetchProducts kicks in — step back a page up
+      // front instead so the transition lands directly on the right page.
+      if (products.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchProducts();
+      }
     } catch (err) {
       console.error(err);
     }
@@ -797,6 +833,7 @@ const Products = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
+                <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('product.productName')}</th>
                 <th>{t('product.category')}</th>
                 <th>{t('product.sellingPrice')}</th>
@@ -808,19 +845,22 @@ const Products = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
                     {t('empty.noProducts')}
                   </td>
                 </tr>
-              ) : products.map((product) => (
+              ) : products.map((product, idx) => (
                 <tr key={product._id}>
+                  <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {(page - 1) * PRODUCTS_PER_PAGE + idx + 1}
+                  </td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{product.name}</div>
                     {product.nameBn && <small style={{ color: 'var(--text-muted)' }}>{product.nameBn}</small>}
@@ -956,6 +996,15 @@ const Products = () => {
           />
         ))}
       </div>
+
+      {/* Pagination — shared between desktop table and mobile cards */}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={PRODUCTS_PER_PAGE}
+        onPageChange={setPage}
+      />
 
       {/* Add / Edit Product Drawer */}
       <ProductDrawer

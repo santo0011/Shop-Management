@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Shop = require('../models/Shop');
 
 const protect = async (req, res, next) => {
   let token;
@@ -9,15 +10,43 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = await User.findById(decoded.id).select('-password');
-      
+
       if (!req.user) {
         return res.status(401).json({ message: 'User not found' });
       }
-      
-      if (!req.user.isActive) {
-        return res.status(401).json({ message: 'Account is deactivated' });
+
+      // Authoritative shop-status check runs BEFORE the individual
+      // User.isActive check and BEFORE anything else. This must not be
+      // gated behind req.user.isActive: toggleShopStatus (shopController.js)
+      // bulk-sets isActive=false on every user of a deactivated shop, so by
+      // the time this middleware next runs for them, req.user.isActive is
+      // already false. If the isActive check ran first it would swallow
+      // every shop-deactivation case behind a generic "Account is
+      // deactivated" response, and the shop-specific code below would never
+      // be reached — which is exactly why the frontend never saw a
+      // distinguishable signal to act on. Checking Shop.isActive directly,
+      // first, and independent of the mirror guarantees deactivation takes
+      // effect immediately, on the very next request, for every user of
+      // that shop, regardless of their own isActive flag's state.
+      if (req.user.role !== 'super_admin' && req.user.shop) {
+        const shop = await Shop.findById(req.user.shop).select('isActive');
+        if (!shop || !shop.isActive) {
+          return res.status(403).json({
+            success: false,
+            code: 'SHOP_DEACTIVATED',
+            message: 'Your shop has been deactivated by the Super Admin.',
+          });
+        }
       }
-      
+
+      if (!req.user.isActive) {
+        return res.status(401).json({
+          success: false,
+          code: 'ACCOUNT_DEACTIVATED',
+          message: 'Account is deactivated',
+        });
+      }
+
       next();
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
@@ -46,7 +75,6 @@ const checkSubscription = async (req, res, next) => {
     return next();
   }
   
-  const Shop = require('../models/Shop');
   const shop = await Shop.findById(req.user.shop);
   
   if (!shop) {

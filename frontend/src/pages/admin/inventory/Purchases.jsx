@@ -4,12 +4,15 @@ import api from '../../../services/api';
 import ProductDrawer from '../../../components/common/ProductDrawer';
 import ProductSearchField from '../../../components/common/ProductSearchField';
 import ExpandableCard from '../../../components/common/ExpandableCard';
+import Pagination from '../../../components/common/Pagination';
 import { showToast } from '../../../utils/toast';
 import {
   BiSearch, BiPlus, BiTrash, BiX, BiCheck, BiShow, BiCalendar, BiNote,
   BiCreditCard, BiHash, BiUser, BiChevronDown,
+  BiUpload, BiDownload, BiFile, BiPaste, BiTable, BiError, BiRefresh, BiInfoCircle,
 } from 'react-icons/bi';
 import Swal from 'sweetalert2';
+import * as XLSX from 'xlsx';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 const getPaymentMethods = (t) => [
@@ -791,41 +794,605 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   );
 };
 
+const PAYMENT_METHOD_VALUES = ['cash', 'card', 'bank_transfer', 'mobile_banking', 'due'];
+
+// ─── Bulk Import Drawer ─────────────────────────────────────────────────────
+// Each imported row creates one purchase with a single line item — the same
+// shape PurchaseDrawer's handleSubmit posts to /purchases, just one row at a
+// time instead of built up interactively. Supplier and product are matched
+// by exact (case-insensitive) name against the shop's existing records;
+// unmatched names are a row error, not an auto-create, since suppliers and
+// products are managed on their own pages.
+const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
+  const [activeTab, setActiveTab] = useState('excel');
+  const [pasteData, setPasteData] = useState('');
+  const [parsedRows, setParsedRows] = useState([]);
+  const [errors, setErrors] = useState({});
+  const [existingSuppliers, setExistingSuppliers] = useState([]);
+  const [existingProducts, setExistingProducts] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [showPreview, setShowPreview] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    resetState();
+    loadReferenceData();
+  }, [open]);
+
+  const resetState = () => {
+    setPasteData('');
+    setParsedRows([]);
+    setErrors({});
+    setShowPreview(false);
+    setImportResult(null);
+    setImportProgress({ current: 0, total: 0 });
+    setActiveTab('excel');
+  };
+
+  const loadReferenceData = async () => {
+    try {
+      const [supRes, prodRes] = await Promise.all([
+        api.get('/suppliers?limit=10000', { _skipLoading: true }),
+        api.get('/products?limit=10000', { _skipLoading: true }),
+      ]);
+      setExistingSuppliers(Array.isArray(supRes.data) ? supRes.data : supRes.data.suppliers || []);
+      setExistingProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data.products || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const findSupplier = useCallback((name) => {
+    const q = name?.trim().toLowerCase();
+    if (!q) return null;
+    return existingSuppliers.find((s) => s.name?.trim().toLowerCase() === q) || null;
+  }, [existingSuppliers]);
+
+  const findProduct = useCallback((name) => {
+    const q = name?.trim().toLowerCase();
+    if (!q) return null;
+    return existingProducts.find((p) => p.name?.trim().toLowerCase() === q) || null;
+  }, [existingProducts]);
+
+  // ─── Validate ───────────────────────────────────────────────────────────
+  const validateRows = useCallback((rows) => {
+    const errorMap = {};
+    rows.forEach((row, idx) => {
+      const rowErrors = [];
+
+      if (!row.supplier?.trim()) rowErrors.push(t('purchasesPage.bulkImport.supplierRequired'));
+      else if (!findSupplier(row.supplier)) rowErrors.push(t('purchasesPage.bulkImport.supplierNotFound', { name: row.supplier }));
+
+      if (!row.product?.trim()) rowErrors.push(t('purchasesPage.bulkImport.productRequired'));
+      else if (!findProduct(row.product)) rowErrors.push(t('purchasesPage.bulkImport.productNotFound', { name: row.product }));
+
+      if (row.quantity === '' || row.quantity === null || isNaN(Number(row.quantity)) || Number(row.quantity) <= 0)
+        rowErrors.push(t('purchasesPage.bulkImport.invalidQuantity'));
+      if (row.purchasePrice === '' || row.purchasePrice === null || isNaN(Number(row.purchasePrice)) || Number(row.purchasePrice) < 0)
+        rowErrors.push(t('validation.invalidPurchasePrice'));
+      if (row.sellingPrice === '' || row.sellingPrice === null || isNaN(Number(row.sellingPrice)) || Number(row.sellingPrice) < 0)
+        rowErrors.push(t('validation.invalidSellingPrice'));
+
+      if (row.paymentMethod && !PAYMENT_METHOD_VALUES.includes(row.paymentMethod)) {
+        rowErrors.push(t('purchasesPage.bulkImport.invalidPaymentMethod', { method: row.paymentMethod, valid: PAYMENT_METHOD_VALUES.join(', ') }));
+      }
+
+      if (row.expiryDate && isNaN(new Date(row.expiryDate).getTime())) rowErrors.push(t('purchasesPage.bulkImport.invalidExpiryDate'));
+      if (row.purchaseDate && isNaN(new Date(row.purchaseDate).getTime())) rowErrors.push(t('purchasesPage.bulkImport.invalidPurchaseDate'));
+
+      if (rowErrors.length > 0) errorMap[idx] = rowErrors;
+    });
+    setErrors(errorMap);
+    return errorMap;
+  }, [t, findSupplier, findProduct]);
+
+  // ─── Excel/CSV Import ───────────────────────────────────────────────────
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+        if (jsonData.length === 0) {
+          Swal.fire({ icon: 'warning', title: t('purchasesPage.bulkImport.emptyFileTitle'), text: t('purchasesPage.bulkImport.emptyFileText'), confirmButtonColor: '#6C63FF' });
+          return;
+        }
+
+        const mapped = jsonData.map((row) => {
+          const keys = Object.keys(row).reduce((acc, key) => {
+            acc[key.toLowerCase().trim()] = row[key];
+            return acc;
+          }, {});
+          return {
+            supplier: keys.supplier || keys['supplier name'] || keys['supplier_name'] || '',
+            product: keys.product || keys['product name'] || keys['product_name'] || '',
+            quantity: keys.quantity || keys.qty || '',
+            purchasePrice: keys.purchaseprice || keys['purchase price'] || keys['purchase_price'] || '',
+            sellingPrice: keys.sellingprice || keys['selling price'] || keys['selling_price'] || '',
+            batchNumber: keys.batchnumber || keys['batch number'] || keys['batch no'] || keys['batch_no'] || '',
+            expiryDate: keys.expirydate || keys['expiry date'] || keys['expiry_date'] || '',
+            discount: keys.discount || 0,
+            tax: keys.tax || 0,
+            supplierInvoiceNo: keys.supplierinvoiceno || keys['supplier invoice no'] || keys['supplier invoice'] || keys['invoice no'] || '',
+            purchaseDate: keys.purchasedate || keys['purchase date'] || keys['purchase_date'] || '',
+            paymentMethod: (keys.paymentmethod || keys['payment method'] || keys['payment_method'] || '').toLowerCase(),
+            paidAmount: keys.paidamount || keys['paid amount'] || keys['paid_amount'] || 0,
+            notes: keys.notes || '',
+          };
+        });
+
+        setParsedRows(mapped);
+        setShowPreview(true);
+        validateRows(mapped);
+      } catch (err) {
+        Swal.fire({ icon: 'error', title: t('purchasesPage.bulkImport.parseErrorTitle'), text: t('purchasesPage.bulkImport.parseErrorText'), confirmButtonColor: '#6C63FF' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // ─── Download Sample Template ───────────────────────────────────────────
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        supplier: 'ABC Traders', product: 'Rice 25kg', quantity: 10,
+        purchasePrice: 1200, sellingPrice: 1400, batchNumber: 'B-001',
+        expiryDate: '2027-12-31', discount: 0, tax: 0,
+        supplierInvoiceNo: 'INV-1001', purchaseDate: '2026-07-21',
+        paymentMethod: 'cash', paidAmount: 12000, notes: '',
+      },
+      {
+        supplier: 'XYZ Foods', product: 'Coca Cola 500ml', quantity: 50,
+        purchasePrice: 25, sellingPrice: 35, batchNumber: '',
+        expiryDate: '2027-06-30', discount: 5, tax: 0,
+        supplierInvoiceNo: 'INV-2002', purchaseDate: '2026-07-21',
+        paymentMethod: 'due', paidAmount: 0, notes: 'Partial delivery',
+      },
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Purchases');
+    XLSX.writeFile(wb, 'purchase_import_template.xlsx');
+  };
+
+  // ─── Paste Import ───────────────────────────────────────────────────────
+  const handleParsePaste = () => {
+    if (!pasteData.trim()) {
+      Swal.fire({ icon: 'warning', title: t('purchasesPage.bulkImport.emptyDataTitle'), text: t('purchasesPage.bulkImport.emptyDataText'), confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    const lines = pasteData.split('\n').filter((line) => line.trim());
+    const parsed = lines.map((line) => {
+      const parts = line.includes('\t') ? line.split('\t') :
+                    line.includes('|') ? line.split('|') :
+                    line.split(',');
+      const c = parts.map((p) => p.trim());
+      return {
+        supplier: c[0] || '',
+        product: c[1] || '',
+        quantity: c[2] || '',
+        purchasePrice: c[3] || '',
+        sellingPrice: c[4] || '',
+        batchNumber: c[5] || '',
+        expiryDate: c[6] || '',
+        discount: c[7] || 0,
+        tax: c[8] || 0,
+        supplierInvoiceNo: c[9] || '',
+        purchaseDate: c[10] || '',
+        paymentMethod: (c[11] || '').toLowerCase(),
+        paidAmount: c[12] || 0,
+        notes: c[13] || '',
+      };
+    });
+
+    if (parsed.length === 0) {
+      Swal.fire({ icon: 'warning', title: t('purchasesPage.bulkImport.noDataTitle'), text: t('purchasesPage.bulkImport.noDataText'), confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    setParsedRows(parsed);
+    setShowPreview(true);
+    validateRows(parsed);
+  };
+
+  // ─── Remove Row ─────────────────────────────────────────────────────────
+  const removeRow = (idx) => {
+    const updated = parsedRows.filter((_, i) => i !== idx);
+    setParsedRows(updated);
+    validateRows(updated);
+  };
+
+  // ─── Import All ─────────────────────────────────────────────────────────
+  const handleImport = async () => {
+    const validRows = parsedRows.filter((_, idx) => !(errors[idx] && errors[idx].length > 0));
+
+    if (validRows.length === 0) {
+      Swal.fire({ icon: 'warning', title: t('purchasesPage.bulkImport.noValidRowsTitle'), text: t('purchasesPage.bulkImport.noValidRowsText'), confirmButtonColor: '#6C63FF' });
+      return;
+    }
+
+    setImporting(true);
+    setImportProgress({ current: 0, total: validRows.length });
+    let imported = 0;
+    let failed = 0;
+    const failedDetails = [];
+
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
+      setImportProgress({ current: i + 1, total: validRows.length });
+
+      try {
+        const supplier = findSupplier(row.supplier);
+        const product = findProduct(row.product);
+
+        const item = {
+          product: product._id,
+          batchNumber: row.batchNumber || '',
+          expiryDate: row.expiryDate || undefined,
+          quantity: Number(row.quantity) || 1,
+          unit: product.unit,
+          purchasePrice: Number(row.purchasePrice) || 0,
+          sellingPrice: Number(row.sellingPrice) || 0,
+          discount: Number(row.discount) || 0,
+          tax: Number(row.tax) || 0,
+          total: rowTotal(row),
+        };
+
+        const payload = {
+          supplier: supplier._id,
+          supplierInvoiceNo: (row.supplierInvoiceNo || '').trim(),
+          purchaseDate: row.purchaseDate || new Date().toISOString().slice(0, 10),
+          paymentMethod: row.paymentMethod || 'cash',
+          notes: row.notes || '',
+          items: [item],
+          subtotal: rowBase(row),
+          discount: rowDiscountAmt(row),
+          tax: rowTaxAmt(row),
+          totalAmount: rowTotal(row),
+          paidAmount: Number(row.paidAmount) || 0,
+        };
+
+        await api.post('/purchases', payload, { _skipLoading: true });
+        imported++;
+      } catch (err) {
+        failed++;
+        failedDetails.push(`${row.supplier} / ${row.product}: ${err.response?.data?.message || err.message}`);
+      }
+    }
+
+    setImportResult({ total: validRows.length, imported, failed, failedDetails });
+    setImporting(false);
+    onSuccess();
+  };
+
+  const errorCount = Object.keys(errors).length;
+  const validRowsList = useMemo(
+    () => parsedRows.filter((_, idx) => !(errors[idx] && errors[idx].length > 0)),
+    [parsedRows, errors]
+  );
+  const validCount = validRowsList.length;
+  const validTotalAmount = useMemo(
+    () => validRowsList.reduce((sum, row) => sum + rowTotal(row), 0),
+    [validRowsList]
+  );
+
+  const getRowStatus = (idx) => (errors[idx] && errors[idx].length > 0 ? 'error' : 'valid');
+
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+      <div className={`drawer ${open ? 'open' : ''}`} style={{ width: '760px', maxWidth: '100vw' }}>
+        <div className="drawer-header">
+          <h5><BiUpload className="me-2" />{t('purchasesPage.bulkImport.title')}</h5>
+          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        </div>
+        <div className="drawer-body" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
+          {/* Tabs */}
+          <div className="bulk-import-tabs">
+            <button
+              className={`bulk-import-tab ${activeTab === 'excel' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('excel'); setShowPreview(false); setParsedRows([]); }}
+            >
+              <BiFile /> {t('purchasesPage.bulkImport.tabExcel')}
+            </button>
+            <button
+              className={`bulk-import-tab ${activeTab === 'paste' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('paste'); setShowPreview(false); setParsedRows([]); }}
+            >
+              <BiPaste /> {t('purchasesPage.bulkImport.tabPaste')}
+            </button>
+          </div>
+
+          <div style={{ padding: '1.25rem', flex: 1, overflowY: 'auto' }}>
+            {/* ─── Tab 1: Excel/CSV ────────────────────────────────────────── */}
+            {activeTab === 'excel' && !showPreview && (
+              <div className="bulk-import-upload-area">
+                <div className="bulk-import-upload-box">
+                  <BiUpload size={48} />
+                  <h6>{t('purchasesPage.bulkImport.uploadTitle')}</h6>
+                  <p>{t('purchasesPage.bulkImport.uploadSubtitle')}</p>
+                  <div className="d-flex gap-2 justify-content-center flex-wrap">
+                    <button className="btn-premium btn-premium-primary" onClick={() => fileInputRef.current?.click()}>
+                      <BiUpload /> {t('purchasesPage.bulkImport.selectFile')}
+                    </button>
+                    <button className="btn-premium btn-premium-secondary" onClick={handleDownloadTemplate}>
+                      <BiDownload /> {t('purchasesPage.bulkImport.downloadTemplate')}
+                    </button>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                  />
+                  <div className="bulk-import-format-info">
+                    <BiInfoCircle />
+                    <small>{t('purchasesPage.bulkImport.expectedFormat')}</small>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Tab 2: Paste ────────────────────────────────────────────── */}
+            {activeTab === 'paste' && !showPreview && (
+              <div className="bulk-import-paste-area">
+                <div className="bulk-import-paste-header">
+                  <BiPaste size={28} />
+                  <h6>{t('purchasesPage.bulkImport.pasteTitle')}</h6>
+                </div>
+                <p className="bulk-import-paste-desc">{t('purchasesPage.bulkImport.pasteDesc')}</p>
+                <div className="bulk-import-format-example">
+                  <strong>{t('purchasesPage.bulkImport.formatLabel')}</strong> {t('purchasesPage.bulkImport.formatExample')}
+                </div>
+                <textarea
+                  className="bulk-import-textarea"
+                  rows={8}
+                  value={pasteData}
+                  onChange={(e) => setPasteData(e.target.value)}
+                  placeholder={t('purchasesPage.bulkImport.pastePlaceholder')}
+                />
+                <button className="btn-premium btn-premium-primary w-100 mt-2" onClick={handleParsePaste}>
+                  <BiTable /> {t('purchasesPage.bulkImport.parsePreview')}
+                </button>
+              </div>
+            )}
+
+            {/* ─── Preview Table ───────────────────────────────────────────── */}
+            {showPreview && parsedRows.length > 0 && (
+              <div className="bulk-import-preview">
+                {/* Summary Stats */}
+                <div className="bulk-import-summary">
+                  <div className="bulk-import-stat">
+                    <span className="bulk-import-stat-value">{parsedRows.length}</span>
+                    <span className="bulk-import-stat-label">{t('purchasesPage.bulkImport.totalRows')}</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-valid">
+                    <span className="bulk-import-stat-value">{validCount}</span>
+                    <span className="bulk-import-stat-label">{t('purchasesPage.bulkImport.valid')}</span>
+                  </div>
+                  <div className="bulk-import-stat bulk-import-stat-error">
+                    <span className="bulk-import-stat-value">{errorCount}</span>
+                    <span className="bulk-import-stat-label">{t('purchasesPage.bulkImport.errors')}</span>
+                  </div>
+                  <div className="bulk-import-stat">
+                    <span className="bulk-import-stat-value">{money(validTotalAmount)}</span>
+                    <span className="bulk-import-stat-label">{t('purchasesPage.bulkImport.totalValue')}</span>
+                  </div>
+                </div>
+
+                {/* Import Progress */}
+                {importing && (
+                  <div className="bulk-import-progress">
+                    <div className="bulk-import-progress-bar">
+                      <div
+                        className="bulk-import-progress-fill"
+                        style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <span className="bulk-import-progress-text">
+                      {t('purchasesPage.bulkImport.importingProgress', { current: importProgress.current, total: importProgress.total })}
+                    </span>
+                  </div>
+                )}
+
+                {/* Import Result */}
+                {importResult && (
+                  <div className="bulk-import-result">
+                    <div className="bulk-import-result-icon">
+                      <BiCheck size={32} />
+                    </div>
+                    <h6>{t('purchasesPage.bulkImport.importComplete')}</h6>
+                    <div className="bulk-import-result-stats">
+                      <span>{t('purchasesPage.bulkImport.imported')} <strong>{importResult.imported}</strong></span>
+                      <span>{t('purchasesPage.bulkImport.failed')} <strong style={{ color: importResult.failed > 0 ? 'var(--danger)' : undefined }}>{importResult.failed}</strong></span>
+                    </div>
+                    {importResult.failedDetails.length > 0 && (
+                      <div className="bulk-import-result-failures">
+                        <small>{t('purchasesPage.bulkImport.details')}</small>
+                        {importResult.failedDetails.map((detail, i) => (
+                          <div key={i} className="bulk-import-failure-item">{detail}</div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      className="btn-premium btn-premium-primary mt-3"
+                      onClick={() => { setShowPreview(false); setImportResult(null); setParsedRows([]); }}
+                    >
+                      <BiRefresh /> {t('purchasesPage.bulkImport.importMore')}
+                    </button>
+                  </div>
+                )}
+
+                {/* Preview Table */}
+                {!importResult && !importing && (
+                  <>
+                    <div className="bulk-import-preview-scroll">
+                      <table className="bulk-import-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '36px' }}>#</th>
+                            <th>{t('purchase.supplier')}</th>
+                            <th>{t('purchasesPage.product')}</th>
+                            <th>{t('purchasesPage.qty')}</th>
+                            <th>{t('product.purchasePrice')}</th>
+                            <th>{t('product.sellingPrice')}</th>
+                            <th>{t('purchasesPage.lineTotal')}</th>
+                            <th style={{ width: '70px' }}>{t('common.status')}</th>
+                            <th style={{ width: '36px' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parsedRows.map((row, idx) => {
+                            const status = getRowStatus(idx);
+                            return (
+                              <tr key={idx} className={`bulk-import-row-${status}`}>
+                                <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{idx + 1}</td>
+                                <td style={{ fontSize: '0.8rem' }}>{row.supplier || '-'}</td>
+                                <td>
+                                  <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{row.product || '-'}</div>
+                                </td>
+                                <td style={{ fontSize: '0.78rem' }}>{row.quantity || '-'}</td>
+                                <td style={{ fontSize: '0.78rem' }}>₹{Number(row.purchasePrice || 0).toFixed(2)}</td>
+                                <td style={{ fontSize: '0.78rem' }}>₹{Number(row.sellingPrice || 0).toFixed(2)}</td>
+                                <td style={{ fontSize: '0.78rem', fontWeight: 600 }}>{money(rowTotal(row))}</td>
+                                <td>
+                                  {status === 'error' ? (
+                                    <span className="bulk-import-status-badge status-error" title={errors[idx]?.join(', ')}>
+                                      <BiError /> {t('common.error')}
+                                    </span>
+                                  ) : (
+                                    <span className="bulk-import-status-badge status-valid">
+                                      <BiCheck /> {t('purchasesPage.bulkImport.valid')}
+                                    </span>
+                                  )}
+                                </td>
+                                <td>
+                                  <button
+                                    className="bulk-import-remove-row"
+                                    onClick={() => removeRow(idx)}
+                                    title={t('purchasesPage.bulkImport.removeRow')}
+                                  >
+                                    <BiX />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Error Details */}
+                    {errorCount > 0 && (
+                      <div className="bulk-import-errors-section">
+                        <h6><BiError /> {t('purchasesPage.bulkImport.rowErrorsHeading')}</h6>
+                        {Object.entries(errors).map(([idx, errs]) => (
+                          <div key={idx} className="bulk-import-error-item">
+                            <strong>{t('purchasesPage.bulkImport.rowLabel', { number: parseInt(idx) + 1 })}</strong> {parsedRows[parseInt(idx)]?.supplier} / {parsedRows[parseInt(idx)]?.product} — {errs.join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="bulk-import-actions">
+                      <button
+                        className="btn-premium btn-premium-secondary"
+                        onClick={() => { setShowPreview(false); setImportResult(null); }}
+                      >
+                        <BiX /> {t('common.cancel')}
+                      </button>
+                      <button
+                        className="btn-premium btn-premium-primary"
+                        onClick={handleImport}
+                        disabled={importing || validCount === 0}
+                      >
+                        {importing ? (
+                          <><span className="spinner-border spinner-border-sm" /> {t('purchasesPage.bulkImport.importingButton')}</>
+                        ) : (
+                          <><BiUpload /> {t('purchasesPage.bulkImport.importPurchases', { count: validCount })}</>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 // ─── Main Purchases Page ───────────────────────────────────────────────────
+// Fixed page size for the Purchases list — server-side pagination via ?page=&limit=.
+const PURCHASES_PER_PAGE = 10;
+
 const Purchases = () => {
   const { t } = useTranslation();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
-    fetchPurchases();
-  }, []);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // A new search term invalidates the current page — always land back on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const fetchPurchases = useCallback(async () => {
     const silent = !isFirstLoad.current;
     // Always skip global loading overlay — this page uses its own table loader
     if (silent) setSearching(true); else setLoading(true);
     try {
-      const { data } = await api.get(`/purchases?search=${search}`, { _skipLoading: true });
-      setPurchases(data.purchases);
+      const { data } = await api.get(
+        `/purchases?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${PURCHASES_PER_PAGE}`,
+        { _skipLoading: true }
+      );
+      setPurchases(data.purchases || []);
+      setTotalCount(data.total || 0);
+      const pages = Math.max(1, data.pages || 1);
+      setTotalPages(pages);
+      // Self-correct if the current page no longer exists — e.g. the last
+      // purchase on the last page was just deleted.
+      if (page > pages) {
+        setPage(pages);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       if (silent) setSearching(false); else setLoading(false);
       isFirstLoad.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [debouncedSearch, page]);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchPurchases(), 300);
-    return () => clearTimeout(timer);
+    fetchPurchases();
   }, [fetchPurchases]);
 
   const handleView = async (purchase) => {
@@ -842,7 +1409,13 @@ const Purchases = () => {
     try {
       await api.delete(`/purchases/${id}`);
       setDeleteConfirm(null);
-      fetchPurchases();
+      // Deleting the only purchase on a page beyond the first would otherwise
+      // fetch that now-empty page first — step back a page up front instead.
+      if (purchases.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchPurchases();
+      }
     } catch (err) {
       console.error(err);
     }
@@ -897,9 +1470,16 @@ const Purchases = () => {
             {t('purchasesPage.subtitle')}
           </p>
         </div>
-        <button className="btn-premium btn-premium-primary" onClick={() => { setViewing(null); setDrawerOpen(true); }}>
-          <BiPlus /> {t('common.add')} <span className="purchase-btn-full-label">{t('purchasesPage.purchase')}</span>
-        </button>
+        <div className="d-flex gap-2">
+          {/* Bulk Import temporarily hidden — re-enable by uncommenting this button.
+          <button className="btn-premium btn-premium-secondary" onClick={() => setBulkImportOpen(true)}>
+            <BiUpload /> {t('purchasesPage.bulkImportButton')}
+          </button>
+          */}
+          <button className="btn-premium btn-premium-primary" onClick={() => { setViewing(null); setDrawerOpen(true); }}>
+            <BiPlus /> {t('common.add')} <span className="purchase-btn-full-label">{t('purchasesPage.purchase')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -921,6 +1501,7 @@ const Purchases = () => {
           <table className="table-custom mb-0">
             <thead>
               <tr>
+                <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('purchasesPage.purchaseNo')}</th>
                 <th>{t('purchasesPage.supplierInvoiceNo')}</th>
                 <th>{t('purchase.supplier')}</th>
@@ -934,19 +1515,22 @@ const Purchases = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={9} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : purchases.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={9} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
                     {t('purchasesPage.noPurchasesFound')}
                   </td>
                 </tr>
-              ) : purchases.map((purchase) => (
+              ) : purchases.map((purchase, idx) => (
                 <tr key={purchase._id}>
+                  <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {(page - 1) * PURCHASES_PER_PAGE + idx + 1}
+                  </td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{purchase.purchaseNo}</div>
                   </td>
@@ -1074,12 +1658,29 @@ const Purchases = () => {
         ))}
       </div>
 
+      {/* Pagination — shared between desktop table and mobile cards */}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={PURCHASES_PER_PAGE}
+        onPageChange={setPage}
+      />
+
       {/* Add Purchase / View Purchase Drawer */}
       <PurchaseDrawer
         open={drawerOpen}
         onClose={() => { setDrawerOpen(false); setViewing(null); }}
         onSuccess={fetchPurchases}
         viewing={viewing}
+        t={t}
+      />
+
+      {/* Bulk Import Drawer */}
+      <BulkImportDrawer
+        open={bulkImportOpen}
+        onClose={() => setBulkImportOpen(false)}
+        onSuccess={fetchPurchases}
         t={t}
       />
 

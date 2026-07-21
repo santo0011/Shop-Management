@@ -26,7 +26,7 @@ export const showToast = {
     });
   },
   error: (message) => {
-    Toast.fire({
+    return Toast.fire({
       icon: 'error',
       title: message,
       background: '#fff',

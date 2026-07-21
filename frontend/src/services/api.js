@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { store } from '../redux/store';
 import { showLoading, hideLoading } from '../redux/slices/loadingSlice';
+import { logout } from '../redux/slices/authSlice';
+import { showToast } from '../utils/toast';
+import i18n from '../utils/i18n';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -49,6 +52,28 @@ const safeHideLoading = () => {
   }
 };
 
+// Guards against showing the forced-logout dialog more than once when
+// several in-flight requests all come back with SHOP_DEACTIVATED at the
+// same time (e.g. the idle-session poll and a user-triggered request
+// landing together).
+let forcedLogoutInProgress = false;
+
+const forceLogout = (message) => {
+  if (forcedLogoutInProgress) return;
+  forcedLogoutInProgress = true;
+
+  // The `logout` reducer clears token/refreshToken/user from localStorage
+  // as part of its own state update — see redux/slices/authSlice.js.
+  store.dispatch(logout());
+
+  // Top-right toast (same style as every other notification in the app,
+  // via utils/toast.js) — hovering pauses its timer so it won't get missed.
+  // Redirect only once it actually closes, so the user has a chance to read it.
+  showToast.error(message).finally(() => {
+    window.location.href = '/login';
+  });
+};
+
 // Response interceptor for token refresh and loading management
 api.interceptors.response.use(
   (response) => {
@@ -63,6 +88,23 @@ api.interceptors.response.use(
     // Hide loading for failed requests
     if (originalRequest && !originalRequest._skipLoading) {
       safeHideLoading();
+    }
+
+    if (error.response?.status === 403 && error.response?.data?.code === 'SHOP_DEACTIVATED') {
+      forceLogout(i18n.t('toast.shopDeactivatedMessage'));
+      return Promise.reject(error);
+    }
+
+    // Skip forced-logout handling for the login request itself: a login
+    // attempt against a deactivated account never had a session to begin
+    // with, so it's just a form error — Login.jsx already shows it inline.
+    // This branch is only for a session that was active and just got
+    // invalidated mid-use.
+    const isLoginRequest = originalRequest?.url?.includes('/auth/login');
+
+    if (!isLoginRequest && error.response?.status === 401 && error.response?.data?.code === 'ACCOUNT_DEACTIVATED') {
+      forceLogout(i18n.t('auth.accountDeactivated'));
+      return Promise.reject(error);
     }
 
     if (error.response?.status === 401 && error.response?.data?.expired && !originalRequest._retry) {

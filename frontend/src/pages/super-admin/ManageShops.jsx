@@ -350,7 +350,7 @@ const ManageShops = () => {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <BiUser style={{ color: 'var(--text-muted)' }} />
-                      {shop.ownerName || t('common.notAvailable')}
+                      {shop.owner?.name || shop.ownerName || t('common.notAvailable')}
                     </div>
                   </td>
                   <td>
