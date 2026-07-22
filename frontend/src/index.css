@@ -84,7 +84,7 @@
   --border-color: #e8e8f0;
   --border-light: #f0f0f8;
   --divider-color: #e8e8f0;
-
+  
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-card-hover: 0 10px 25px rgba(0, 0, 0, 0.05), 0 20px 48px rgba(0, 0, 0, 0.04);
   --shadow-sidebar: 2px 0 12px rgba(0, 0, 0, 0.3);
@@ -1494,7 +1494,7 @@ select:-webkit-autofill {
    other filter fields (e.g. Products' category select). ─────────── */
 .list-filters-card {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 1.25rem;
   flex-wrap: wrap;
   padding: 1rem 1.25rem;
@@ -1534,17 +1534,20 @@ select:-webkit-autofill {
   max-width: 400px;
 }
 
+/* Matches .list-search-field's flex-basis/max-width exactly (Products page
+   only) so the search field and category dropdown are always equal width,
+   never diverging as the container width changes. */
 .products-category-field {
-  flex: 1 1 240px;
+  flex: 1 1 320px;
   min-width: 0;
-  max-width: 300px;
+  max-width: 400px;
 }
 
 /* Matches the react-select control's 44px height exactly, so multiple
    fields on the same row line up perfectly. */
 .list-filter-input {
-  height: 44px;
-  min-height: 44px;
+  height: 36px;
+  min-height: 36px;
 }
 
 .products-category-filter {
@@ -1575,13 +1578,77 @@ select:-webkit-autofill {
   .list-filters-card {
     flex-direction: column;
     align-items: stretch;
-    padding: 0.85rem 1rem;
-    gap: 0.85rem;
+    padding: 10px 0.5rem;
+    gap: 10px;
+    margin-bottom: 10px;
   }
 
   .list-search-field,
   .products-category-field {
+    /* Reset the desktop flex-basis (320px/240px, meant for row-layout width).
+       flex-direction becomes column here, which flips the main axis to
+       vertical — those basis values would otherwise be read as height,
+       stretching each field into a tall box with empty space below it. */
+    flex: 0 1 auto;
     max-width: 100%;
+  }
+
+  /* Reduce bottom margin/padding on list filter fields for a cleaner look */
+  .list-filter-field {
+    margin: 0;
+    padding: 0;
+    gap: 0;
+  }
+
+  /* Tighten the search input padding on mobile for a more compact look */
+  .search-box input {
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: 30px;
+    line-height: 1;
+    height: 34px;
+    min-height: 34px;
+  }
+
+  /* Override Bootstrap form-control padding on mobile for list filter inputs */
+  .list-filter-input.form-control {
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1;
+    font-size: 0.82rem;
+    height: 34px;
+    min-height: 34px;
+  }
+
+  /* Ensure the category react-select control height matches the search
+     input on mobile (classNamePrefix="products-category-select" on Products). */
+  .products-category-select__control {
+    min-height: 34px !important;
+  }
+
+  /* Reduce react-select value container padding on mobile for tighter fit */
+  .products-category-select__value-container {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: 34px;
+  }
+
+  /* Ensure react-select indicators don't add extra height */
+  .products-category-select__indicators {
+    min-height: 34px !important;
+  }
+
+  /* Reduce the search icon left offset on mobile */
+  .search-box .search-icon {
+    left: 10px;
+    font-size: 0.9rem;
+  }
+
+  /* Tighten the mobile "select all" bar so it doesn't add extra whitespace
+     between the filter section and the product cards below it. */
+  .bulk-select-mobile-bar {
+    padding: 0.45rem 0.65rem;
+    margin-bottom: 10px;
   }
 }
 
@@ -12567,6 +12634,234 @@ select:-webkit-autofill {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+/* Mobile: shift Customer Ledger button slightly left from right-aligned position */
+@media (max-width: 575.98px) {
+  .customer-ledger-btn-row {
+    justify-content: center !important;
+  }
+}
+
+/* Mobile: hide KPI icons in the Customer Details drawer summary cards */
+@media (max-width: 575.98px) {
+  .customer-kpi-icon {
+    display: none !important;
+  }
+}
+
+/* ==========================================================
+   CUSTOMER LEDGER — mobile responsive overrides
+   ========================================================== */
+@media (max-width: 575.98px) {
+  /* ─── Page container ────────────────────────────────────── */
+  .ledger-page-container {
+    padding: 0 0.5rem !important;
+  }
+
+  /* ─── Title bar ─────────────────────────────────────────── */
+  .ledger-titlebar {
+    padding: 0.5rem 0.25rem !important;
+  }
+  .ledger-titlebar .btn-premium {
+    padding: 0.35rem 0.7rem !important;
+    font-size: 0.72rem !important;
+  }
+  .ledger-titlebar-heading {
+    font-size: 0.95rem !important;
+  }
+
+  /* ─── Header banner ─────────────────────────────────────── */
+  .ledger-header-banner {
+    padding: 0.9rem !important;
+    gap: 0.75rem !important;
+  }
+  .ledger-avatar {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 1.05rem !important;
+  }
+  .ledger-header-banner h4,
+  .ledger-header-banner h2 {
+    font-size: 0.95rem !important;
+  }
+  .ledger-header-banner p {
+    font-size: 0.75rem !important;
+  }
+  .ledger-header-banner > div {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .supplier-ledger-page .ledger-header-meta {
+    display: none !important;
+  }
+  .supplier-ledger-page .ledger-mobile-status {
+    display: inline-flex !important;
+  }
+  .ledger-mobile-stats {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px 12px !important;
+    margin-top: 6px !important;
+  }
+  .ledger-mobile-stat {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 0 !important;
+    border: none !important;
+    border-top: none !important;
+    border-radius: 0 !important;
+    background: none !important;
+    flex-direction: row !important;
+  }
+  .ledger-mobile-stat__label {
+    font-size: 0.65rem !important;
+    color: var(--text-muted) !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+  }
+  .ledger-mobile-stat__value {
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+  }
+  .ledger-header-meta {
+    gap: 5px !important;
+    margin-top: 6px !important;
+  }
+  .ledger-meta-chip {
+    padding: 2px 8px !important;
+    font-size: 0.68rem !important;
+    gap: 4px !important;
+  }
+  .ledger-header-actions {
+    width: 100% !important;
+    justify-content: stretch !important;
+    gap: 6px !important;
+  }
+  .ledger-header-actions .btn-premium {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 0.4rem 0.5rem !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* ─── KPI grid — 2 per row, no icons ────────────────────── */
+  .ledger-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 1rem !important;
+  }
+  .ledger-kpi-card {
+    padding: 0.65rem 0.7rem !important;
+    gap: 0 !important;
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+  .ledger-kpi-icon {
+    display: none !important;
+  }
+  .ledger-kpi-value {
+    font-size: 0.95rem !important;
+    margin-bottom: 1px !important;
+  }
+  .ledger-kpi-label {
+    font-size: 0.62rem !important;
+  }
+
+  /* ─── Filter bar ────────────────────────────────────────── */
+  .ledger-filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 0.5rem 0.6rem !important;
+    gap: 8px !important;
+  }
+  .ledger-filter-pills {
+    gap: 4px !important;
+  }
+  .ledger-pill {
+    padding: 0.25rem 0.55rem !important;
+    font-size: 0.68rem !important;
+  }
+  .ledger-filter-controls {
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+  .ledger-search-box {
+    width: 100% !important;
+  }
+  .ledger-filter-select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* ─── Custom date range panel ────────────────────────────── */
+  .ledger-custom-date-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .ledger-custom-date-row input[type="date"] {
+    width: 100% !important;
+  }
+
+  /* ─── Timeline ──────────────────────────────────────────── */
+  .ledger-timeline {
+    gap: 6px !important;
+  }
+  .ledger-txn-row {
+    gap: 8px !important;
+  }
+  .ledger-txn-rail {
+    width: 24px !important;
+  }
+  .ledger-txn-dot {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 0.75rem !important;
+    border-radius: 8px !important;
+  }
+  .ledger-txn-rail::before {
+    top: 28px !important;
+  }
+  .ledger-txn-card {
+    padding: 10px 10px !important;
+    gap: 6px !important;
+  }
+  .ledger-txn-top {
+    gap: 6px !important;
+  }
+  .ledger-txn-type-badge {
+    font-size: 0.65rem !important;
+    padding: 1px 7px !important;
+  }
+  .ledger-txn-invoice {
+    font-size: 0.72rem !important;
+  }
+  .ledger-txn-datetime {
+    font-size: 0.65rem !important;
+  }
+  .ledger-txn-amounts {
+    gap: 8px !important;
+  }
+  .ledger-txn-amount-label {
+    font-size: 0.58rem !important;
+  }
+  .ledger-txn-amount-value {
+    font-size: 0.78rem !important;
+  }
+  .ledger-txn-balance-badge {
+    padding: 3px 8px !important;
+  }
+  .ledger-txn-note {
+    font-size: 0.68rem !important;
+    padding-top: 4px !important;
   }
 }
 

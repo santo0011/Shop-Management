@@ -9,6 +9,7 @@ const emptyForm = {
   stock: '', minStock: '10', trackStock: true, discount: '', tax: '',
   batchNumber: '', expiryDate: '', size: '', color: '', brand: '',
   serialNumber: '', warranty: '', modelNumber: '', length: '', width: '',
+  allowCustomQuantity: false,
 };
 
 const REQUIRED_FIELDS = ['name', 'category', 'purchasePrice', 'sellingPrice', 'stock'];
@@ -60,6 +61,7 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, t, initi
       modelNumber: editing.modelNumber || '',
       length: editing.length ?? '',
       width: editing.width ?? '',
+      allowCustomQuantity: !!editing.allowCustomQuantity,
     } : { ...emptyForm, name: initialName });
   }, [open, editing, initialName]);
 
@@ -198,6 +200,45 @@ const ProductDrawer = ({ open, onClose, onSuccess, editing, categories, t, initi
                   <input type="number" {...field('sellingPrice')} />
                   {errors.sellingPrice && <div className="invalid-feedback-premium" style={errorStyle}>{errors.sellingPrice}</div>}
                 </div>
+              </div>
+              {/* Allow Custom Quantity — OFF (default): sellable only in whole
+                  Base Units. ON: POS lets the cashier sell any quantity/sub-unit
+                  (e.g. 200 ml of a Litre-based product). Purchase/Selling Price
+                  above always stay priced per Base Unit either way. */}
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '0.5rem 0.7rem', borderRadius: 'var(--border-radius-sm)',
+                  background: 'var(--bg-input)', border: '1px solid var(--border-color)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>{t('product.allowCustomQuantity')}</div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{t('product.allowCustomQuantityHint')}</div>
+                </div>
+                <label style={{ position: 'relative', display: 'inline-block', width: '38px', height: '22px', flexShrink: 0, marginLeft: '0.75rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!form.allowCustomQuantity}
+                    onChange={(e) => handleChange('allowCustomQuantity', e.target.checked)}
+                    style={{ opacity: 0, width: 0, height: 0 }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute', inset: 0, cursor: 'pointer',
+                      background: form.allowCustomQuantity ? 'var(--primary)' : 'var(--border-color)',
+                      borderRadius: '999px', transition: 'background 150ms ease',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute', top: '3px', left: form.allowCustomQuantity ? '19px' : '3px',
+                        width: '16px', height: '16px', background: '#fff', borderRadius: '50%',
+                        transition: 'left 150ms ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      }}
+                    />
+                  </span>
+                </label>
               </div>
               {/* 2-col row: Wholesale Price + Stock */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>

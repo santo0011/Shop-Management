@@ -115,6 +115,15 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  // OFF (default) — sellable only in whole units of `unit` (the Base Unit),
+  // e.g. 1 Piece, 1 Bag. ON — POS may sell any quantity/sub-unit of `unit`
+  // (e.g. 200 ml of a Litre-based product); purchasePrice/sellingPrice
+  // always stay priced per Base Unit either way, so this never needs its
+  // own price fields.
+  allowCustomQuantity: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: true,
 });

@@ -300,6 +300,11 @@ const ProductDetailsDrawer = ({ open, productId, onClose, t, i18n }) => {
                   <InfoRow icon={BiDollar} label={t('product.purchasePrice') || 'Purchase Price'} value={formatCurrency(product.purchasePrice || 0)} />
                   <InfoRow icon={BiDollar} label={t('product.sellingPrice') || 'Selling Price'} value={formatCurrency(product.sellingPrice || 0)} />
                   <InfoRow icon={BiTrendingUp} label={t('productsPage.profitMargin') || 'Profit Margin'} value={`${profitMargin}%`} />
+                  <InfoRow
+                    icon={BiCheckCircle}
+                    label={t('product.allowCustomQuantity') || 'Allow Custom Quantity'}
+                    value={product.allowCustomQuantity ? (t('common.yes') || 'Yes') : (t('common.no') || 'No')}
+                  />
                   <InfoRow icon={BiCube} label={t('product.stock') || 'Current Stock'} value={`${currentStock} ${product.unit || ''}`} />
                   <InfoRow icon={BiCube} label={t('product.minStock') || 'Min Stock'} value={minStock} />
                   <InfoRow icon={BiCube} label={t('productsPage.stockValue') || 'Stock Value'} value={formatCurrency(summary?.stockValue || 0)} />

@@ -356,7 +356,9 @@
     "warrantyPlaceholder": "যেমন ১ বছর",
     "modelNumber": "মডেল নম্বর",
     "length": "দৈর্ঘ্য",
-    "width": "প্রস্থ"
+    "width": "প্রস্থ",
+    "allowCustomQuantity": "কাস্টম পরিমাণ অনুমতি দিন",
+    "allowCustomQuantityHint": "বন্ধ: শুধুমাত্র সম্পূর্ণ একক বিক্রি হবে (যেমন ১ পিস)। চালু: যেকোনো পরিমাণ (যেমন ২০০ মিলি)।"
   },
   "customer": {
     "sale": "বিক্রয়"
@@ -485,6 +487,17 @@
       "walkIn": "সাধারণ ক্রেতা",
       "walkInCustomer": "সাধারণ ক্রেতা",
       "dueLabel": "বাকি:"
+    },
+    "customQty": {
+      "title": "কাস্টম পরিমাণ",
+      "baseUnitPrice": "একক মূল্য",
+      "quantityLabel": "পরিমাণ",
+      "autoPrice": "স্বয়ংক্রিয় হিসাবকৃত মূল্য",
+      "extraCharge": "অতিরিক্ত চার্জ",
+      "finalPrice": "চূড়ান্ত মূল্য",
+      "addToCart": "কার্টে যোগ করুন",
+      "invalidQuantity": "শূন্যের চেয়ে বড় একটি সঠিক পরিমাণ লিখুন",
+      "exceedsStock": "মাত্র {{available}} {{unit}} মজুদ আছে"
     },
     "printer": {
       "apply": "প্রয়োগ করুন",

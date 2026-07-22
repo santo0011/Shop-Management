@@ -10,9 +10,11 @@ import {
   BiDollar, BiShoppingBag, BiTag, BiCrown, BiCheckCircle,
   BiErrorCircle, BiWallet, BiFile, BiGridSmall, BiLayout,
   BiStore, BiQr, BiIdCard, BiUserCircle,
-  BiNote
+  BiNote, BiEdit
 } from 'react-icons/bi';
 import PrintPreview from '../../components/common/PrintPreview';
+import useBusinessConfig from '../../hooks/useBusinessConfig';
+import { getCompatibleUnitKeys, convertToBaseUnit } from '../../config/unitConversions';
 
 const formatAddress = (addr) => {
   if (!addr) return '';
@@ -91,9 +93,113 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
   );
 };
 
+// Shown when a Custom-Quantity-enabled product is added to the cart — lets
+// the cashier enter the actual quantity sold (in any compatible unit, e.g.
+// ml for a Litre-based product) plus an optional manual extra charge, and
+// previews the auto-calculated + final price before it's added as a cart line.
+const CustomQuantityModal = ({ product, initial, reservedBaseQty, onConfirm, onCancel }) => {
+  const { t } = useTranslation();
+  const { units } = useBusinessConfig();
+  const unitLabel = (key) => units.find((u) => u.value === key)?.label || key;
+  const compatibleUnits = getCompatibleUnitKeys(product.unit);
+
+  const [qty, setQty] = useState(initial?.enteredQuantity ?? '');
+  const [unit, setUnit] = useState(initial?.enteredUnit ?? product.unit);
+  const [extraCharge, setExtraCharge] = useState(initial?.extraCharge || '');
+
+  const enteredQty = Number(qty) || 0;
+  const baseQty = convertToBaseUnit(enteredQty, unit, product.unit);
+  const autoPrice = baseQty * (product.sellingPrice || 0);
+  const extra = Number(extraCharge) || 0;
+  const finalPrice = autoPrice + extra;
+  const availableForThis = Math.max(0, (product.stock || 0) - reservedBaseQty);
+  const invalidQty = !(enteredQty > 0);
+  const exceedsStock = !invalidQty && baseQty > availableForThis;
+
+  const handleConfirm = () => {
+    if (invalidQty) { showToast.error(t('posPage.customQty.invalidQuantity')); return; }
+    if (exceedsStock) { showToast.error(t('posPage.customQty.exceedsStock', { available: availableForThis, unit: unitLabel(product.unit) })); return; }
+    onConfirm({
+      quantity: baseQty,
+      unit: product.unit,
+      price: product.sellingPrice,
+      enteredQuantity: enteredQty,
+      enteredUnit: unit,
+      extraCharge: extra,
+      total: finalPrice,
+    });
+  };
+
+  return (
+    <div className="confirm-sale-overlay" onClick={onCancel}>
+      <div className="confirm-sale-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+        <div className="confirm-sale-header">
+          <div className="confirm-sale-header-left">
+            <div className="confirm-sale-header-icon"><BiPackage size={22} /></div>
+            <div><h3 className="confirm-sale-title">{product.name}</h3><span className="confirm-sale-datetime">{t('posPage.customQty.title')}</span></div>
+          </div>
+          <button className="confirm-sale-close" onClick={onCancel}><BiX size={22} /></button>
+        </div>
+        <div className="confirm-sale-body">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.25rem 0 1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <span>{t('posPage.customQty.baseUnitPrice')}</span>
+              <strong>₹{product.sellingPrice} / {unitLabel(product.unit)}</strong>
+            </div>
+            <div>
+              <label className="pos-payment-label">{t('posPage.customQty.quantityLabel')}</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="number" min="0" step="any" autoFocus
+                  className="form-control" value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  placeholder="0" style={{ flex: 1 }}
+                />
+                <select className="form-select" value={unit} onChange={(e) => setUnit(e.target.value)} style={{ flex: 1 }}>
+                  {compatibleUnits.map((u) => <option key={u} value={u}>{unitLabel(u)}</option>)}
+                </select>
+              </div>
+              {exceedsStock && (
+                <div className="pos-paid-error">
+                  <BiErrorCircle size={14} />
+                  <span>{t('posPage.customQty.exceedsStock', { available: availableForThis, unit: unitLabel(product.unit) })}</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span>{t('posPage.customQty.autoPrice')}</span>
+              <strong>₹{autoPrice.toFixed(2)}</strong>
+            </div>
+            <div>
+              <label className="pos-payment-label">{t('posPage.customQty.extraCharge')}</label>
+              <input
+                type="number" min="0" step="any"
+                className="form-control" value={extraCharge}
+                onChange={(e) => setExtraCharge(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div className="pos-grand-total" style={{ marginTop: '0.25rem' }}>
+              <span>{t('posPage.customQty.finalPrice')}</span>
+              <span className="pos-grand-total-amount">₹{finalPrice.toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="confirm-sale-actions">
+            <button className="confirm-sale-btn confirm-sale-btn-primary" onClick={handleConfirm} disabled={invalidQty || exceedsStock}>
+              <BiCheck size={18} /><span>{t('posPage.customQty.addToCart')}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const POS = () => {
   const { t, i18n } = useTranslation();
   const isBn = i18n.language === 'bn';
+  const { units: unitOptions } = useBusinessConfig();
+  const unitLabel = useCallback((key) => unitOptions.find((u) => u.value === key)?.label || key, [unitOptions]);
   const [products, setProducts] = useState([]);
   const [topSelling, setTopSelling] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -136,6 +242,9 @@ const POS = () => {
   const [showTopSelling, setShowTopSelling] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmData, setConfirmData] = useState(null);
+  // { product, editingKey, initial } | null — editingKey is set when
+  // re-opening an existing custom-quantity cart line to adjust it.
+  const [customQtyModal, setCustomQtyModal] = useState(null);
   const [discountMode, setDiscountMode] = useState('percent');
   const [discountValue, setDiscountValue] = useState('');
   const [customerNote, setCustomerNote] = useState('');
@@ -347,19 +456,25 @@ const POS = () => {
 
   const addToCart = useCallback((product) => {
     if (product.stock <= 0) { showToast.warning(t('posPage.stockWarnings.outOfStock', { name: product.name })); return; }
+    // Custom-Quantity products are never just incremented by 1 — each sale
+    // amount (and its optional extra charge) is entered explicitly.
+    if (product.allowCustomQuantity) {
+      setCustomQtyModal({ product, editingKey: null, initial: null });
+      return;
+    }
     setCart(prev => {
-      const existing = prev.find(item => item.product._id === product._id);
+      const existing = prev.find(item => item.key === product._id);
       if (existing) {
         if (existing.quantity >= product.stock) { showToast.warning(t('posPage.stockWarnings.onlyAvailable', { count: product.stock, unit: product.unit || t('product.piece') })); return prev; }
-        return prev.map(item => item.product._id === product._id ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.price } : item);
+        return prev.map(item => item.key === product._id ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.price } : item);
       }
-      return [...prev, { product, quantity: 1, price: product.sellingPrice, discount: product.discount || 0, total: product.sellingPrice }];
+      return [...prev, { key: product._id, product, quantity: 1, price: product.sellingPrice, discount: product.discount || 0, total: product.sellingPrice }];
     });
   }, [t]);
 
-  const updateQty = useCallback((id, delta) => {
+  const updateQty = useCallback((key, delta) => {
     setCart(prev => prev.map(item => {
-      if (item.product._id === id) {
+      if (item.key === key) {
         const newQty = Math.max(1, item.quantity + delta);
         if (newQty > item.product.stock) { showToast.warning(t('posPage.stockWarnings.onlyAvailable', { count: item.product.stock, unit: item.product.unit || t('product.piece') })); return item; }
         return { ...item, quantity: newQty, total: newQty * item.price };
@@ -368,7 +483,28 @@ const POS = () => {
     }));
   }, [t]);
 
-  const removeItem = useCallback((id) => { setCart(prev => prev.filter(item => item.product._id !== id)); }, []);
+  const removeItem = useCallback((key) => { setCart(prev => prev.filter(item => item.key !== key)); }, []);
+
+  // Total base-unit quantity already committed in the cart for a product,
+  // across every custom-quantity line — used to cap a new/edited line so the
+  // combined amount can never exceed real stock. Excludes the line currently
+  // being edited (its own reserved amount shouldn't count against itself).
+  const reservedBaseQtyForProduct = useCallback((productId, excludeKey) => (
+    cart.reduce((sum, item) => (
+      item.product._id === productId && item.key !== excludeKey ? sum + item.quantity : sum
+    ), 0)
+  ), [cart]);
+
+  const handleConfirmCustomQty = useCallback((payload) => {
+    setCart(prev => {
+      if (customQtyModal?.editingKey) {
+        return prev.map(item => item.key === customQtyModal.editingKey ? { ...item, ...payload } : item);
+      }
+      const key = `${customQtyModal.product._id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      return [...prev, { key, product: customQtyModal.product, discount: 0, isCustomQty: true, ...payload }];
+    });
+    setCustomQtyModal(null);
+  }, [customQtyModal]);
 
   // Resets the cart/inputs for the next transaction WITHOUT touching lastSale —
   // used right after a successful checkout, where we still want the Print
@@ -469,7 +605,11 @@ const POS = () => {
       const targetCustomerId = customer;
       const payload = {
         customer: customer || null,
-        items: cart.map(item => ({ product: item.product._id, quantity: item.quantity, unit: item.product.unit, price: item.price, discount: item.discount, tax: item.product.tax || 0, total: item.total })),
+        items: cart.map(item => ({
+          product: item.product._id, quantity: item.quantity, unit: item.product.unit,
+          price: item.price, discount: item.discount, tax: item.product.tax || 0, total: item.total,
+          ...(item.isCustomQty ? { enteredQuantity: item.enteredQuantity, enteredUnit: item.enteredUnit, extraCharge: item.extraCharge || 0 } : {}),
+        })),
         // subtotal/discount/tax are sent as the raw (pre-round) figures — the
         // backend independently derives Grand Total from these and floors it
         // to get totalAmount/roundOff, so the stored Round Off always matches
@@ -830,19 +970,33 @@ const POS = () => {
             </div>
           ) : (
             cart.map(item => (
-              <div key={item.product._id} className="pos-cart-item">
+              <div key={item.key} className="pos-cart-item">
                 <div className="pos-cart-item-info">
                   <div className="pos-cart-item-name">{item.product.name}</div>
-                  <div className="pos-cart-item-price">₹{item.price} / {item.product.unit || t('product.piece')}</div>
+                  <div className="pos-cart-item-price">
+                    {item.isCustomQty
+                      ? `${item.enteredQuantity} ${unitLabel(item.enteredUnit)} · ₹${item.price}/${unitLabel(item.product.unit)}${item.extraCharge > 0 ? ` +₹${item.extraCharge}` : ''}`
+                      : `₹${item.price} / ${item.product.unit || t('product.piece')}`}
+                  </div>
                 </div>
                 <div className="pos-cart-item-controls">
-                  <div className="pos-qty-control">
-                    <button className="pos-qty-btn pos-qty-minus" onClick={() => updateQty(item.product._id, -1)} disabled={item.quantity <= 1}><BiMinus /></button>
-                    <span className="pos-qty-value">{item.quantity}</span>
-                    <button className="pos-qty-btn pos-qty-plus" onClick={() => updateQty(item.product._id, 1)}><BiPlus /></button>
-                  </div>
+                  {item.isCustomQty ? (
+                    <button
+                      className="pos-qty-btn"
+                      onClick={() => setCustomQtyModal({ product: item.product, editingKey: item.key, initial: item })}
+                      title={t('common.edit')}
+                    >
+                      <BiEdit />
+                    </button>
+                  ) : (
+                    <div className="pos-qty-control">
+                      <button className="pos-qty-btn pos-qty-minus" onClick={() => updateQty(item.key, -1)} disabled={item.quantity <= 1}><BiMinus /></button>
+                      <span className="pos-qty-value">{item.quantity}</span>
+                      <button className="pos-qty-btn pos-qty-plus" onClick={() => updateQty(item.key, 1)}><BiPlus /></button>
+                    </div>
+                  )}
                   <div className="pos-cart-item-total">₹{item.total.toFixed(2)}</div>
-                  <button className="pos-cart-item-remove" onClick={() => removeItem(item.product._id)}><BiTrash /></button>
+                  <button className="pos-cart-item-remove" onClick={() => removeItem(item.key)}><BiTrash /></button>
                 </div>
               </div>
             ))
@@ -953,6 +1107,15 @@ const POS = () => {
 
       {showConfirmModal && confirmData && (
         <ConfirmSaleModal data={confirmData} onConfirm={handleProcessSale} onCancel={() => setShowConfirmModal(false)} loading={loading} />
+      )}
+      {customQtyModal && (
+        <CustomQuantityModal
+          product={customQtyModal.product}
+          initial={customQtyModal.initial}
+          reservedBaseQty={reservedBaseQtyForProduct(customQtyModal.product._id, customQtyModal.editingKey)}
+          onConfirm={handleConfirmCustomQty}
+          onCancel={() => setCustomQtyModal(null)}
+        />
       )}
       {showInvoice && lastSale && (
         <PrintPreview

@@ -357,7 +357,9 @@
     "warrantyPlaceholder": "e.g. 1 Year",
     "modelNumber": "Model Number",
     "length": "Length",
-    "width": "Width"
+    "width": "Width",
+    "allowCustomQuantity": "Allow Custom Quantity",
+    "allowCustomQuantityHint": "OFF: sold only in whole units (e.g. 1 Piece). ON: any quantity (e.g. 200 ml)."
   },
   "customer": {
     "sale": "Sale"
@@ -486,6 +488,17 @@
       "walkIn": "Walk-in",
       "walkInCustomer": "Walk-in Customer",
       "dueLabel": "Due:"
+    },
+    "customQty": {
+      "title": "Custom Quantity",
+      "baseUnitPrice": "Base Unit Price",
+      "quantityLabel": "Quantity",
+      "autoPrice": "Auto Calculated Price",
+      "extraCharge": "Extra Charge",
+      "finalPrice": "Final Price",
+      "addToCart": "Add to Cart",
+      "invalidQuantity": "Enter a valid quantity greater than zero",
+      "exceedsStock": "Only {{available}} {{unit}} available"
     },
     "printer": {
       "apply": "Apply",

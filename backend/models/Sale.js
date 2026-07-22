@@ -7,17 +7,38 @@ const saleItemSchema = new mongoose.Schema({
     required: true,
   },
   quantity: {
+    // Always the Base Unit quantity actually deducted from stock — for a
+    // custom-quantity line (e.g. 200 ml of a Litre-based product) this is
+    // the converted decimal (0.2), not the amount the customer asked for.
     type: Number,
     required: true,
-    min: 1,
+    min: 0.001,
   },
   returnedQty: {
     type: Number,
     default: 0,
   },
   unit: {
+    // Always the product's Base Unit — see enteredUnit for what the
+    // customer/cashier actually typed at checkout.
     type: String,
     required: true,
+  },
+  // The raw quantity/unit the cashier entered at POS for a Custom Quantity
+  // sale (e.g. 200 / 'ml') — kept only for invoice/history display. Absent
+  // for ordinary Base-Unit sales, where quantity/unit above are shown as-is.
+  enteredQuantity: {
+    type: Number,
+  },
+  enteredUnit: {
+    type: String,
+  },
+  // Manual per-line surcharge entered by the cashier at checkout (e.g. for
+  // odd-quantity handling). Never persisted on Product — this is sale-only,
+  // one-time transaction data.
+  extraCharge: {
+    type: Number,
+    default: 0,
   },
   price: {
     type: Number,

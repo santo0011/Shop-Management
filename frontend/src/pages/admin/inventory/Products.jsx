@@ -248,8 +248,8 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     const lines = pasteData.split('\n').filter(line => line.trim());
     const parsed = lines.map((line) => {
       const parts = line.includes('\t') ? line.split('\t') :
-                    line.includes('|') ? line.split('|') :
-                    line.split(',');
+        line.includes('|') ? line.split('|') :
+          line.split(',');
       const cleanParts = parts.map(p => p.trim());
       const row = {
         name: cleanParts[0] || '',
@@ -957,7 +957,7 @@ const Products = () => {
   const categorySelectStyles = {
     control: (base, state) => ({
       ...base,
-      minHeight: '44px',
+      minHeight: '36px',
       backgroundColor: 'var(--bg-input)',
       borderWidth: '1.5px',
       borderColor: state.isFocused ? 'var(--primary)' : 'var(--border-color)',
@@ -1025,7 +1025,6 @@ const Products = () => {
       {/* Search + Category Filter */}
       <div className="list-filters-card">
         <div className="list-filter-field list-search-field">
-          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
           <div className="search-box">
             <BiSearch className="search-icon" />
             <input
@@ -1037,7 +1036,6 @@ const Products = () => {
           </div>
         </div>
         <div className="list-filter-field products-category-field">
-          <label className="list-filter-label"><BiCategory size={13} /> {t('product.category')}</label>
           <div className="products-category-filter">
             <BiCategory className="products-category-filter-icon" />
             <Select

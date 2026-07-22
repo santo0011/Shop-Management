@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Chart from 'react-apexcharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '../../services/api';
 import StatCard from '../../components/common/StatCard';
@@ -35,7 +36,41 @@ const PAYMENT_METHOD_ICONS = { cash: '💵', card: '💳', upi: '📱', mobile_b
 const getPaymentMethodLabels = (t) => ({ cash: t('sale.cash'), card: t('sale.card'), upi: t('sale.upi'), mobile_banking: t('sale.mobileBanking'), due: t('common.due') });
 
 // ─── Top Products Chart Palette (one color per product bar) ──
+// Mirrors Dashboard.jsx's Top Selling Products chart exactly — same colors,
+// gradient bars, colored-dot Y-axis ticks, and tooltip — so the two pages
+// present the same chart for the same underlying data.
 const TOP_PRODUCTS_COLORS = ['#2a78d6', '#1baf7a', '#eb6834', '#7c5cd6', '#e34948'];
+
+const TopProductsYAxisTick = ({ x, y, payload, index, textColor }) => {
+  const color = TOP_PRODUCTS_COLORS[index % TOP_PRODUCTS_COLORS.length];
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <circle cx={-108} cy={0} r={4} fill={color} />
+      <text x={-98} y={0} dy={4} textAnchor="start" fontSize={11} fontWeight={600} fill={textColor}>
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
+const CustomTopProductsTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="dashboard-tooltip">
+      <div className="dashboard-tooltip-date" style={{ marginBottom: 4 }}>{label}</div>
+      {payload.map((entry, idx) => {
+        const color = TOP_PRODUCTS_COLORS[(entry.payload?._index ?? 0) % TOP_PRODUCTS_COLORS.length];
+        return (
+          <div key={idx} className="dashboard-tooltip-row" style={{ color }}>
+            <span className="dashboard-tooltip-dot" style={{ background: color }} />
+            <span>{entry.name}: </span>
+            <strong>{Number(entry.value).toLocaleString('en-IN')}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const getStatusStyles = (t) => ({
   paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: t('common.paid') },
@@ -250,22 +285,18 @@ const Reports = () => {
     { name: t('product.profit'), data: analytics.daily.map(d => Number((d.profit || 0).toFixed(2))) },
   ], [analytics.daily, t]);
 
-  const topProductsChartOptions = useMemo(() => ({
-    chart: { type: 'bar', height: 320, toolbar: { show: false }, foreColor: chartColors.textSecondary },
-    plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: '55%', distributed: true } },
-    dataLabels: { enabled: true, style: { fontSize: '11px', fontWeight: 600, colors: [theme === 'dark' ? '#fff' : '#1a1a2e'] } },
-    legend: { show: false },
-    xaxis: { categories: analytics.topProducts.map(p => p.name), labels: { style: { fontSize: '11px' } } },
-    yaxis: { labels: { style: { fontSize: '11px' } } },
-    tooltip: { y: { formatter: (val) => t('reportsPage.soldCount', { count: val }) } },
-    grid: { borderColor: chartColors.gridColor },
-    theme: { mode: theme },
-    colors: TOP_PRODUCTS_COLORS,
-  }), [analytics.topProducts, theme, t, chartColors]);
+  const isDark = theme === 'dark';
 
-  const topProductsChartSeries = useMemo(() => [
-    { name: t('dashboard.quantitySold'), data: analytics.topProducts.map(p => p.quantity) },
-  ], [analytics.topProducts, t]);
+  // Same shape as Dashboard.jsx's topProductsData — top 5, truncated names,
+  // Quantity Sold as the bar value, Revenue carried along for the tooltip.
+  const topProductsChartData = useMemo(() => {
+    return analytics.topProducts.slice(0, 5).map((p, index) => ({
+      name: p.name?.length > 20 ? p.name.substring(0, 20) + '...' : p.name || t('common.unknown'),
+      'Quantity Sold': p.quantity || 0,
+      Revenue: p.revenue || 0,
+      _index: index,
+    }));
+  }, [analytics.topProducts, t]);
 
   // Merge low stock and totals from persistent cache + analytics
   const summaryCards = useMemo(() => {
@@ -515,8 +546,58 @@ const Reports = () => {
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                   <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                 </div>
-              ) : analytics.topProducts.length > 0 ? (
-                <Chart options={topProductsChartOptions} series={topProductsChartSeries} type="bar" height={320} />
+              ) : topProductsChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart
+                    data={topProductsChartData}
+                    layout="vertical"
+                    margin={{ top: 5, right: 38, left: 10, bottom: 5 }}
+                    barSize={20}
+                    barCategoryGap="28%"
+                  >
+                    <defs>
+                      {TOP_PRODUCTS_COLORS.map((color, index) => (
+                        <linearGradient key={index} id={`reportsTopProductBarGradient-${index}`} x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={color} stopOpacity={0.75} />
+                          <stop offset="100%" stopColor={color} stopOpacity={1} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridColor} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fill: chartColors.textSecondary, fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      tick={<TopProductsYAxisTick textColor={chartColors.textSecondary} />}
+                      tickLine={false}
+                      axisLine={false}
+                      width={120}
+                    />
+                    <Tooltip content={<CustomTopProductsTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
+                    <Bar
+                      dataKey="Quantity Sold"
+                      name={t('dashboard.quantitySold')}
+                      radius={[0, 8, 8, 0]}
+                      animationDuration={900}
+                      animationEasing="ease-out"
+                    >
+                      {topProductsChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={`url(#reportsTopProductBarGradient-${index})`} />
+                      ))}
+                      <LabelList
+                        dataKey="Quantity Sold"
+                        position="right"
+                        formatter={(val) => Number(val).toLocaleString('en-IN')}
+                        style={{ fill: chartColors.textSecondary, fontSize: 11, fontWeight: 700 }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               ) : (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                   <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>

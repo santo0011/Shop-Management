@@ -79,6 +79,15 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
     });
   };
 
+  // A Custom Quantity line item stores what the cashier actually entered
+  // (enteredQuantity/enteredUnit, e.g. "200 ml") separately from the Base
+  // Unit amount used for stock/pricing (quantity/unit, e.g. "0.2 liter") —
+  // the invoice must always show what the customer was sold, not the
+  // internal Base Unit conversion. Ordinary line items have no
+  // enteredQuantity, so this just falls back to quantity/unit unchanged.
+  const displayQty = (item) => item.enteredQuantity ?? item.quantity;
+  const displayUnit = (item) => item.enteredUnit ?? item.unit ?? '';
+
   // ─── Single source of truth for receipt styling ──────────────────────────
   // This exact CSS text is used both for the on-screen preview (injected via
   // a <style> tag) and for the print window's <head>. They must never diverge
@@ -335,7 +344,7 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
               <span className="receipt-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span>
               {item.discount > 0 && <span className="receipt-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</span>}
             </div>
-            <div className="receipt-col-qty">{item.quantity} {item.unit || ''}</div>
+            <div className="receipt-col-qty">{displayQty(item)} {displayUnit(item)}</div>
             <div className="receipt-col-price">₹{Number(item.price).toFixed(2)}</div>
             <div className="receipt-col-total">₹{Number(item.total).toFixed(2)}</div>
           </div>
@@ -395,7 +404,7 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
           <div key={idx} className="receipt-modern-item">
             <div className="receipt-modern-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div>
             <div className="receipt-modern-item-details">
-              <span>{item.quantity} {item.unit || ''}</span>
+              <span>{displayQty(item)} {displayUnit(item)}</span>
               <span>₹{Number(item.price).toFixed(2)}</span>
               <span className="receipt-modern-item-total">₹{Number(item.total).toFixed(2)}</span>
             </div>
@@ -447,7 +456,7 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
           <div key={idx} className="receipt-minimal-item">
             <div className="receipt-minimal-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div>
             <div className="receipt-minimal-item-line">
-              <span>{item.quantity} x ₹{Number(item.price).toFixed(2)}</span>
+              <span>{displayQty(item)} {displayUnit(item)} x ₹{Number(item.price).toFixed(2)}</span>
               <span className="receipt-minimal-item-total">₹{Number(item.total).toFixed(2)}</span>
             </div>
           </div>
@@ -501,7 +510,7 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
         {sale?.items?.map((item, idx) => (
           <div key={idx} className="receipt-grocery-item">
             <span className="receipt-grocery-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span>
-            <span className="receipt-grocery-item-qty">{item.quantity}{item.unit || ''}</span>
+            <span className="receipt-grocery-item-qty">{displayQty(item)}{displayUnit(item)}</span>
             <span className="receipt-grocery-item-price">₹{Number(item.price).toFixed(2)}</span>
             <span className="receipt-grocery-item-total">₹{Number(item.total).toFixed(2)}</span>
           </div>

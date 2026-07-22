@@ -138,6 +138,26 @@ const createSale = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields: paymentMethod' });
     }
 
+    // Quantity must be a positive number (covers both whole Base Unit sales
+    // and fractional Custom Quantity sales, e.g. 0.2 Litre) and can never
+    // exceed what's actually in stock — checked against the live Product
+    // record so a stale client-side cart can't oversell.
+    for (const item of req.body.items) {
+      const qty = Number(item.quantity);
+      if (!(qty > 0)) {
+        return res.status(400).json({ message: 'Item quantity must be greater than zero.' });
+      }
+      const product = await Product.findOne({ _id: item.product, shop: req.user.shop });
+      if (!product) {
+        return res.status(400).json({ message: 'One or more products in this sale were not found.' });
+      }
+      if (product.trackStock !== false && qty > product.stock) {
+        return res.status(400).json({
+          message: `Insufficient stock for "${product.name}". Available: ${product.stock} ${product.unit}, requested: ${qty}.`,
+        });
+      }
+    }
+
     req.body.shop = req.user.shop;
 
     // Generate invoice number

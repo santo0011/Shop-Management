@@ -1487,7 +1487,6 @@ const Purchases = () => {
       {/* Search */}
       <div className="list-filters-card">
         <div className="list-filter-field list-search-field">
-          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
           <div className="search-box">
             <BiSearch className="search-icon" />
             <input

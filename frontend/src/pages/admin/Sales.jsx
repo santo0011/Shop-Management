@@ -322,7 +322,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
           <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.close')}</button>
           {sale && (
             <>
-              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice?.(sale.invoiceNo)} title={t('salesPage.copyInvoiceNumber')}><BiCopy size={16} /></button>
+              {/* <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice?.(sale.invoiceNo)} title={t('salesPage.copyInvoiceNumber')}><BiCopy size={16} /></button> */}
               <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint?.(sale)}><BiPrinter size={16} /> {t('salesPage.reprint')}</button>
             </>
           )}
@@ -912,7 +912,6 @@ const Sales = () => {
                     <td>
                       <div className="sales-actions">
                         <button className="sales-action-btn sales-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow size={16} /></button>
-                        <button className="sales-action-btn sales-action-print" title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter size={16} /></button>
                         <button className="sales-action-btn sales-action-return" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo size={16} /></button>
                       </div>
                     </td>

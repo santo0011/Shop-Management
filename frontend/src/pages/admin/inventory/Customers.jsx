@@ -355,125 +355,125 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
             }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'var(--gradient-primary)' }} />
 
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
-                <div style={{
-                  width: '52px', height: '52px', borderRadius: '14px',
-                  background: 'var(--gradient-primary)', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', color: '#fff',
-                  fontSize: '1.2rem', fontWeight: 700, flexShrink: 0,
-                  boxShadow: '0 4px 15px rgba(108, 99, 255, 0.3)',
-                }}>
-                  {(data.name || '?').charAt(0).toUpperCase()}
-                </div>
-
-                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h4 style={{ margin: 0, fontWeight: 800, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{data.name}</h4>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '4px',
-                      padding: '2px 9px', borderRadius: '20px', fontSize: '0.68rem', fontWeight: 700,
-                      background: data.dueAmount > 0 ? 'rgba(255,107,107,0.12)' : 'rgba(0,217,166,0.12)',
-                      color: data.dueAmount > 0 ? 'var(--danger)' : 'var(--secondary)',
-                    }}>
-                      {data.dueAmount > 0 ? <BiErrorCircle size={12} /> : <BiCheckCircle size={12} />}
-                      {data.dueAmount > 0 ? t('common.due') : t('common.active')}
-                    </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
+                  <div style={{
+                    width: '52px', height: '52px', borderRadius: '14px',
+                    background: 'var(--gradient-primary)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', color: '#fff',
+                    fontSize: '1.2rem', fontWeight: 700, flexShrink: 0,
+                    boxShadow: '0 4px 15px rgba(108, 99, 255, 0.3)',
+                  }}>
+                    {(data.name || '?').charAt(0).toUpperCase()}
                   </div>
-                  {data.nameBn && data.nameBn.trim().toLowerCase() !== (data.name || '').trim().toLowerCase() && (
-                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{data.nameBn}</p>
-                  )}
 
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
-                    {data.phone && (
+                  <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontWeight: 800, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{data.name}</h4>
                       <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '5px',
-                        padding: '3px 10px', borderRadius: '20px',
-                        background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                        color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 600,
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        padding: '2px 9px', borderRadius: '20px', fontSize: '0.68rem', fontWeight: 700,
+                        background: data.dueAmount > 0 ? 'rgba(255,107,107,0.12)' : 'rgba(0,217,166,0.12)',
+                        color: data.dueAmount > 0 ? 'var(--danger)' : 'var(--secondary)',
                       }}>
-                        <BiPhone size={13} /> {data.phone}
+                        {data.dueAmount > 0 ? <BiErrorCircle size={12} /> : <BiCheckCircle size={12} />}
+                        {data.dueAmount > 0 ? t('common.due') : t('common.active')}
                       </span>
-                    )}
-                    {data.email && (
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '5px',
-                        padding: '3px 10px', borderRadius: '20px',
-                        background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                        color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 600,
-                        maxWidth: '100%',
-                      }}>
-                        <BiEnvelope size={13} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.email}</span>
-                      </span>
-                    )}
-                  </div>
-                  {(data.address) && (
-                    <div style={{
-                      display: 'flex', alignItems: 'flex-start', gap: '5px', marginTop: '6px',
-                      color: 'var(--text-muted)', fontSize: '0.72rem',
-                    }}>
-                      <BiMapPin size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
-                      <span>{typeof data.address === 'object' ? Object.values(data.address).filter(Boolean).join(', ') : data.address}</span>
                     </div>
-                  )}
-                </div>
-              </div>
+                    {data.nameBn && data.nameBn.trim().toLowerCase() !== (data.name || '').trim().toLowerCase() && (
+                      <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{data.nameBn}</p>
+                    )}
 
-              <div style={{ marginTop: '14px' }}>
-                <button
-                  className="customer-ledger-btn"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    padding: '0.4rem 1rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    border: '1px solid rgba(108,99,255,0.25)',
-                    borderRadius: '8px',
-                    background: 'rgba(108,99,255,0.08)',
-                    color: 'var(--primary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    whiteSpace: 'nowrap',
-                    letterSpacing: '0.2px',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--gradient-primary)';
-                    e.currentTarget.style.color = '#fff';
-                    e.currentTarget.style.borderColor = 'transparent';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(108,99,255,0.3)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(108,99,255,0.08)';
-                    e.currentTarget.style.color = 'var(--primary)';
-                    e.currentTarget.style.borderColor = 'rgba(108,99,255,0.25)';
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                  onClick={() => { navigate(`/customers/${data._id}/ledger`); onClose(); }}
-                >
-                  <BiBook size={14} />
-                  <span>{t('customersPage.customerLedger')}</span>
-                </button>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                      {data.phone && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '5px',
+                          padding: '3px 10px', borderRadius: '20px',
+                          background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+                          color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 600,
+                        }}>
+                          <BiPhone size={13} /> {data.phone}
+                        </span>
+                      )}
+                      {data.email && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '5px',
+                          padding: '3px 10px', borderRadius: '20px',
+                          background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+                          color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 600,
+                          maxWidth: '100%',
+                        }}>
+                          <BiEnvelope size={13} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.email}</span>
+                        </span>
+                      )}
+                    </div>
+                    {(data.address) && (
+                      <div style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '5px', marginTop: '6px',
+                        color: 'var(--text-muted)', fontSize: '0.72rem',
+                      }}>
+                        <BiMapPin size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
+                        <span>{typeof data.address === 'object' ? Object.values(data.address).filter(Boolean).join(', ') : data.address}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="customer-ledger-btn-row" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    className="customer-ledger-btn"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '0.4rem 1rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: 'var(--gradient-primary)',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      whiteSpace: 'nowrap',
+                      letterSpacing: '0.2px',
+                      boxShadow: '0 4px 12px rgba(108,99,255,0.3)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.filter = 'brightness(0.92)';
+                      e.currentTarget.style.boxShadow = '0 6px 18px rgba(108,99,255,0.4)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.filter = 'none';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(108,99,255,0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                    onClick={() => { navigate(`/customers/${data._id}/ledger`); onClose(); }}
+                  >
+                    <BiBook size={14} />
+                    <span>{t('customersPage.customerLedger')}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* ─── Financial Overview (KPI grid) ──────────────────── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '1.25rem' }}>
               {[
-                { icon: BiWallet, label: t('customersPage.totalPurchases'), value: formatCurrency(data.totalPurchases), color: 'var(--primary)', bg: 'rgba(108,99,255,0.1)' },
-                { icon: BiDollar, label: t('common.due'), value: formatCurrency(data.dueAmount), color: data.dueAmount > 0 ? 'var(--danger)' : 'var(--secondary)', bg: data.dueAmount > 0 ? 'rgba(255,107,107,0.1)' : 'rgba(0,217,166,0.1)' },
-                { icon: BiAward, label: t('customersPage.loyaltyPoints'), value: `${data.loyaltyPoints || 0} ${t('customersPage.pts')}`, color: 'var(--primary)', bg: 'rgba(108,99,255,0.1)' },
-                { icon: BiCalendar, label: t('customersPage.customerSince'), value: formatDate(data.createdAt), color: 'var(--text-primary)', bg: 'var(--bg-input)' },
+                { icon: BiWallet, label: t('customersPage.totalPurchases'), value: formatCurrency(data.totalPurchases), color: 'var(--primary)', bg: 'rgba(108,99,255,0.1)', borderColor: 'var(--primary)' },
+                { icon: BiDollar, label: t('common.due'), value: formatCurrency(data.dueAmount), color: data.dueAmount > 0 ? 'var(--danger)' : 'var(--secondary)', bg: data.dueAmount > 0 ? 'rgba(255,107,107,0.1)' : 'rgba(0,217,166,0.1)', borderColor: data.dueAmount > 0 ? 'var(--danger)' : 'var(--secondary)' },
+                { icon: BiAward, label: t('customersPage.loyaltyPoints'), value: `${data.loyaltyPoints || 0} ${t('customersPage.pts')}`, color: 'var(--primary)', bg: 'rgba(108,99,255,0.1)', borderColor: 'var(--warning)' },
+                { icon: BiCalendar, label: t('customersPage.customerSince'), value: formatDate(data.createdAt), color: 'var(--text-primary)', bg: 'var(--bg-input)', borderColor: 'var(--info)' },
               ].map((kpi, i) => (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0,
                   padding: '10px 12px', borderRadius: 'var(--border-radius-md)',
                   background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+                  borderTop: `3px solid ${kpi.borderColor}`,
                 }}>
-                  <div style={{
+                  <div className="customer-kpi-icon" style={{
                     width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0,
                     background: kpi.bg, color: kpi.color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1567,7 +1567,6 @@ const Customers = () => {
       {/* Search */}
       <div className="list-filters-card">
         <div className="list-filter-field list-search-field">
-          <label className="list-filter-label"><BiSearch size={13} /> {t('common.search')}</label>
           <div className="search-box">
             <BiSearch className="search-icon" />
             <input className="form-control list-filter-input" placeholder={t('customersPage.searchPlaceholder')}
