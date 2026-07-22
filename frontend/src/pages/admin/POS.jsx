@@ -1003,6 +1003,7 @@ const POS = () => {
           )}
         </div>
 
+
         <div className="pos-checkout-section">
           <div className="pos-payment-section">
             <label className="pos-payment-label">{t('sale.paymentMethod')}</label>
