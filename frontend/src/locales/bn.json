@@ -88,11 +88,11 @@
     "passwordMismatch": "পাসওয়ার্ড মিলছে না",
     "invalidEmail": "সঠিক ইমেইল ঠিকানা দিন",
     "selectLanguage": "ভাষা নির্বাচন করুন",
-    "createdBy": "তৈরি করেছেন সান্তো বিশ্বাস",
+    "createdBy": "তৈরি করেছেন শান্ত বিশ্বাস",
     "softwareDeveloper": "সফটওয়্যার ডেভেলপার",
     "heroTitleLine1": "আপনার দোকান চালান",
     "heroTitleLine2": "পেশাদারের মতো।",
-    "heroSubtitle": "বিলিং, মজুদ আর বিক্রয় — সব একসাথে, ব্যস্ত মুদি দোকানের জন্য তৈরি।",
+    "heroSubtitle": "বিলিং, ইনভেন্টরি ও বিক্রয় ব্যবস্থাপনা — সব এক জায়গায়, সব ধরনের ব্যবসার জন্য।",
     "previewOverview": "আজকের সারসংক্ষেপ",
     "previewOrders": "অর্ডার",
     "trustShops": "আস্থাশীল দোকান",
@@ -263,7 +263,9 @@
     "id": "আইডি",
     "stackTrace": "স্ট্যাক ট্রেস",
     "reloadPage": "পেজ আবার লোড করুন",
-    "loadingApplication": "অ্যাপ লোড হচ্ছে..."
+    "loadingApplication": "অ্যাপ লোড হচ্ছে...",
+    "off": "বন্ধ",
+    "on": "চালু"
   },
   "toast": {
     "createSuccess": "{{item}} সফলভাবে তৈরি হয়েছে",

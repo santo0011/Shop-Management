@@ -92,7 +92,7 @@
     "softwareDeveloper": "Software Developer",
     "heroTitleLine1": "Run your store",
     "heroTitleLine2": "like a pro.",
-    "heroSubtitle": "Billing, inventory, and sales — all in one place, built for busy grocery shops.",
+    "heroSubtitle": "Billing, inventory, and sales — all in one place, built for every business.",
     "previewOverview": "Today's Overview",
     "previewOrders": "Orders",
     "trustShops": "Shops Trust Us",
@@ -264,7 +264,9 @@
     "stackTrace": "Stack Trace",
     "reloadPage": "Reload Page",
     "loadingApplication": "Loading application...",
-    "stock": "Stock"
+    "stock": "Stock",
+    "off": "OFF",
+    "on": "ON"
   },
   "toast": {
     "createSuccess": "{{item}} created successfully",

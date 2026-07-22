@@ -2549,13 +2549,13 @@ select:-webkit-autofill {
 .pos-category-filter {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 10px 16px;
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
   border-bottom: 1px solid var(--border-color);
-  background: var(--bg-primary);
+  background: var(--bg-card);
   scrollbar-width: thin;
 }
 
@@ -2570,39 +2570,46 @@ select:-webkit-autofill {
 
 .pos-category-chip {
   flex-shrink: 0;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-card);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: none;
+  background: var(--bg-input);
   color: var(--text-secondary);
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   font-weight: 600;
   font-family: var(--font-family);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.25s ease;
   white-space: nowrap;
+  letter-spacing: 0.2px;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
 .pos-category-chip:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  background: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .pos-category-chip.active {
-  border-color: var(--primary);
-  background: rgba(var(--primary-rgb), 0.12);
-  color: var(--primary);
+  background: var(--gradient-primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(108,99,255,0.25);
   font-weight: 700;
 }
 
 @media (max-width: 575.98px) {
   .pos-category-filter {
-    padding: 6px 8px;
+    padding: 8px 10px;
+    gap: 6px;
   }
 
   .pos-category-chip {
-    padding: 5px 12px;
-    font-size: 0.72rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.68rem;
   }
 }
 
@@ -2787,6 +2794,12 @@ select:-webkit-autofill {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
   align-content: start;
+  animation: posGridFadeIn 200ms ease both;
+}
+
+@keyframes posGridFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .pos-empty-state {

@@ -765,7 +765,7 @@ const POS = () => {
             </div>
           </div>
         )}
-        <div className="pos-product-grid">
+        <div className="pos-product-grid" key={selectedCategory || '__all__'}>
           {!showTopSelling && products.length === 0 && search && <div className="pos-empty-state"><BiPackage size={48} /><p>{t('product.noProductsFoundFor', { query: search })}</p></div>}
           {/* No spinner here on purpose — a category switch behaves exactly
               like Top Selling: cached data (or the previous category's list)
