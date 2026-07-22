@@ -313,16 +313,18 @@ const ManageShops = () => {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input
-            className="form-control"
-            placeholder={t('manageShopsPage.searchShopsPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Search — consistent filter card style */}
+      <div className="list-filters-card mb-3">
+        <div className="list-filter-field list-search-field">
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input
+              className="form-control list-filter-input"
+              placeholder={t('manageShopsPage.searchShopsPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 

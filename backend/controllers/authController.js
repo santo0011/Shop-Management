@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Shop = require('../models/Shop');
 const { generateToken, generateRefreshToken } = require('../utils/generateToken');
 const { sendForgotPasswordEmail, sendResetSuccessEmail } = require('../services/emailService');
+const { logActivity } = require('../services/activityLogService');
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -34,6 +35,15 @@ const login = async (req, res) => {
 
     user.refreshToken = refreshToken;
     await user.save();
+
+    // Log login activity
+    logActivity({
+      user: user._id,
+      action: 'Login',
+      resource: 'Auth',
+      details: `User ${user.email} logged in`,
+      req,
+    });
 
     let shop = null;
     if (user.shop) {

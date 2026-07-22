@@ -39,7 +39,22 @@
     "mainMenu": "Main Menu",
     "management": "Management",
     "system": "System",
-    "superAdmin": "Super Admin"
+    "superAdmin": "Super Admin",
+    "businessManagement": "Business Management",
+    "businessTypes": "Business Types",
+    "categoriesLibrary": "Categories Library",
+    "activeSubscriptions": "Active Subscriptions",
+    "payments": "Payments",
+    "businessReports": "Business Reports",
+    "revenueReports": "Revenue Reports",
+    "globalSettings": "Global Settings",
+    "backupRestore": "Backup & Restore",
+    "security": "Security",
+    "activityLogs": "Activity Logs",
+    "myProfile": "My Profile",
+    "changePassword": "Change Password",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar"
   },
   "auth": {
     "login": "Login",

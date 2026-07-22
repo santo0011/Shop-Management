@@ -39,7 +39,21 @@
     "mainMenu": "প্রধান মেনু",
     "management": "ব্যবস্থাপনা",
     "system": "সিস্টেম",
-    "superAdmin": "সুপার অ্যাডমিন"
+    "superAdmin": "সুপার অ্যাডমিন",
+    "businessManagement": "ব্যবসা ব্যবস্থাপনা",
+    "businessTypes": "ব্যবসার ধরণ",
+    "categoriesLibrary": "বিভাগসমূহ",
+    "activeSubscriptions": "সক্রিয় সাবস্ক্রিপশন",
+    "payments": "পেমেন্ট",
+    "businessReports": "ব্যবসা রিপোর্ট",
+    "revenueReports": "রাজস্ব রিপোর্ট",
+    "globalSettings": "গ্লোবাল সেটিংস",
+    "backupRestore": "ব্যাকআপ ও পুনরুদ্ধার",
+    "activityLogs": "অ্যাক্টিভিটি লগ",
+    "myProfile": "আমার প্রোফাইল",
+    "changePassword": "পাসওয়ার্ড পরিবর্তন",
+    "expandSidebar": "সাইডবার প্রসারিত করুন",
+    "collapseSidebar": "সাইডবার সঙ্কুচিত করুন"
   },
   "auth": {
     "login": "লগইন",

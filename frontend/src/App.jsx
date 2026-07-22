@@ -35,8 +35,18 @@ import Settings from './pages/admin/Settings';
 import SuperDashboard from './pages/super-admin/Dashboard';
 import ManageShops from './pages/super-admin/ManageShops';
 import ManagePlans from './pages/super-admin/ManagePlans';
-import Transactions from './pages/super-admin/Transactions';
 import SuperAdminSettings from './pages/super-admin/Settings';
+import BusinessTypes from './pages/super-admin/BusinessTypes';
+import CategoriesLibrary from './pages/super-admin/CategoriesLibrary';
+import ActiveSubscriptions from './pages/super-admin/ActiveSubscriptions';
+import Payments from './pages/super-admin/Payments';
+import RevenueReports from './pages/super-admin/RevenueReports';
+import BusinessReports from './pages/super-admin/BusinessReports';
+import GlobalSettings from './pages/super-admin/GlobalSettings';
+import BackupRestore from './pages/super-admin/BackupRestore';
+import ActivityLogs from './pages/super-admin/ActivityLogs';
+import MyProfile from './pages/super-admin/MyProfile';
+import ChangePassword from './pages/super-admin/ChangePassword';
 
 // Common
 import LoadingOverlay from './components/common/LoadingOverlay';
@@ -45,7 +55,7 @@ const PrivateRoute = ({ children, role }) => {
   const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
 
   if (loading) {
-    return null; // LoadingOverlay handles this globally via API calls
+    return null;
   }
 
   if (!isAuthenticated) {
@@ -74,7 +84,6 @@ function App() {
     }
   }, [mode]);
 
-  // Initialize language from persistent storage on mount, independent of user object
   useEffect(() => {
     const savedLang = getSavedLanguage();
     if (savedLang && savedLang !== i18n.language) {
@@ -84,17 +93,12 @@ function App() {
     }
   }, [i18n]);
 
-  // When user logs in, do NOT override the language from user object.
-  // The language preference is stored independently in localStorage.
-  // If the user object has a language but no preference is saved yet,
-  // store it so it persists.
   useEffect(() => {
     if (user?.language && !getSavedLanguage()) {
       saveLanguage(user.language);
     }
   }, [user?.language]);
 
-  // Listen for language changes from any component and persist them
   useEffect(() => {
     const handleLanguageChanged = (lng) => {
       saveLanguage(lng);
@@ -106,7 +110,6 @@ function App() {
     };
   }, [i18n, dispatch]);
 
-  // Compute redirect paths based on auth state
   const loginRedirect = useMemo(() => {
     if (!isAuthenticated) return null;
     return user?.role === 'super_admin' ? '/super-admin' : '/';
@@ -144,8 +147,18 @@ function App() {
         >
           <Route index element={<SuperDashboard />} />
           <Route path="shops" element={<ManageShops />} />
+          <Route path="business-types" element={<BusinessTypes />} />
+          <Route path="categories-library" element={<CategoriesLibrary />} />
           <Route path="plans" element={<ManagePlans />} />
-          <Route path="transactions" element={<Transactions />} />
+          <Route path="active-subscriptions" element={<ActiveSubscriptions />} />
+          <Route path="payments" element={<Payments />} />
+          <Route path="revenue-reports" element={<RevenueReports />} />
+          <Route path="business-reports" element={<BusinessReports />} />
+          <Route path="global-settings" element={<GlobalSettings />} />
+          <Route path="backup-restore" element={<BackupRestore />} />
+          <Route path="activity-logs" element={<ActivityLogs />} />
+          <Route path="my-profile" element={<MyProfile />} />
+          <Route path="change-password" element={<ChangePassword />} />
           <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
 

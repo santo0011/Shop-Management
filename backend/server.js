@@ -20,6 +20,7 @@ const purchaseRoutes = require('./routes/purchaseRoutes');
 const saleRoutes = require('./routes/saleRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
+const businessTypeRoutes = require('./routes/businessTypeRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 
@@ -54,6 +55,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/business-types', businessTypeRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
