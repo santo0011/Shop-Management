@@ -61,9 +61,114 @@ const mergeModules = (businessType, shopModules) => {
   return { ...getBusinessTypeDefaults(businessType).modules, ...explicit };
 };
 
+// ─── Skeleton Loading ────────────────────────────────────────
+const SettingsSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="mb-4">
+      <div style={{
+        height: 28, width: '35%', marginBottom: 8,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 14, width: '25%',
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 6,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Desktop skeleton — mirrors settings-layout */}
+    <div className="settings-layout" style={{ display: 'flex', gap: '1.5rem' }}>
+      {/* Sidebar */}
+      <aside className="settings-sidebar" style={{ flex: '0 0 240px' }}>
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} style={{
+            height: 42, marginBottom: 4,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 10,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </aside>
+
+      {/* Content */}
+      <div className="settings-content" style={{ flex: 1 }}>
+        {/* Settings card skeleton */}
+        <div className="settings-card" style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--border-radius-lg)',
+          overflow: 'hidden',
+        }}>
+          {/* Section header */}
+          <div className="settings-card-header" style={{
+            display: 'flex', alignItems: 'center', gap: 14,
+            padding: '1.25rem 1.5rem',
+            borderBottom: '1px solid var(--border-color)',
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{ flex: 1 }}>
+              <div style={{
+                height: 18, width: '40%', marginBottom: 6,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 6,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{
+                height: 12, width: '60%',
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            </div>
+          </div>
+
+          {/* Form fields */}
+          <div style={{ padding: '1.5rem' }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{ marginBottom: '1.25rem' }}>
+                <div style={{
+                  height: 12, width: '20%', marginBottom: 8,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 42, width: '100%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 8,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            ))}
+
+            {/* Save button */}
+            <div style={{
+              height: 42, width: '30%', marginTop: '0.5rem',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const Settings = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch();
+  const [loading, setLoading] = useState(true);
 
   const SECTIONS = [
     { key: 'shop', label: t('settingsPage.shopInformation'), icon: BiStore, description: t('settingsPage.shopInfoDesc') },
@@ -177,8 +282,10 @@ const Settings = () => {
       setCustomUnits(s.settings?.customUnits || []);
       setProfileData(profile);
       setProfileForm({ name: profile.name || '', phone: profile.phone || '', avatar: profile.avatar || '' });
+      setLoading(false);
     } catch (err) {
       console.error(err);
+      setLoading(false);
     }
   };
 
@@ -1401,6 +1508,8 @@ const Settings = () => {
   };
 
   const saveAction = SAVE_ACTIONS[activeSection];
+
+  if (loading) return <SettingsSkeletonLoader />;
 
   return (
     <div>

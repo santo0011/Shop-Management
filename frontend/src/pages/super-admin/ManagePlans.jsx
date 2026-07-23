@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { BiPlus, BiEdit, BiTrash, BiStore, BiX, BiCheck, BiUser, BiPackage, BiStar } from 'react-icons/bi';
+import toast from 'react-hot-toast';
 
 const REQUIRED_PLAN_FIELDS = ['name', 'price', 'duration'];
 
@@ -257,9 +258,12 @@ const ManagePlans = () => {
     try {
       await api.delete(`/plans/${id}`, { _skipLoading: true });
       setDeleteConfirm(null);
+      toast.success(t('managePlansPage.deletePlanSuccess'));
       fetchPlans();
     } catch (err) {
-      console.error(err);
+      setDeleteConfirm(null);
+      const errorMessage = err.response?.data?.message || t('toast.actionFailed');
+      toast.error(errorMessage);
     }
   };
 
