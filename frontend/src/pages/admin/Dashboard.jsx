@@ -205,7 +205,23 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [salesPeriod, setSalesPeriod] = useState(7);
   const [theme, setTheme] = useState('light');
+  const [subStatus, setSubStatus] = useState(null);
   const initialLoadDone = useRef(false);
+
+  // Fetch subscription status for expiry warning
+  useEffect(() => {
+    const fetchSubStatus = async () => {
+      try {
+        const { data } = await api.get('/subscription/status', { _skipLoading: true });
+        setSubStatus(data);
+      } catch (err) {
+        // Silently fail
+      }
+    };
+    fetchSubStatus();
+    const interval = setInterval(fetchSubStatus, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Simple theme detection — read once on mount, no MutationObserver
   useEffect(() => {
@@ -376,6 +392,32 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Subscription Expiry Warning */}
+      {subStatus && !subStatus.isExpired && subStatus.daysRemaining > 0 && subStatus.daysRemaining <= 3 && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fff8e1, #ffecb3)',
+          border: '1px solid #ffc107', borderRadius: 14,
+          padding: '1rem 1.5rem', marginBottom: '1.5rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: '0.75rem',
+        }}>
+          <span style={{ color: '#e65100', fontWeight: 600 }}>
+            ⚠ Your subscription will expire in {subStatus.daysRemaining} day{subStatus.daysRemaining > 1 ? 's' : ''}. Please contact your Super Admin.
+          </span>
+          <a
+            href="/subscription"
+            style={{
+              padding: '0.5rem 1.25rem', borderRadius: 8, border: 'none',
+              background: '#ff8f00', color: 'white', fontWeight: 700,
+              cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'none',
+              display: 'inline-block',
+            }}
+          >
+            Renew Now
+          </a>
+        </div>
+      )}
 
       {/* Stat Cards - 3 per row desktop, 2 per row mobile */}
       <div className="row g-3 mb-4">

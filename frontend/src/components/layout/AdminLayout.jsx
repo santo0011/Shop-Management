@@ -1,28 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import api from '../../services/api';
 import { setMyShop } from '../../redux/slices/shopSlice';
 
-// How often to check that this shop is still active while the user sits
-// idle on a page (no other API calls firing). Keeps deactivation-by-
-// Super-Admin effective without requiring a manual page refresh.
 const SHOP_STATUS_POLL_INTERVAL_MS = 30000;
+
+// Protected routes for when subscription is NOT expired
+const PROTECTED_ROUTES = [
+  '/pos',
+  '/products',
+  '/categories',
+  '/suppliers',
+  '/customers',
+  '/purchases',
+  '/sales',
+  '/reports',
+  '/settings',
+];
+
+// Routes always allowed (even when expired)
+const ALLOWED_ROUTES = [
+  '/dashboard',
+  '/',
+  '/subscription',
+];
 
 const AdminLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const dispatch = useDispatch();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Check subscription status and protect routes
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const { data } = await api.get('/subscription/status', { _skipLoading: true });
+        if (data.isExpired) {
+          setSubscriptionExpired(true);
+          // Redirect to dashboard if trying to access protected routes
+          const isProtected = PROTECTED_ROUTES.some(route => 
+            location.pathname === route || location.pathname.startsWith(route + '/')
+          );
+          if (isProtected) {
+            navigate('/dashboard', { replace: true });
+          }
+        } else {
+          setSubscriptionExpired(false);
+        }
+      } catch (err) {
+        // Silently fail - may be offline
+      }
+    };
+
+    checkAccess();
+    const interval = setInterval(checkAccess, SHOP_STATUS_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [location.pathname, navigate]);
 
   // Periodically ping an authenticated endpoint so the backend's shop-status
-  // check (in the `protect` middleware) gets a chance to run even when the
-  // user isn't actively triggering requests. If the shop was deactivated,
-  // the response interceptor in services/api.js handles the forced logout.
-  // Reused for a second purpose: the response includes the shop's business
-  // configuration (businessType, settings.enabledModules/customUnits), so we
-  // keep Redux's `myShop` fresh from the same call instead of a second fetch.
+  // check gets a chance to run even when the user isn't actively triggering requests.
   useEffect(() => {
     const fetchProfile = () => {
       api.get('/auth/profile', { _skipLoading: true })
@@ -34,14 +76,12 @@ const AdminLayout = () => {
     return () => clearInterval(interval);
   }, [dispatch]);
 
-  // Close mobile sidebar on route change
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 991.98) {
         setMobileOpen(false);
       }
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);

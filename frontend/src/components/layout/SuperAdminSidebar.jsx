@@ -17,6 +17,7 @@ import {
   BiChevronDown,
   BiChevronRight,
   BiX,
+  BiTime,
 } from 'react-icons/bi';
 
 const NAV_DATA = [
@@ -44,8 +45,10 @@ const NAV_DATA = [
     icon: BiCreditCard,
     items: [
       { path: '/super-admin/plans', icon: BiCreditCard, labelKey: 'nav.plans' },
+      { path: '/super-admin/subscriptions', icon: BiDollar, labelKey: 'nav.subscriptions' },
       { path: '/super-admin/active-subscriptions', icon: BiDollar, labelKey: 'nav.activeSubscriptions' },
-      { path: '/super-admin/payments', icon: BiDollar, labelKey: 'nav.payments' },
+      { path: '/super-admin/expiring-soon', icon: BiTime, labelKey: 'nav.expiringSoon' },
+      { path: '/super-admin/subscription-history', icon: BiHistory, labelKey: 'nav.subscriptionHistory' },
     ],
   },
   {

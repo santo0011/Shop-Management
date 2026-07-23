@@ -23,6 +23,8 @@ const superAdminRoutes = require('./routes/superAdminRoutes');
 const businessTypeRoutes = require('./routes/businessTypeRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const { startScheduler } = require('./services/schedulerService');
 
 const app = express();
 
@@ -56,6 +58,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/business-types', businessTypeRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -102,3 +105,6 @@ const startServer = (port) => {
 };
 
 startServer(PORT);
+
+// Start background scheduler for subscription management
+startScheduler();

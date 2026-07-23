@@ -1,11 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { toggleTheme } from '../../redux/slices/themeSlice';
 import { updateLanguage } from '../../redux/slices/authSlice';
 import api from '../../services/api';
-import { BiMenu, BiSun, BiMoon, BiUser, BiGlobe, BiLogOut, BiBell } from 'react-icons/bi';
+import { BiMenu, BiSun, BiMoon, BiUser, BiGlobe, BiLogOut, BiBell, BiCheckDouble } from 'react-icons/bi';
 import GlobalSearch from '../common/GlobalSearch';
+import NotificationDropdown from '../common/NotificationDropdown';
 import Swal from 'sweetalert2';
 import { showToast } from '../../utils/toast';
 
@@ -123,6 +125,9 @@ const Header = ({ onToggleSidebar }) => {
         >
           {mode === 'light' ? <BiMoon /> : <BiSun />}
         </button>
+
+        {/* Notifications */}
+        <NotificationDropdown />
 
         {/* User Profile */}
         <div className="dropdown-premium" ref={profileRef}>

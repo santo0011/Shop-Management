@@ -39,6 +39,9 @@ import SuperAdminSettings from './pages/super-admin/Settings';
 import BusinessTypes from './pages/super-admin/BusinessTypes';
 import CategoriesLibrary from './pages/super-admin/CategoriesLibrary';
 import ActiveSubscriptions from './pages/super-admin/ActiveSubscriptions';
+import Subscriptions from './pages/super-admin/Subscriptions';
+import SubscriptionHistory from './pages/super-admin/SubscriptionHistory';
+import ExpiringSoon from './pages/super-admin/ExpiringSoon';
 import Payments from './pages/super-admin/Payments';
 import RevenueReports from './pages/super-admin/RevenueReports';
 import BusinessReports from './pages/super-admin/BusinessReports';
@@ -151,6 +154,9 @@ function App() {
           <Route path="categories-library" element={<CategoriesLibrary />} />
           <Route path="plans" element={<ManagePlans />} />
           <Route path="active-subscriptions" element={<ActiveSubscriptions />} />
+          <Route path="subscriptions" element={<Subscriptions />} />
+          <Route path="subscription-history" element={<SubscriptionHistory />} />
+          <Route path="expiring-soon" element={<ExpiringSoon />} />
           <Route path="payments" element={<Payments />} />
           <Route path="revenue-reports" element={<RevenueReports />} />
           <Route path="business-reports" element={<BusinessReports />} />

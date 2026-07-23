@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
-import { BiPlus, BiEdit, BiTrash, BiStore, BiX, BiCheck, BiDollar, BiUser, BiPackage, BiStar } from 'react-icons/bi';
+import { BiPlus, BiEdit, BiTrash, BiStore, BiX, BiCheck, BiUser, BiPackage, BiStar } from 'react-icons/bi';
 
 const REQUIRED_PLAN_FIELDS = ['name', 'price', 'duration'];
 
@@ -158,7 +158,7 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label className="form-label"><BiDollar style={{ marginRight: '4px' }} />{t('common.price')} <span style={{color: 'var(--danger)'}}>*</span></label>
+                  <label className="form-label">💰 {t('common.price')} <span style={{color: 'var(--danger)'}}>*</span></label>
                   <input type="number" {...field('price')} placeholder={t('managePlansPage.pricePlaceholder')} />
                   {errors.price && <div className="invalid-feedback-premium">{errors.price}</div>}
                 </div>
@@ -281,40 +281,167 @@ const ManagePlans = () => {
       {/* Plans Grid */}
       <div className="row g-3">
         {loading ? (
-          <div className="col-12 text-center py-5">
-            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-          </div>
+          <>
+            {[1,2,3].map(i => (
+              <div key={i} className="col-md-4">
+                <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+                  <div className="premium-card-body">
+                    <div className="d-flex justify-content-between mb-3">
+                      <div style={{
+                        height: 20, width: '60%',
+                        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                        backgroundSize: '200% 100%', borderRadius: 6,
+                        animation: 'shimmer 1.5s infinite',
+                      }} />
+                      <div style={{
+                        height: 20, width: 60,
+                        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                        backgroundSize: '200% 100%', borderRadius: 6,
+                        animation: 'shimmer 1.5s infinite',
+                      }} />
+                    </div>
+                    <div style={{
+                      height: 36, width: '40%', marginBottom: '1rem',
+                      background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                      backgroundSize: '200% 100%', borderRadius: 6,
+                      animation: 'shimmer 1.5s infinite',
+                    }} />
+                    <div style={{
+                      height: 14, width: '90%', marginBottom: 8,
+                      background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                      backgroundSize: '200% 100%', borderRadius: 6,
+                      animation: 'shimmer 1.5s infinite',
+                    }} />
+                    <div style={{
+                      height: 14, width: '70%', marginBottom: '1rem',
+                      background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                      backgroundSize: '200% 100%', borderRadius: 6,
+                      animation: 'shimmer 1.5s infinite',
+                    }} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{
+                        height: 32, width: 80,
+                        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                        backgroundSize: '200% 100%', borderRadius: 6,
+                        animation: 'shimmer 1.5s infinite',
+                      }} />
+                      <div style={{
+                        height: 32, width: 80,
+                        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                        backgroundSize: '200% 100%', borderRadius: 6,
+                        animation: 'shimmer 1.5s infinite',
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+          </>
         ) : plans.length === 0 ? (
           <div className="col-12 text-center py-5" style={{ color: 'var(--text-muted)' }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📋</div>
             {t('managePlansPage.noPlansFound')}
           </div>
         ) : plans.map((plan) => (
-          <div key={plan._id} className="col-md-4">
-            <div className={`premium-card ${plan.isPopular ? 'border-primary' : ''}`}>
-              <div className="premium-card-body">
-                <div className="d-flex justify-content-between align-items-start mb-3">
-                  <div>
-                    <h5 className="mb-0" style={{ fontWeight: 700 }}>{plan.name}</h5>
-                    {plan.nameBn && <small style={{ color: 'var(--text-muted)' }}>{plan.nameBn}</small>}
+          <div key={plan._id} className="col-md-6 col-lg-4">
+            <div style={{
+              background: '#ffffff', borderRadius: 16, overflow: 'hidden',
+              border: plan.isPopular ? '2px solid #6C63FF' : '1px solid #e8e8f0',
+              boxShadow: plan.isPopular ? '0 4px 24px rgba(108,99,255,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
+              transition: 'all 0.25s ease',
+              position: 'relative', height: '100%',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = plan.isPopular ? '0 4px 24px rgba(108,99,255,0.12)' : '0 1px 4px rgba(0,0,0,0.04)'; }}
+            >
+              {/* Popular badge */}
+              {plan.isPopular && (
+                <div style={{
+                  position: 'absolute', top: 16, right: 16,
+                  background: 'linear-gradient(135deg, #6C63FF, #3a0ca3)',
+                  color: 'white', padding: '3px 14px', borderRadius: 100,
+                  fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.5px',
+                  boxShadow: '0 2px 8px rgba(108,99,255,0.3)',
+                }}>
+                  {t('managePlansPage.popular')}
+                </div>
+              )}
+
+              {/* Card content - compact */}
+              <div style={{ padding: '1.25rem 1.5rem 1rem' }}>
+                {/* Header: badge + name */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h5 style={{ margin: 0, fontWeight: 800, fontSize: '1.05rem', color: '#1a1a2e' }}>{plan.name}</h5>
+                  {plan.isPopular && (
+                    <span style={{
+                      background: 'linear-gradient(135deg, #6C63FF, #3a0ca3)',
+                      color: 'white', padding: '2px 10px', borderRadius: 100,
+                      fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.3px',
+                    }}>
+                      {t('managePlansPage.popular')}
+                    </span>
+                  )}
+                </div>
+                {plan.nameBn && <span style={{ fontSize: '0.72rem', color: '#9a9ab8', display: 'block', marginBottom: '0.5rem' }}>{plan.nameBn}</span>}
+
+                {/* Price row */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#6C63FF' }}>₹{plan.price}</span>
+                  <span style={{ color: '#9a9ab8', fontSize: '0.78rem', fontWeight: 500 }}>/{plan.duration}</span>
+                </div>
+
+                {/* Description (short inline) */}
+                {plan.description && (
+                  <p style={{ color: '#6b6b8d', fontSize: '0.78rem', marginBottom: '0.65rem', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {plan.description}
+                  </p>
+                )}
+
+                {/* Limits row */}
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.65rem', fontSize: '0.75rem', color: '#6b6b8d' }}>
+                  <span><BiUser size={13} color="#6C63FF" style={{ verticalAlign: 'middle', marginRight: 3 }} />{plan.maxUsers} {t('managePlansPage.users')}</span>
+                  <span><BiPackage size={13} color="#00D9A6" style={{ verticalAlign: 'middle', marginRight: 3 }} />{plan.maxProducts} {t('managePlansPage.products')}</span>
+                </div>
+
+                {/* Features - compact */}
+                {plan.features?.length > 0 && (
+                  <div style={{ marginBottom: '0.65rem' }}>
+                    {plan.features.slice(0, 3).map((f, i) => (
+                      <div key={i} style={{ padding: '0.12rem 0', fontSize: '0.76rem', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ color: '#00D9A6', fontWeight: 700 }}>✓</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
+                      </div>
+                    ))}
+                    {plan.features.length > 3 && (
+                      <div style={{ fontSize: '0.7rem', color: '#9a9ab8', paddingLeft: 16 }}>{t('managePlansPage.moreFeatures', { count: plan.features.length - 3 })}</div>
+                    )}
                   </div>
-                  {plan.isPopular && <span className="badge badge-primary">{t('managePlansPage.popular')}</span>}
-                </div>
-                <div className="mb-3">
-                  <span style={{ fontSize: '2rem', fontWeight: 800 }}>₹{plan.price}</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>/{plan.duration}</span>
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{plan.description}</p>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  <div><BiUser style={{ marginRight: '4px' }} />{plan.maxUsers} {t('managePlansPage.users')}</div>
-                  <div><BiPackage style={{ marginRight: '4px' }} />{plan.maxProducts} {t('managePlansPage.products')}</div>
-                </div>
-                <div className="d-flex gap-2 mt-3">
-                  <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => openEditDrawer(plan)}>
-                    <BiEdit /> {t('common.edit')}
+                )}
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => openEditDrawer(plan)} style={{
+                    flex: 1, padding: '0.4rem', borderRadius: 8, border: '1px solid #e8e8f0',
+                    background: '#ffffff', color: '#555', fontWeight: 600, fontSize: '0.75rem',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    transition: 'all 0.15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#6C63FF'; e.currentTarget.style.color = '#6C63FF'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e8e8f0'; e.currentTarget.style.color = '#555'; }}
+                  >
+                    <BiEdit size={13} /> {t('common.edit')}
                   </button>
-                  <button className="btn-premium btn-premium-danger btn-premium-sm" onClick={() => setDeleteConfirm(plan._id)}>
-                    <BiTrash /> {t('common.delete')}
+                  <button onClick={() => setDeleteConfirm(plan._id)} style={{
+                    flex: 1, padding: '0.4rem', borderRadius: 8, border: '1px solid #FF6B6B',
+                    background: '#ffffff', color: '#FF6B6B', fontWeight: 600, fontSize: '0.75rem',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    transition: 'all 0.15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#FF6B6B15'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+                  >
+                    <BiTrash size={13} /> {t('common.delete')}
                   </button>
                 </div>
               </div>

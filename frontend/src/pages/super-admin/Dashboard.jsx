@@ -17,8 +17,22 @@ const SuperDashboard = () => {
   const fetchData = useCallback(async () => {
     setError(null);
     try {
-      const { data: result } = await api.get('/super-admin/dashboard', { _skipLoading: true });
-      setData(result);
+      const [dashboardRes, subDashboardRes] = await Promise.all([
+        api.get('/super-admin/dashboard', { _skipLoading: true }),
+        api.get('/subscription/dashboard', { _skipLoading: true }),
+      ]);
+      // Merge data carefully - subscription dashboard has numeric monthlyRevenue
+      // which conflicts with the array monthlyRevenue from main dashboard
+      setData({
+        ...dashboardRes.data,
+        ...subDashboardRes.data,
+        // Keep the array version from main dashboard, not the numeric one
+        monthlyRevenue: dashboardRes.data?.monthlyRevenue,
+        // Add subscription-specific fields separately
+        queuedSubscriptions: subDashboardRes.data?.queuedSubscriptions || 0,
+        expiredToday: subDashboardRes.data?.expiredToday || 0,
+        expiringIn3Days: subDashboardRes.data?.expiringIn3Days || 0,
+      });
     } catch (err) {
       setError(err.response?.data?.message || t('dashboard.failedToLoadData'));
     }

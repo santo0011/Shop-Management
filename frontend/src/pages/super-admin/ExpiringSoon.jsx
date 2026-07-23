@@ -4,9 +4,10 @@ import api from '../../services/api';
 import showToast from '../../utils/toast';
 import {
   BiSearch, BiFilter, BiX, BiChevronLeft, BiChevronRight,
-  BiRefresh, BiStore, BiCalendar, BiCheckCircle, BiDollar,
-  BiInfoCircle, BiTime,
+  BiRefresh, BiStore, BiTime, BiCalendar, BiError,
+  BiCheckCircle, BiBell, BiInfoCircle,
 } from 'react-icons/bi';
+import Swal from 'sweetalert2';
 
 // ─── Color Palette ────────────────────────────────────────────
 const COLORS = {
@@ -55,21 +56,19 @@ const formatNumber = (num, lang) => {
 };
 
 // ─── Status Badge ─────────────────────────────────────────────
-const StatusBadge = ({ status, size = 'md' }) => {
+const StatusBadge = ({ status }) => {
   const { t } = useTranslation();
   const map = {
-    active:    { bg: COLORS.successLight, color: '#00a67e', dot: '#00D9A6', labelKey: 'saActiveSubscriptionsPage.statusActive' },
-    queued:    { bg: COLORS.warningLight, color: '#cc8a00', dot: '#FFB545', labelKey: 'saActiveSubscriptionsPage.statusQueued' },
-    expired:   { bg: COLORS.dangerLight,  color: '#cc3b3b', dot: '#FF6B6B', labelKey: 'saActiveSubscriptionsPage.statusExpired' },
-    cancelled: { bg: COLORS.greyLight,    color: '#6b6b8d', dot: '#9a9ab8', labelKey: 'saActiveSubscriptionsPage.statusCancelled' },
+    active:    { bg: COLORS.successLight, color: '#00a67e', dot: '#00D9A6', labelKey: 'saExpiringSoonPage.statusActive' },
+    queued:    { bg: COLORS.warningLight, color: '#cc8a00', dot: '#FFB545', labelKey: 'saExpiringSoonPage.statusQueued' },
+    expired:   { bg: COLORS.dangerLight,  color: '#cc3b3b', dot: '#FF6B6B', labelKey: 'saExpiringSoonPage.statusExpired' },
+    cancelled: { bg: COLORS.greyLight,    color: '#6b6b8d', dot: '#9a9ab8', labelKey: 'saExpiringSoonPage.statusCancelled' },
   };
   const s = map[status] || map.expired;
-  const isSm = size === 'sm';
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: isSm ? 4 : 6,
-      padding: isSm ? '2px 8px' : '4px 12px',
-      borderRadius: 100, fontSize: isSm ? '0.7rem' : '0.78rem',
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 10px', borderRadius: 100, fontSize: '0.72rem',
       fontWeight: 700, background: s.bg, color: s.color,
       letterSpacing: '0.2px', whiteSpace: 'nowrap',
       transition: 'transform 0.15s',
@@ -77,14 +76,19 @@ const StatusBadge = ({ status, size = 'md' }) => {
       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
       onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
     >
-      <span style={{
-        width: isSm ? 5 : 7, height: isSm ? 5 : 7,
-        borderRadius: '50%', background: s.dot,
-        display: 'inline-block', flexShrink: 0,
-      }} />
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, display: 'inline-block', flexShrink: 0 }} />
       {t(s.labelKey)}
     </span>
   );
+};
+
+// ─── Urgency Badge ────────────────────────────────────────────
+const UrgencyBadge = ({ days }) => {
+  const { t } = useTranslation();
+  if (days <= 0) return <span style={{ color: COLORS.danger, fontWeight: 700 }}>{t('saExpiringSoonPage.urgencyExpired')}</span>;
+  if (days === 1) return <span style={{ color: COLORS.danger, fontWeight: 700 }}>{t('saExpiringSoonPage.urgencyToday')}</span>;
+  if (days <= 3) return <span style={{ color: '#e65100', fontWeight: 700 }}>{t('saExpiringSoonPage.urgencyDays', { days })}</span>;
+  return <span style={{ color: COLORS.textSecondary }}>{t('saExpiringSoonPage.urgencyDaysNormal', { days })}</span>;
 };
 
 // ─── Skeleton Row ────────────────────────────────────────────
@@ -93,7 +97,7 @@ const SkeletonRow = () => (
     display: 'flex', alignItems: 'center', gap: 16,
     padding: '1rem 1.5rem', borderBottom: `1px solid ${COLORS.border}`,
   }}>
-    {[35, 25, 20, 18, 15].map((w, i) => (
+    {[35, 25, 20, 18, 15, 12].map((w, i) => (
       <div key={i} style={{
         flex: i < 2 ? w : 1, height: 14,
         background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
@@ -134,7 +138,7 @@ const KpiCard = ({ icon: Icon, label, value, color, subtitle }) => (
 );
 
 // ─── Drawer ──────────────────────────────────────────────────
-const Drawer = ({ open, onClose, title, children, width = 500 }) => (
+const Drawer = ({ open, onClose, title, children, width = 480 }) => (
   <>
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
@@ -176,38 +180,45 @@ const Drawer = ({ open, onClose, title, children, width = 500 }) => (
 );
 
 // ─── Main Component ──────────────────────────────────────────
-const ActiveSubscriptions = () => {
+const ExpiringSoon = () => {
   const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [subscriptions, setSubscriptions] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [daysFilter, setDaysFilter] = useState(7);
   const [selectedSub, setSelectedSub] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const lang = i18n.language;
 
-  // KPI data
-  const [totalActive, setTotalActive] = useState(0);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [expiringSoon, setExpiringSoon] = useState(0);
-  const [queuedCount, setQueuedCount] = useState(0);
+  // KPI counts
+  const [expiringToday, setExpiringToday] = useState(0);
+  const [expiringIn3, setExpiringIn3] = useState(0);
+  const [expiringIn7, setExpiringIn7] = useState(0);
+  const [totalExpiring, setTotalExpiring] = useState(0);
 
-  useEffect(() => { fetchData(); }, [page]);
+  useEffect(() => { fetchExpiring(); }, [page, daysFilter]);
 
-  const fetchData = async () => {
+  const fetchExpiring = async () => {
     setLoading(true);
     try {
-      const [subsRes, dashRes] = await Promise.all([
-        api.get(`/subscription/all?page=${page}&limit=20&status=active`, { _skipLoading: true }),
-        api.get('/subscription/dashboard', { _skipLoading: true }).catch(() => ({ data: {} })),
-      ]);
-      setSubscriptions(subsRes.data.subscriptions || []);
-      setTotalPages(subsRes.data.pages || 1);
-      setTotalActive(dashRes.data?.activeSubscriptions || 0);
-      setTotalRevenue(dashRes.data?.totalRevenue || 0);
-      setExpiringSoon(dashRes.data?.expiringIn3Days || 0);
-      setQueuedCount(dashRes.data?.queuedSubscriptions || 0);
+      const { data } = await api.get(
+        `/subscription/expiring?page=${page}&limit=20&days=${daysFilter}`,
+        { _skipLoading: true }
+      );
+      const subs = data.subscriptions || [];
+      setSubscriptions(subs);
+      setTotalPages(data.pages || 1);
+
+      // Calculate KPI counts
+      const today = subs.filter(s => s.remainingDays <= 0).length;
+      const in3 = subs.filter(s => s.remainingDays > 0 && s.remainingDays <= 3).length;
+      const in7 = subs.filter(s => s.remainingDays > 3 && s.remainingDays <= 7).length;
+      setExpiringToday(today);
+      setExpiringIn3(in3);
+      setExpiringIn7(in7);
+      setTotalExpiring(subs.length);
     } catch (err) {
       console.error(err);
     } finally {
@@ -227,15 +238,33 @@ const ActiveSubscriptions = () => {
       const { data } = await api.get(`/subscription/${sub._id}`, { _skipLoading: true });
       setSelectedSub(data);
       setDrawerOpen(true);
-    } catch { showToast.error(t('saActiveSubscriptionsPage.failedToLoadDetails')); }
+    } catch { showToast.error(t('saExpiringSoonPage.failedToLoadDetails')); }
+  };
+
+  const handleRenew = (sub) => {
+    Swal.fire({
+      title: t('saExpiringSoonPage.renewTitle'),
+      text: t('saExpiringSoonPage.renewText', { shop: sub.shop?.name, plan: sub.plan?.name }),
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: COLORS.primary,
+      confirmButtonText: t('saExpiringSoonPage.renewConfirm'),
+      cancelButtonText: t('saExpiringSoonPage.renewCancel'),
+      background: COLORS.card,
+      color: COLORS.text,
+    }).then(result => {
+      if (result.isConfirmed) {
+        showToast.info(t('saExpiringSoonPage.renewInfo'));
+      }
+    });
   };
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: 1360, margin: '0 auto' }}>
       <style>{`
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        .sub-row { transition: background 0.15s, transform 0.15s; }
-        .sub-row:hover { background: #f8f9ff; transform: translateX(2px); }
+        .exp-row { transition: background 0.15s, transform 0.15s; }
+        .exp-row:hover { background: #f8f9ff; transform: translateX(2px); }
       `}</style>
 
       {/* ── Header ─────────────────────────────────────────── */}
@@ -245,13 +274,13 @@ const ActiveSubscriptions = () => {
       }}>
         <div>
           <h2 style={{ margin: 0, fontWeight: 800, fontSize: '1.5rem', color: COLORS.text }}>
-            {t('saActiveSubscriptionsPage.title')}
+            {t('saExpiringSoonPage.title')}
           </h2>
           <p style={{ margin: '0.25rem 0 0', color: COLORS.textSecondary, fontSize: '0.85rem' }}>
-            {t('saActiveSubscriptionsPage.subtitle')}
+            {t('saExpiringSoonPage.subtitle')}
           </p>
         </div>
-        <button onClick={fetchData} style={{
+        <button onClick={fetchExpiring} style={{
           padding: '0.55rem 1.25rem', borderRadius: 10, border: `1px solid ${COLORS.border}`,
           background: COLORS.card, color: COLORS.text, fontWeight: 600, fontSize: '0.85rem',
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
@@ -260,7 +289,7 @@ const ActiveSubscriptions = () => {
           onMouseEnter={e => e.currentTarget.style.borderColor = COLORS.primary}
           onMouseLeave={e => e.currentTarget.style.borderColor = COLORS.border}
         >
-          <BiRefresh /> {t('saActiveSubscriptionsPage.refresh')}
+          <BiRefresh /> {t('saExpiringSoonPage.refresh')}
         </button>
       </div>
 
@@ -269,10 +298,10 @@ const ActiveSubscriptions = () => {
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '1rem', marginBottom: '1.5rem',
       }}>
-        <KpiCard icon={BiCheckCircle} label={t('saActiveSubscriptionsPage.kpiActiveSubscriptions')} value={totalActive} color={COLORS.success} subtitle={t('saActiveSubscriptionsPage.kpiActiveSubscriptionsSub')} />
-        <KpiCard icon={BiTime} label={t('saActiveSubscriptionsPage.kpiQueued')} value={queuedCount} color={COLORS.warning} subtitle={t('saActiveSubscriptionsPage.kpiQueuedSub')} />
-        <KpiCard icon={BiInfoCircle} label={t('saActiveSubscriptionsPage.kpiExpiringIn3Days')} value={expiringSoon} color={COLORS.danger} subtitle={t('saActiveSubscriptionsPage.kpiExpiringIn3DaysSub')} />
-        <KpiCard icon={BiDollar} label={t('saActiveSubscriptionsPage.kpiTotalRevenue')} value={`₹${formatNumber(totalRevenue, lang)}`} color={COLORS.primary} subtitle={t('saActiveSubscriptionsPage.kpiTotalRevenueSub')} />
+        <KpiCard icon={BiError} label={t('saExpiringSoonPage.kpiExpiringToday')} value={expiringToday} color={COLORS.danger} subtitle={t('saExpiringSoonPage.kpiExpiringTodaySub')} />
+        <KpiCard icon={BiBell} label={t('saExpiringSoonPage.kpiWithin3Days')} value={expiringIn3} color={COLORS.warning} subtitle={t('saExpiringSoonPage.kpiWithin3DaysSub')} />
+        <KpiCard icon={BiTime} label={t('saExpiringSoonPage.kpiWithin7Days')} value={expiringIn7} color="#17a2b8" subtitle={t('saExpiringSoonPage.kpiWithin7DaysSub')} />
+        <KpiCard icon={BiCheckCircle} label={t('saExpiringSoonPage.kpiTotalExpiring')} value={totalExpiring} color={COLORS.primary} subtitle={t('saExpiringSoonPage.kpiTotalExpiringSub')} />
       </div>
 
       {/* ── Filters ────────────────────────────────────────── */}
@@ -280,6 +309,27 @@ const ActiveSubscriptions = () => {
         display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem',
         flexWrap: 'wrap',
       }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: COLORS.textSecondary }}>
+          <BiFilter size={16} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{t('saExpiringSoonPage.filterPeriod')}</span>
+        </div>
+        {[
+          { value: 1, labelKey: 'saExpiringSoonPage.filterToday' },
+          { value: 3, labelKey: 'saExpiringSoonPage.filter3Days' },
+          { value: 7, labelKey: 'saExpiringSoonPage.filter7Days' },
+          { value: 14, labelKey: 'saExpiringSoonPage.filter14Days' },
+          { value: 30, labelKey: 'saExpiringSoonPage.filter30Days' },
+        ].map(opt => (
+          <button key={opt.value} onClick={() => { setDaysFilter(opt.value); setPage(1); }} style={{
+            padding: '0.4rem 1rem', borderRadius: 100, border: `1px solid ${daysFilter === opt.value ? COLORS.primary : COLORS.border}`,
+            background: daysFilter === opt.value ? COLORS.primaryLight : COLORS.card,
+            color: daysFilter === opt.value ? COLORS.primary : COLORS.textSecondary,
+            fontWeight: daysFilter === opt.value ? 700 : 500, fontSize: '0.8rem',
+            cursor: 'pointer', transition: 'all 0.15s',
+          }}>{t(opt.labelKey)}</button>
+        ))}
+
+        {/* Search */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto',
           padding: '0.4rem 0.85rem', borderRadius: 100, border: `1px solid ${COLORS.border}`,
@@ -287,12 +337,12 @@ const ActiveSubscriptions = () => {
         }}>
           <BiSearch size={14} style={{ color: COLORS.textSecondary }} />
           <input
-            placeholder={t('saActiveSubscriptionsPage.searchPlaceholder')}
+            placeholder={t('saExpiringSoonPage.searchPlaceholder')}
             value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            onChange={e => setSearchQuery(e.target.value)}
             style={{
               border: 'none', background: 'none', outline: 'none',
-              color: COLORS.text, fontSize: '0.8rem', width: 200,
+              color: COLORS.text, fontSize: '0.8rem', width: 160,
             }}
           />
           {searchQuery && (
@@ -313,11 +363,11 @@ const ActiveSubscriptions = () => {
           color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px',
           borderBottom: `1px solid ${COLORS.border}`,
         }}>
-          <div style={{ flex: 2 }}>{t('saActiveSubscriptionsPage.tableShopPlan')}</div>
-          <div style={{ flex: 1 }}>{t('saActiveSubscriptionsPage.tableAmount')}</div>
-          <div style={{ flex: 1.2 }}>{t('saActiveSubscriptionsPage.tableExpiryDate')}</div>
-          <div style={{ flex: 0.5 }}>{t('saActiveSubscriptionsPage.tableDaysLeft')}</div>
-          <div style={{ flex: 0.8 }}>{t('saActiveSubscriptionsPage.tableStatus')}</div>
+          <div style={{ flex: 2 }}>{t('saExpiringSoonPage.tableShopPlan')}</div>
+          <div style={{ flex: 1.2 }}>{t('saExpiringSoonPage.tableExpiryDate')}</div>
+          <div style={{ flex: 1 }}>{t('saExpiringSoonPage.tableRemaining')}</div>
+          <div style={{ flex: 0.8 }}>{t('saExpiringSoonPage.tableStatus')}</div>
+          <div style={{ flex: 0.7, textAlign: 'right' }}>{t('saExpiringSoonPage.tableAction')}</div>
         </div>
 
         {/* Rows */}
@@ -327,57 +377,64 @@ const ActiveSubscriptions = () => {
           </>
         ) : filteredSubs.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: COLORS.textSecondary }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem', opacity: 0.3 }}>✅</div>
-            <h4 style={{ color: COLORS.text, marginBottom: '0.25rem' }}>{t('saActiveSubscriptionsPage.emptyTitle')}</h4>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem', opacity: 0.3 }}>📅</div>
+            <h4 style={{ color: COLORS.text, marginBottom: '0.25rem' }}>{t('saExpiringSoonPage.emptyTitle')}</h4>
             <p style={{ fontSize: '0.85rem', margin: 0 }}>
-              {searchQuery ? t('saActiveSubscriptionsPage.emptySearchText') : t('saActiveSubscriptionsPage.emptyText')}
+              {searchQuery
+                ? t('saExpiringSoonPage.emptySearchText')
+                : t('saExpiringSoonPage.emptyText')}
             </p>
           </div>
         ) : (
           filteredSubs.map(sub => {
-            const now = new Date();
-            const end = new Date(sub.endDate);
-            const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-            const isExpiring = daysLeft <= 3;
+            const days = sub.remainingDays || 0;
+            const isUrgent = days <= 1;
+            const isWarning = days <= 3;
+            const rowBg = isUrgent ? COLORS.dangerLight : isWarning ? `${COLORS.warningLight}80` : 'transparent';
 
             return (
-              <div key={sub._id} className="sub-row" onClick={() => viewDetails(sub)} style={{
+              <div key={sub._id} className="exp-row" onClick={() => viewDetails(sub)} style={{
                 display: 'flex', alignItems: 'center', padding: '0.85rem 1.5rem',
                 borderBottom: `1px solid ${COLORS.border}`, cursor: 'pointer',
+                background: rowBg,
               }}>
                 {/* Shop & Plan */}
                 <div style={{ flex: 2, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: '0.9rem', color: COLORS.text }}>
                     {sub.plan?.name || t('common.notAvailable')}
-                    {isExpiring && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>⚠️</span>}
+                    {isUrgent && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>🔥</span>}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <BiStore size={12} /> {sub.shop?.name || t('common.notAvailable')} · {sub.shop?.phone || ''}
+                    <BiStore size={12} /> {sub.shop?.name || t('common.notAvailable')}
                   </div>
-                </div>
-                {/* Amount */}
-                <div style={{ flex: 1, fontWeight: 700, fontSize: '0.9rem', color: COLORS.primary }}>
-                  ₹{sub.totalAmount || sub.amount}
                 </div>
                 {/* Expiry Date */}
                 <div style={{ flex: 1.2, fontSize: '0.82rem', color: COLORS.text }}>
-                  <span style={{ color: isExpiring ? COLORS.danger : COLORS.text, fontWeight: isExpiring ? 700 : 400 }}>
+                  <span style={{ color: isUrgent ? COLORS.danger : COLORS.text, fontWeight: isUrgent ? 700 : 400 }}>
                     {formatDate(sub.endDate, lang)}
                   </span>
                 </div>
-                {/* Days Left */}
-                <div style={{ flex: 0.5, fontSize: '0.85rem' }}>
-                  {daysLeft > 0 ? (
-                    <span style={{ color: isExpiring ? COLORS.danger : COLORS.textSecondary, fontWeight: isExpiring ? 700 : 400 }}>
-                      {t('saActiveSubscriptionsPage.daysRemaining', { days: daysLeft })}
-                    </span>
-                  ) : (
-                    <span style={{ color: COLORS.danger, fontWeight: 700 }}>{t('saActiveSubscriptionsPage.expired')}</span>
-                  )}
+                {/* Remaining Days */}
+                <div style={{ flex: 1, fontSize: '0.85rem' }}>
+                  <UrgencyBadge days={days} />
                 </div>
                 {/* Status */}
                 <div style={{ flex: 0.8 }}>
-                  <StatusBadge status="active" />
+                  <StatusBadge status={sub.status} />
+                </div>
+                {/* Action */}
+                <div style={{ flex: 0.7, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                  <button onClick={() => handleRenew(sub)} style={{
+                    padding: '0.3rem 0.85rem', borderRadius: 8,
+                    border: `1px solid ${COLORS.primary}`,
+                    background: 'transparent', color: COLORS.primary, fontWeight: 600,
+                    fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = COLORS.primaryLight; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    {t('saExpiringSoonPage.btnRenew')}
+                  </button>
                 </div>
               </div>
             );
@@ -394,7 +451,7 @@ const ActiveSubscriptions = () => {
             cursor: page <= 1 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.8rem',
             display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            <BiChevronLeft /> {t('saActiveSubscriptionsPage.paginationPrev')}
+            <BiChevronLeft /> {t('saExpiringSoonPage.paginationPrev')}
           </button>
           {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
             const p = page <= 3 ? i + 1 : (page > totalPages - 2 ? totalPages - 4 + i : page - 2 + i);
@@ -414,7 +471,7 @@ const ActiveSubscriptions = () => {
             cursor: page >= totalPages ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.8rem',
             display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            {t('saActiveSubscriptionsPage.paginationNext')} <BiChevronRight />
+            {t('saExpiringSoonPage.paginationNext')} <BiChevronRight />
           </button>
         </div>
       )}
@@ -422,7 +479,7 @@ const ActiveSubscriptions = () => {
       {/* ──────────────────────────────────────────────────────── */}
       {/* ── DRAWER: Subscription Details ────────────────────── */}
       {/* ──────────────────────────────────────────────────────── */}
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={t('saActiveSubscriptionsPage.drawerTitle')}>
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={t('saExpiringSoonPage.drawerTitle')}>
         {selectedSub && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Header Card */}
@@ -440,27 +497,22 @@ const ActiveSubscriptions = () => {
               <div style={{ fontSize: '1.5rem', fontWeight: 900, marginTop: 12 }}>
                 ₹{selectedSub.totalAmount || selectedSub.amount}
               </div>
-              {(() => {
-                const now = new Date();
-                const end = new Date(selectedSub.endDate);
-                const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-                return (
-                  <div style={{ marginTop: 8, fontSize: '0.85rem', opacity: 0.9 }}>
-                    {daysLeft <= 0
-                      ? t('saActiveSubscriptionsPage.drawerExpired')
-                      : t('saActiveSubscriptionsPage.drawerDaysRemaining', { days: daysLeft, plural: daysLeft > 1 ? 's' : '' })}
-                  </div>
-                );
-              })()}
+              {selectedSub.remainingDays !== undefined && (
+                <div style={{ marginTop: 8, fontSize: '0.85rem', opacity: 0.9 }}>
+                  {selectedSub.remainingDays <= 0
+                    ? t('saExpiringSoonPage.drawerExpired')
+                    : t('saExpiringSoonPage.drawerDaysRemaining', { days: selectedSub.remainingDays, plural: selectedSub.remainingDays > 1 ? 's' : '' })}
+                </div>
+              )}
             </div>
 
             {/* Details Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               {[
-                { label: t('saActiveSubscriptionsPage.drawerStartDate'), value: formatDate(selectedSub.startDate, lang) },
-                { label: t('saActiveSubscriptionsPage.drawerEndDate'), value: formatDate(selectedSub.endDate, lang) },
-                { label: t('saActiveSubscriptionsPage.drawerDuration'), value: selectedSub.plan?.duration || t('common.notAvailable') },
-                { label: t('saActiveSubscriptionsPage.drawerAmount'), value: `₹${selectedSub.totalAmount || selectedSub.amount}` },
+                { label: t('saExpiringSoonPage.drawerStartDate'), value: formatDate(selectedSub.startDate, lang) },
+                { label: t('saExpiringSoonPage.drawerEndDate'), value: formatDate(selectedSub.endDate, lang) },
+                { label: t('saExpiringSoonPage.drawerDuration'), value: selectedSub.plan?.duration || t('common.notAvailable') },
+                { label: t('saExpiringSoonPage.drawerAmount'), value: `₹${selectedSub.totalAmount || selectedSub.amount}` },
               ].map((item, i) => (
                 <div key={i} style={{ background: COLORS.bg, borderRadius: 10, padding: '0.75rem 1rem' }}>
                   <div style={{ fontSize: '0.7rem', color: COLORS.textSecondary, marginBottom: 2 }}>{item.label}</div>
@@ -472,7 +524,7 @@ const ActiveSubscriptions = () => {
             {/* Assigned By */}
             {selectedSub.assignedBy && (
               <div style={{ background: COLORS.bg, borderRadius: 10, padding: '0.75rem 1rem' }}>
-                <div style={{ fontSize: '0.7rem', color: COLORS.textSecondary, marginBottom: 2 }}>{t('saActiveSubscriptionsPage.drawerAssignedBy')}</div>
+                <div style={{ fontSize: '0.7rem', color: COLORS.textSecondary, marginBottom: 2 }}>{t('saExpiringSoonPage.drawerAssignedBy')}</div>
                 <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{selectedSub.assignedBy?.name || t('common.notAvailable')}</div>
               </div>
             )}
@@ -480,7 +532,7 @@ const ActiveSubscriptions = () => {
             {/* Cancellation */}
             {selectedSub.cancellationReason && (
               <div style={{ background: COLORS.dangerLight, borderRadius: 10, padding: '0.75rem 1rem', color: COLORS.danger }}>
-                <strong>{t('saActiveSubscriptionsPage.drawerCancelled')}</strong> {selectedSub.cancellationReason}
+                <strong>{t('saExpiringSoonPage.drawerCancelled')}</strong> {selectedSub.cancellationReason}
                 {selectedSub.cancelledAt && <div style={{ fontSize: '0.75rem', marginTop: 4 }}>{formatDateTime(selectedSub.cancelledAt, lang)}</div>}
               </div>
             )}
@@ -488,18 +540,18 @@ const ActiveSubscriptions = () => {
             {/* Notes */}
             {selectedSub.notes && (
               <div style={{ background: COLORS.bg, borderRadius: 10, padding: '0.75rem 1rem' }}>
-                <div style={{ fontSize: '0.7rem', color: COLORS.textSecondary, marginBottom: 2 }}>{t('saActiveSubscriptionsPage.drawerNotes')}</div>
+                <div style={{ fontSize: '0.7rem', color: COLORS.textSecondary, marginBottom: 2 }}>{t('saExpiringSoonPage.drawerNotes')}</div>
                 <div style={{ fontSize: '0.85rem' }}>{selectedSub.notes}</div>
               </div>
             )}
 
             {/* Timeline */}
             <div>
-              <h6 style={{ fontWeight: 700, marginBottom: '1rem', color: COLORS.text }}>{t('saActiveSubscriptionsPage.drawerTimeline')}</h6>
+              <h6 style={{ fontWeight: 700, marginBottom: '1rem', color: COLORS.text }}>{t('saExpiringSoonPage.drawerTimeline')}</h6>
               <div style={{ position: 'relative', paddingLeft: 24 }}>
                 <div style={{ position: 'absolute', left: 7, top: 0, bottom: 0, width: 2, background: COLORS.border }} />
                 {(selectedSub.timeline || []).length === 0 ? (
-                  <p style={{ color: COLORS.textSecondary, fontSize: '0.85rem' }}>{t('saActiveSubscriptionsPage.drawerNoTimeline')}</p>
+                  <p style={{ color: COLORS.textSecondary, fontSize: '0.85rem' }}>{t('saExpiringSoonPage.drawerNoTimeline')}</p>
                 ) : (
                   selectedSub.timeline.map((event, i) => {
                     const dotColors = {
@@ -526,6 +578,16 @@ const ActiveSubscriptions = () => {
                 )}
               </div>
             </div>
+
+            {/* Renew Button */}
+            <button onClick={() => handleRenew(selectedSub)} style={{
+              width: '100%', padding: '0.75rem', borderRadius: 10, border: 'none',
+              background: `linear-gradient(135deg, ${COLORS.primary}, #3a0ca3)`,
+              color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem',
+              marginTop: '0.5rem',
+            }}>
+              {t('saExpiringSoonPage.drawerRenewBtn')}
+            </button>
           </div>
         )}
       </Drawer>
@@ -533,4 +595,4 @@ const ActiveSubscriptions = () => {
   );
 };
 
-export default ActiveSubscriptions;
+export default ExpiringSoon;

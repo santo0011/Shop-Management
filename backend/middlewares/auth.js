@@ -81,28 +81,52 @@ const checkSubscription = async (req, res, next) => {
     return res.status(404).json({ message: 'Shop not found' });
   }
 
-  const subscriptionEnd = shop.subscriptionStatus === 'trial' ? shop.trialEndsAt : null;
+  const now = new Date();
+  const isExpired = shop.subscriptionStatus === 'expired' || 
+    (shop.subscriptionStatus === 'active' && shop.subscription && await checkIfExpired(shop.subscription)) ||
+    (shop.subscriptionStatus === 'trial' && shop.trialEndsAt < now);
   
-  if (shop.subscriptionStatus === 'expired' || 
-      (shop.subscriptionStatus === 'trial' && shop.trialEndsAt < new Date())) {
-    // Allow access only to limited pages
+  if (isExpired) {
+    // Auto-update status if needed
+    if (shop.subscriptionStatus !== 'expired') {
+      shop.subscriptionStatus = 'expired';
+      await shop.save();
+    }
+    
+    // Allow access only to limited endpoints
     const allowedPaths = [
       '/api/subscription',
-      '/api/auth/profile',
-      '/api/auth/update-password',
-      '/api/shop'
+      '/api/auth',
+      '/api/shop',
+      '/api/notifications',
     ];
     
     const isAllowed = allowedPaths.some(path => req.originalUrl.startsWith(path));
-    if (!isAllowed && req.method !== 'GET') {
+    
+    // For GET requests to dashboard, allow subscription status info
+    const isDashboardStatus = req.originalUrl.startsWith('/api/dashboard') && req.method === 'GET';
+    
+    if (!isAllowed && !isDashboardStatus) {
       return res.status(403).json({ 
-        message: 'Your subscription has expired. Please renew to continue.',
+        success: false,
+        code: 'SUBSCRIPTION_EXPIRED',
+        message: 'Your subscription has expired. Please contact the Super Admin to renew your subscription.',
         subscriptionExpired: true 
       });
     }
   }
   
   next();
+};
+
+// Helper to check if subscription is expired
+const checkIfExpired = async (subscriptionId) => {
+  try {
+    const sub = await require('../models/Subscription').findById(subscriptionId);
+    return sub && sub.endDate < new Date();
+  } catch {
+    return false;
+  }
 };
 
 module.exports = { protect, authorize, checkSubscription };
