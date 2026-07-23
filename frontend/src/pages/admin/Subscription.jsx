@@ -40,11 +40,11 @@ const BLUE_LIGHT = '#6C63FF';
 const StatusBadge = ({ status, size = 'sm' }) => {
   const { t } = useTranslation();
   const map = {
-    active:    { bg: COLORS.successLight, color: '#00a67e', dot: '#00D9A6', label: t('subscriptionPage.active', 'Active') },
-    queued:    { bg: COLORS.warningLight, color: '#cc8a00', dot: '#FFB545', label: t('subscriptionPage.queued', 'Queued') },
-    expired:   { bg: COLORS.dangerLight,  color: '#cc3b3b', dot: '#FF6B6B', label: t('subscriptionPage.expired', 'Expired') },
-    cancelled: { bg: COLORS.greyLight,    color: '#6b6b8d', dot: '#9a9ab8', label: t('subscriptionPage.cancelled', 'Cancelled') },
-    trial:     { bg: '#e3f2fd',           color: '#1565c0', dot: '#1565c0', label: t('subscriptionPage.trial', 'Trial') },
+    active: { bg: COLORS.successLight, color: '#00a67e', dot: '#00D9A6', label: t('subscriptionPage.active', 'Active') },
+    queued: { bg: COLORS.warningLight, color: '#cc8a00', dot: '#FFB545', label: t('subscriptionPage.queued', 'Queued') },
+    expired: { bg: COLORS.dangerLight, color: '#cc3b3b', dot: '#FF6B6B', label: t('subscriptionPage.expired', 'Expired') },
+    cancelled: { bg: COLORS.greyLight, color: '#6b6b8d', dot: '#9a9ab8', label: t('subscriptionPage.cancelled', 'Cancelled') },
+    trial: { bg: '#e3f2fd', color: '#1565c0', dot: '#1565c0', label: t('subscriptionPage.trial', 'Trial') },
   };
   const s = map[status] || map.expired;
   const isSmall = size === 'sm';
@@ -70,23 +70,23 @@ const StatusBadge = ({ status, size = 'sm' }) => {
 const PlanBadge = ({ isCurrent }) => {
   const { t } = useTranslation();
   return (
-  <span style={{
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    padding: '4px 14px', borderRadius: 100,
-    fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.3px',
-    background: isCurrent
-      ? BLUE_GRADIENT
-      : COLORS.greyLight,
-    color: isCurrent ? '#fff' : COLORS.textSecondary,
-    whiteSpace: 'nowrap',
-  }}>
     <span style={{
-      width: 6, height: 6, borderRadius: '50%',
-      background: isCurrent ? '#fff' : COLORS.grey,
-      display: 'inline-block',
-    }} />
-    {isCurrent ? t('subscriptionPage.currentPlanBadge', 'Current Plan') : t('subscriptionPage.available', 'Available')}
-  </span>
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '4px 14px', borderRadius: 100,
+      fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.3px',
+      background: isCurrent
+        ? BLUE_GRADIENT
+        : COLORS.greyLight,
+      color: isCurrent ? '#fff' : COLORS.textSecondary,
+      whiteSpace: 'nowrap',
+    }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%',
+        background: isCurrent ? '#fff' : COLORS.grey,
+        display: 'inline-block',
+      }} />
+      {isCurrent ? t('subscriptionPage.currentPlanBadge', 'Current Plan') : t('subscriptionPage.available', 'Available')}
+    </span>
   );
 };
 
@@ -125,7 +125,7 @@ const SkeletonLoader = () => (
       <div style={{ height: 14, width: '25%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 6, animation: 'shimmer 1.5s infinite' }} />
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-      {[1,2,3,4].map(i => (
+      {[1, 2, 3, 4].map(i => (
         <div key={i} style={{ height: 64, borderRadius: 14, background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
       ))}
     </div>
@@ -139,7 +139,7 @@ const SkeletonLoader = () => (
       </div>
       <div style={{ height: 36, width: '25%', marginBottom: '1rem', background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%)', backgroundSize: '200% 100%', borderRadius: 6, animation: 'shimmer 1.5s infinite' }} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
-        {[1,2,3,4].map(i => (
+        {[1, 2, 3, 4].map(i => (
           <div key={i} style={{ height: 52, background: 'linear-gradient(90deg, rgba(255,255,255,0.08) 25%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.08) 75%)', backgroundSize: '200% 100%', borderRadius: 10, animation: 'shimmer 1.5s infinite' }} />
         ))}
       </div>
@@ -436,17 +436,6 @@ const SubscriptionPage = () => {
           </a>
         </div>
       )}
-
-      {/* ═══ KPI Cards ═══ */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: '0.6rem', marginBottom: '1rem',
-      }}>
-        <KpiCard icon={BiCreditCard} label={t('subscriptionPage.planStatus', 'Plan Status')} value={subStatus === 'active' ? t('subscriptionPage.active', 'Active') : subStatus === 'trial' ? t('subscriptionPage.trial', 'Trial') : subStatus || t('subscriptionPage.na', 'N/A')} color={subStatus === 'active' ? COLORS.success : subStatus === 'trial' ? '#1565c0' : COLORS.grey} />
-        <KpiCard icon={BiCalendar} label={t('subscriptionPage.daysRemaining', 'Days Remaining')} value={daysRemaining > 0 ? t('subscriptionPage.daysRemainingValue', '{{days}}d', { days: daysRemaining }) : t('subscriptionPage.expired', 'Expired')} color={daysRemaining <= 3 ? COLORS.danger : daysRemaining > 0 ? COLORS.success : COLORS.grey} />
-        <KpiCard icon={BiDollar} label={t('subscriptionPage.amount', 'Amount')} value={currentSub ? `₹${currentSub.totalAmount || currentSub.amount}` : '—'} color={COLORS.primary} />
-        <KpiCard icon={BiTime} label={t('subscriptionPage.duration', 'Duration')} value={currentSub?.plan?.duration || '—'} color={COLORS.grey} />
-      </div>
 
       {/* ═══ Tabs ═══ */}
       <div style={{

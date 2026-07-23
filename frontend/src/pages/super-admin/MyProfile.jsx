@@ -6,16 +6,120 @@ import { showToast } from '../../utils/toast';
 import SAPageHeader from '../../components/common/SAPageHeader';
 import { BiUserCircle, BiUser, BiEnvelope, BiPhone, BiSave } from 'react-icons/bi';
 
+// ─── Skeleton Loader ──────────────────────────────────────────
+const ProfileSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+
+    {/* Profile Card Row */}
+    <div className="row g-3">
+      <div className="col-md-4">
+        <div className="premium-card text-center">
+          <div className="premium-card-body py-4">
+            {/* Avatar circle */}
+            <div style={{
+              width: 80, height: 80, borderRadius: '50%', margin: '0 auto 1rem',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            {/* Name */}
+            <div style={{
+              height: 20, width: '60%', margin: '0 auto 12px',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 6,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            {/* Email */}
+            <div style={{
+              height: 14, width: '45%', margin: '0 auto 12px',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            {/* Badge */}
+            <div style={{
+              height: 24, width: '30%', margin: '0 auto',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 20,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+      <div className="col-md-8">
+        <div className="premium-card">
+          <div className="premium-card-header">
+            <div style={{
+              height: 20, width: '30%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 6,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{
+              height: 32, width: 100,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body">
+            <div className="row g-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="col-md-6">
+                  <div>
+                    <div style={{
+                      height: 12, width: '40%', marginBottom: 8,
+                      background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                      backgroundSize: '200% 100%', borderRadius: 4,
+                      animation: 'shimmer 1.5s infinite',
+                    }} />
+                    <div style={{
+                      height: 38,
+                      background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                      backgroundSize: '200% 100%', borderRadius: 8,
+                      animation: 'shimmer 1.5s infinite',
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const MyProfile = () => {
   const { t } = useTranslation();
   const { user } = useSelector((state) => state.auth);
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (user) {
       setForm({ name: user.name || '', email: user.email || '', phone: user.phone || '' });
+      setInitialLoading(false);
     }
   }, [user]);
 
@@ -37,6 +141,8 @@ const MyProfile = () => {
       setSaving(false);
     }
   };
+
+  if (initialLoading) return <ProfileSkeletonLoader />;
 
   return (
     <div>
@@ -80,7 +186,7 @@ const MyProfile = () => {
                 <h6 className="mb-0" style={{ fontWeight: 700 }}>{t('common.profile')}</h6>
               </div>
               <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={handleSave} disabled={saving}>
-                <BiSave /> {saving ? t('common.saving') : t('common.save')}
+                {saving ? <><span className="spinner-border spinner-border-sm me-1" /> {t('common.saving')}</> : <><BiSave /> {t('common.save')}</>}
               </button>
             </div>
             <div className="premium-card-body">

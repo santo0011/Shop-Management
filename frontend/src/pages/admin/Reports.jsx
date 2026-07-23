@@ -512,7 +512,7 @@ const Reports = () => {
       { icon: BiDollar, label: t('reportsPage.totalRevenue'), value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
       { icon: BiTrendingUp, label: t('dashboard.totalProfit'), value: money(analytics.summary.totalProfit), color: 'info', rawValue: analytics.summary.totalProfit, isCurrency: true },
       { icon: BiReceipt, label: t('dashboard.totalOrders'), value: count(analytics.summary.totalOrders), color: 'warning', rawValue: analytics.summary.totalOrders, isCurrency: false },
-      { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), value: money(totalDue), color: 'warning', rawValue: totalDue, isCurrency: true },
+      { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), value: money(totalDue), color: 'danger', rawValue: totalDue, isCurrency: true },
       { icon: BiError, label: t('dashboard.lowStockProducts'), value: count(lowStockCount), color: 'danger', rawValue: lowStockCount, isCurrency: false },
     ];
   }, [analytics.summary, persistentData, t]);

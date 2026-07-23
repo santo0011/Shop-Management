@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { getPlans, getAllPlans, createPlan, updatePlan, deletePlan, togglePlanStatus } = require('../controllers/planController');
+const { getPlans, getAllPlans, getPlanHistory, createPlan, updatePlan, deletePlan, togglePlanStatus } = require('../controllers/planController');
 const { protect, authorize } = require('../middlewares/auth');
 
 router.get('/', getPlans);
 router.get('/all', protect, authorize('super_admin'), getAllPlans);
+router.get('/:id/history', protect, authorize('super_admin'), getPlanHistory);
 router.post('/', protect, authorize('super_admin'), createPlan);
 router.put('/:id', protect, authorize('super_admin'), updatePlan);
 router.delete('/:id', protect, authorize('super_admin'), deletePlan);

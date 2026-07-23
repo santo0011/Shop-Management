@@ -129,4 +129,12 @@ const shopSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Indexes for dashboard and frequent queries
+shopSchema.index({ owner: 1 });
+shopSchema.index({ isActive: 1, subscriptionStatus: 1 });
+shopSchema.index({ subscriptionStatus: 1 });
+shopSchema.index({ createdAt: 1 });
+shopSchema.index({ owner: 1, isActive: 1 });
+shopSchema.index({ owner: 1, subscriptionStatus: 1 });
+
 module.exports = mongoose.model('Shop', shopSchema);

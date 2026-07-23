@@ -1,22 +1,188 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import SAPageHeader from '../../components/common/SAPageHeader';
 import Chart from 'react-apexcharts';
 import { BiRefresh, BiDollar, BiTrendingUp, BiStore, BiCalendar } from 'react-icons/bi';
 
+// ─── Skeleton Loader ──────────────────────────────────────────
+const RevenueReportsSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 32, width: 100,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Filter bar skeleton */}
+    <div className="list-filters-card mb-3">
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {[1, 2, 3].map((i) => (
+          <div key={i} style={{
+            height: 32, width: 80,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+        <div style={{
+          height: 32, width: 140,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 32, width: 140,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+
+    {/* Stat cards skeleton */}
+    <div className="row g-3 mb-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col-md-3 col-6">
+          <div className="sa-stat-card" style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 18, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 12, width: '40%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Chart skeleton */}
+    <div className="premium-card">
+      <div className="premium-card-header">
+        <div style={{
+          height: 20, width: '30%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div className="premium-card-body">
+        <div style={{
+          height: 350, width: '100%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 12,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Inline Stat Cards + Chart Skeleton ──────────────────────
+const RevenueContentSkeleton = () => (
+  <>
+    <div className="row g-3 mb-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col-md-3 col-6">
+          <div className="sa-stat-card" style={{ padding: '1rem', opacity: 0.5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 18, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 12, width: '40%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div className="premium-card">
+      <div className="premium-card-header">
+        <div style={{
+          height: 20, width: '30%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div className="premium-card-body">
+        <div style={{
+          height: 350, width: '100%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 12,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+  </>
+);
+
 const RevenueReports = () => {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [period, setPeriod] = useState('monthly');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const isFirstLoad = useRef(true);
 
-  useEffect(() => { fetchData(); }, [period]);
-
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = useCallback(async () => {
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       const params = { period };
       if (dateFrom) params.from = dateFrom;
@@ -26,9 +192,13 @@ const RevenueReports = () => {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
-  };
+  }, [period, dateFrom, dateTo]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const getTheme = () => {
     try { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
@@ -60,6 +230,8 @@ const RevenueReports = () => {
     data: data?.revenue?.map(r => r.total) || [],
   }], [data?.revenue, t]);
 
+  if (initialLoading) return <RevenueReportsSkeletonLoader />;
+
   return (
     <div>
       <SAPageHeader
@@ -84,8 +256,8 @@ const RevenueReports = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-5"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div>
+      {refreshing ? (
+        <RevenueContentSkeleton />
       ) : (
         <>
           <div className="row g-3 mb-4">

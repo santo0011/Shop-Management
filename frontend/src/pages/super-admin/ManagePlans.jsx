@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
-import { BiPlus, BiEdit, BiTrash, BiStore, BiX, BiCheck, BiUser, BiPackage, BiStar } from 'react-icons/bi';
-import toast from 'react-hot-toast';
+import { BiPlus, BiEdit, BiTrash, BiStore, BiX, BiCheck, BiUser, BiPackage, BiStar, BiTimeFive, BiHistory } from 'react-icons/bi';
+import showToast from '../../utils/toast';
 
 const REQUIRED_PLAN_FIELDS = ['name', 'price', 'duration'];
 
@@ -96,14 +96,18 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
     try {
       if (editing) {
         await api.put(`/plans/${plan._id}`, form, { _skipLoading: true });
+        showToast.success(t('managePlansPage.updatePlanSuccess'));
       } else {
         await api.post('/plans', form, { _skipLoading: true });
+        showToast.success(t('managePlansPage.createPlanSuccess'));
       }
       setErrors({});
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || t('managePlansPage.saveFailed'));
+      const errorMessage = err.response?.data?.message || t('managePlansPage.saveFailed');
+      setError(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -219,6 +223,299 @@ const PlanDrawer = ({ open, onClose, onSuccess, editing, plan }) => {
   );
 };
 
+// History Drawer Component
+const HistoryDrawer = ({ open, onClose, plan }) => {
+  const { t } = useTranslation();
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && plan) {
+      fetchHistory();
+    }
+  }, [open, plan]);
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/plans/${plan._id}/history`, { _skipLoading: true });
+      setHistory(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getActionIcon = (action) => {
+    switch (action) {
+      case 'created': return '🟢';
+      case 'updated': return '🟡';
+      case 'activated': return '🔵';
+      case 'deactivated': return '🟠';
+      default: return '⚪';
+    }
+  };
+
+  const getActionLabel = (action) => {
+    switch (action) {
+      case 'created': return t('managePlansPage.historyActionCreated');
+      case 'updated': return t('managePlansPage.historyActionUpdated');
+      case 'activated': return t('managePlansPage.historyActionActivated');
+      case 'deactivated': return t('managePlansPage.historyActionDeactivated');
+      default: return action;
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderChangedValue = (key, value) => {
+    if (key === 'isActive') {
+      return value ? t('managePlansPage.historyActive') : t('managePlansPage.historyInactive');
+    }
+    if (key === 'isPopular') {
+      return value ? t('managePlansPage.historyYes') : t('managePlansPage.historyNo');
+    }
+    if (key === 'features' && Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : '—';
+    }
+    if (value === null || value === undefined || value === '') return '—';
+    return String(value);
+  };
+
+  const getFieldLabel = (key) => {
+    const labels = {
+      name: t('managePlansPage.historyName'),
+      nameBn: t('managePlansPage.nameBengali'),
+      price: t('managePlansPage.historyPrice'),
+      duration: t('managePlansPage.historyDuration'),
+      maxUsers: t('managePlansPage.historyMaxUsers'),
+      maxProducts: t('managePlansPage.historyMaxProducts'),
+      features: t('managePlansPage.historyFeatures'),
+      description: t('managePlansPage.historyDescription'),
+      isPopular: t('managePlansPage.historyIsPopular'),
+      isActive: t('managePlansPage.historyIsActive'),
+    };
+    return labels[key] || key;
+  };
+
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+      <div className={`drawer ${open ? 'open' : ''}`} style={{ width: '520px', maxWidth: '100vw' }}>
+        <div className="drawer-header">
+          <h5><BiHistory style={{ marginRight: '8px', color: 'var(--primary)' }} />{t('managePlansPage.historyDrawerTitle')}</h5>
+          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        </div>
+        <div className="drawer-body" style={{ overflowY: 'auto' }}>
+          {/* Plan Information Card */}
+          {plan && (
+            <div style={{
+              background: 'linear-gradient(135deg, #f8f9ff, #f0f2ff)',
+              borderRadius: 16,
+              padding: '1.25rem',
+              marginBottom: '1.5rem',
+              border: '1px solid #e8e8f0',
+            }}>
+              <h6 style={{ fontWeight: 700, color: '#1a1a2e', marginBottom: '1rem', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {t('managePlansPage.historyPlanInfo')}
+              </h6>
+              <div className="row g-2">
+                <div className="col-6">
+                  <div style={{ fontSize: '0.7rem', color: '#9a9ab8', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>{t('managePlansPage.planName')}</div>
+                  <div style={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.9rem' }}>{plan.name}</div>
+                </div>
+                <div className="col-6">
+                  <div style={{ fontSize: '0.7rem', color: '#9a9ab8', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>{t('managePlansPage.historyCurrentStatus')}</div>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 10px',
+                    borderRadius: 100,
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: plan.isActive ? '#d1fae5' : '#fee2e2',
+                    color: plan.isActive ? '#065f46' : '#991b1b',
+                  }}>
+                    {plan.isActive ? t('managePlansPage.historyActive') : t('managePlansPage.historyInactive')}
+                  </span>
+                </div>
+                <div className="col-6">
+                  <div style={{ fontSize: '0.7rem', color: '#9a9ab8', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>{t('managePlansPage.historyCurrentPrice')}</div>
+                  <div style={{ fontWeight: 700, color: '#6C63FF', fontSize: '1.1rem' }}>₹{plan.price}</div>
+                </div>
+                <div className="col-6">
+                  <div style={{ fontSize: '0.7rem', color: '#9a9ab8', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>{t('managePlansPage.historyDuration')}</div>
+                  <div style={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.9rem', textTransform: 'capitalize' }}>{plan.duration}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Timeline Header */}
+          <h6 style={{
+            fontWeight: 700,
+            color: '#1a1a2e',
+            marginBottom: '1rem',
+            fontSize: '0.85rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <BiTimeFive style={{ color: '#6C63FF' }} />
+            {t('managePlansPage.historyTimeline')}
+          </h6>
+
+          {/* Loading State */}
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div className="spinner-border spinner-border-sm" style={{ color: '#6C63FF' }} />
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && history.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9a9ab8' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📜</div>
+              <div style={{ fontSize: '0.85rem' }}>{t('managePlansPage.historyNoRecords')}</div>
+            </div>
+          )}
+
+          {/* Timeline */}
+          {!loading && history.length > 0 && (
+            <div style={{ position: 'relative', paddingLeft: '2rem' }}>
+              {/* Vertical line */}
+              <div style={{
+                position: 'absolute',
+                left: '0.6rem',
+                top: 0,
+                bottom: 0,
+                width: 2,
+                background: 'linear-gradient(180deg, #6C63FF, #a78bfa, #c4b5fd)',
+                borderRadius: 1,
+              }} />
+
+              {history.map((entry, index) => {
+                const prev = entry.previousValues || {};
+                const next = entry.newValues || {};
+                const changedKeys = Object.keys(next).filter(k => k !== '_id');
+
+                return (
+                  <div key={entry._id} style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                    {/* Timeline dot */}
+                    <div style={{
+                      position: 'absolute',
+                      left: '-1.55rem',
+                      top: '0.25rem',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: '#fff',
+                      border: '2px solid #6C63FF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.7rem',
+                      zIndex: 1,
+                      boxShadow: '0 2px 8px rgba(108,99,255,0.2)',
+                    }}>
+                      {getActionIcon(entry.action)}
+                    </div>
+
+                    {/* Timeline card */}
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: 12,
+                      padding: '1rem',
+                      border: '1px solid #e8e8f0',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      transition: 'all 0.2s ease',
+                    }}>
+                      {/* Action header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          color: '#1a1a2e',
+                        }}>
+                          {getActionLabel(entry.action)}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#9a9ab8' }}>
+                          {formatDate(entry.createdAt)}
+                        </span>
+                      </div>
+
+                      {/* Changed by */}
+                      {entry.changedBy && (
+                        <div style={{ fontSize: '0.75rem', color: '#6b6b8d', marginBottom: '0.75rem' }}>
+                          {t('managePlansPage.historyChangedBy')}: <strong>{entry.changedBy.name || entry.changedBy.email}</strong>
+                        </div>
+                      )}
+
+                      {/* Changed fields */}
+                      {changedKeys.length > 0 && (
+                        <div style={{ borderTop: '1px solid #f0f0f5', paddingTop: '0.75rem' }}>
+                          {changedKeys.map((key) => {
+                            const oldVal = renderChangedValue(key, prev[key]);
+                            const newVal = renderChangedValue(key, next[key]);
+                            if (oldVal === newVal) return null;
+                            return (
+                              <div key={key} style={{ marginBottom: '0.5rem' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#9a9ab8', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.25rem' }}>
+                                  {getFieldLabel(key)}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem' }}>
+                                  <span style={{
+                                    background: '#fee2e2',
+                                    color: '#991b1b',
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                    textDecoration: 'line-through',
+                                    fontWeight: 500,
+                                    flex: 1,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}>
+                                    {oldVal}
+                                  </span>
+                                  <span style={{ color: '#9a9ab8', fontWeight: 700 }}>→</span>
+                                  <span style={{
+                                    background: '#d1fae5',
+                                    color: '#065f46',
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                    fontWeight: 500,
+                                    flex: 1,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}>
+                                    {newVal}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
 const ManagePlans = () => {
   const { t } = useTranslation();
   const [plans, setPlans] = useState([]);
@@ -227,6 +524,8 @@ const ManagePlans = () => {
   const [editingPlan, setEditingPlan] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [historyPlan, setHistoryPlan] = useState(null);
 
   useEffect(() => { fetchPlans(); }, []);
 
@@ -254,16 +553,21 @@ const ManagePlans = () => {
     setDrawerOpen(true);
   };
 
+  const openHistoryDrawer = (plan) => {
+    setHistoryPlan(plan);
+    setHistoryDrawerOpen(true);
+  };
+
   const handleDelete = async (id) => {
     try {
       await api.delete(`/plans/${id}`, { _skipLoading: true });
       setDeleteConfirm(null);
-      toast.success(t('managePlansPage.deletePlanSuccess'));
+      showToast.success(t('managePlansPage.deletePlanSuccess'));
       fetchPlans();
     } catch (err) {
       setDeleteConfirm(null);
       const errorMessage = err.response?.data?.message || t('toast.actionFailed');
-      toast.error(errorMessage);
+      showToast.error(errorMessage);
     }
   };
 
@@ -436,6 +740,17 @@ const ManagePlans = () => {
                   >
                     <BiEdit size={13} /> {t('common.edit')}
                   </button>
+                  <button onClick={() => openHistoryDrawer(plan)} style={{
+                    flex: 1, padding: '0.4rem', borderRadius: 8, border: '1px solid #a78bfa',
+                    background: '#ffffff', color: '#7c3aed', fontWeight: 600, fontSize: '0.75rem',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    transition: 'all 0.15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f5f3ff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+                  >
+                    <BiHistory size={13} /> {t('managePlansPage.history')}
+                  </button>
                   <button onClick={() => setDeleteConfirm(plan._id)} style={{
                     flex: 1, padding: '0.4rem', borderRadius: 8, border: '1px solid #FF6B6B',
                     background: '#ffffff', color: '#FF6B6B', fontWeight: 600, fontSize: '0.75rem',
@@ -461,6 +776,13 @@ const ManagePlans = () => {
         onSuccess={fetchPlans}
         editing={editing}
         plan={editingPlan}
+      />
+
+      {/* History Drawer */}
+      <HistoryDrawer
+        open={historyDrawerOpen}
+        onClose={() => { setHistoryDrawerOpen(false); setHistoryPlan(null); }}
+        plan={historyPlan}
       />
 
       {/* Delete Confirmation */}

@@ -1,8 +1,82 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import SAPageHeader from '../../components/common/SAPageHeader';
 import { BiCog, BiGlobe, BiDollar, BiCalendar, BiSave, BiRefresh } from 'react-icons/bi';
+
+// ─── Skeleton Loader ──────────────────────────────────────────
+const GlobalSettingsSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{
+          height: 32, width: 100,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 32, width: 80,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+
+    {/* Cards skeleton */}
+    <div className="row g-3">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col-md-6">
+          <div className="premium-card">
+            <div className="premium-card-header">
+              <div style={{
+                height: 20, width: '40%',
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 6,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            </div>
+            <div className="premium-card-body">
+              {[1, 2].map((f) => (
+                <div key={f} style={{ marginBottom: '1rem' }}>
+                  <div style={{
+                    height: 12, width: '30%', marginBottom: 8,
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 4,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                  <div style={{
+                    height: 38,
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 8,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 const GlobalSettings = () => {
   const { t } = useTranslation();
@@ -10,22 +84,26 @@ const GlobalSettings = () => {
     companyName: '', appName: '', currency: 'INR', timezone: 'Asia/Kolkata',
     dateFormat: 'DD/MM/YYYY', taxRate: 0, taxName: 'GST',
   });
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const isFirstLoad = useRef(true);
 
-  useEffect(() => { fetchSettings(); }, []);
-
-  const fetchSettings = async () => {
-    setLoading(true);
+  const fetchSettings = useCallback(async () => {
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    }
     try {
       const { data } = await api.get('/super-admin/settings', { _skipLoading: true });
       if (data) setSettings(prev => ({ ...prev, ...data }));
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
-  };
+  }, []);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -71,13 +149,7 @@ const GlobalSettings = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="text-center py-5">
-        <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-      </div>
-    );
-  }
+  if (initialLoading) return <GlobalSettingsSkeletonLoader />;
 
   return (
     <div>

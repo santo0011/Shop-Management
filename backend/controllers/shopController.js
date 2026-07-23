@@ -4,6 +4,9 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Supplier = require('../models/Supplier');
 const Customer = require('../models/Customer');
+const Sale = require('../models/Sale');
+const Purchase = require('../models/Purchase');
+const ActivityLog = require('../models/ActivityLog');
 const { BUSINESS_TYPE_KEYS, getBusinessTypeDefaults } = require('../config/businessTypes');
 
 // Best-effort, additive-only: creates any default category for `businessType`
@@ -93,7 +96,12 @@ const getShops = async (req, res) => {
 // @route   GET /api/shops/:id
 const getShop = async (req, res) => {
   try {
-    const shop = await Shop.findById(req.params.id).populate('owner', 'name email phone');
+    const shop = await Shop.findById(req.params.id)
+      .populate('owner', 'name email phone')
+      .populate({
+        path: 'subscription',
+        populate: { path: 'plan', select: 'name nameBn duration price features featuresBn' },
+      });
     if (!shop) {
       return res.status(404).json({ message: 'Shop not found' });
     }
@@ -101,6 +109,68 @@ const getShop = async (req, res) => {
     // Business Type is locked, without a separate round trip.
     const productCount = await Product.countDocuments({ shop: shop._id });
     res.json({ ...shop.toObject(), productCount });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get shop statistics for dashboard (Super Admin view of a specific shop)
+// @route   GET /api/shops/:id/stats
+const getShopStats = async (req, res) => {
+  try {
+    const shopId = req.params.id;
+    
+    const [
+      totalProducts,
+      totalCustomers,
+      totalSuppliers,
+      totalSalesAgg,
+      totalPurchasesAgg,
+    ] = await Promise.all([
+      Product.countDocuments({ shop: shopId }),
+      Customer.countDocuments({ shop: shopId }),
+      Supplier.countDocuments({ shop: shopId }),
+      Sale.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+      Purchase.aggregate([
+        { $match: { shop: shopId } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+    ]);
+
+    res.json({
+      totalProducts,
+      totalCustomers,
+      totalSuppliers,
+      totalSales: totalSalesAgg[0]?.total || 0,
+      totalPurchases: totalPurchasesAgg[0]?.total || 0,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get recent activity logs for a specific shop
+// @route   GET /api/shops/:id/activities
+const getShopActivities = async (req, res) => {
+  try {
+    const shopId = req.params.id;
+    
+    // Find the shop's owner user to filter activities
+    const shop = await Shop.findById(shopId).select('owner');
+    if (!shop) {
+      return res.status(404).json({ message: 'Shop not found' });
+    }
+
+    const logs = await ActivityLog.find({ user: shop.owner })
+      .select('action details createdAt')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    res.json(logs);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -285,7 +355,7 @@ const getMyShop = async (req, res) => {
 
 // @desc    Get shop statistics (Super Admin)
 // @route   GET /api/shops/stats
-const getShopStats = async (req, res) => {
+const getShopStatsOverview = async (req, res) => {
   try {
     const superAdminIds = await User.find({ role: 'super_admin' }).distinct('_id');
     const notSuperAdmin = { owner: { $nin: superAdminIds } };
@@ -504,11 +574,13 @@ const restoreDefaultCategories = async (req, res) => {
 module.exports = {
   getShops,
   getShop,
+  getShopStats: getShopStatsOverview,
+  getShopDetailStats: getShopStats,
+  getShopActivities,
   createShop,
   updateShop,
   toggleShopStatus,
   getMyShop,
-  getShopStats,
   updateMyShopSettings,
   getShopBackup,
   restoreShopBackup,

@@ -1,14 +1,95 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import SAPageHeader from '../../components/common/SAPageHeader';
 import { BiKey, BiLock, BiSave, BiShow, BiHide } from 'react-icons/bi';
+
+// ─── Skeleton Loader ──────────────────────────────────────────
+const ChangePasswordSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '30%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '22%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+
+    {/* Card skeleton */}
+    <div className="row justify-content-center">
+      <div className="col-md-6">
+        <div className="premium-card">
+          <div className="premium-card-header">
+            <div style={{
+              height: 20, width: '35%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 6,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {[1, 2, 3].map((i) => (
+                <div key={i}>
+                  <div style={{
+                    height: 12, width: '45%', marginBottom: 8,
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 4,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                  <div style={{
+                    height: 38,
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 8,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                </div>
+              ))}
+              {/* Checkbox skeleton */}
+              <div style={{
+                height: 16, width: '30%',
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              {/* Button skeleton */}
+              <div style={{
+                height: 40,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 8,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const ChangePassword = () => {
   const { t } = useTranslation();
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    // Brief initial loading to match Sales page pattern
+    const timer = setTimeout(() => setInitialLoading(false), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -31,6 +112,8 @@ const ChangePassword = () => {
       setSaving(false);
     }
   };
+
+  if (initialLoading) return <ChangePasswordSkeletonLoader />;
 
   return (
     <div>
@@ -77,7 +160,7 @@ const ChangePassword = () => {
                   </label>
                 </div>
                 <button type="submit" className="btn-premium btn-premium-primary w-100" disabled={saving}>
-                  <BiSave /> {saving ? t('common.saving') : t('settingsPage.updatePassword')}
+                  {saving ? <><span className="spinner-border spinner-border-sm me-1" /> {t('common.saving')}</> : <><BiSave /> {t('settingsPage.updatePassword')}</>}
                 </button>
               </form>
             </div>

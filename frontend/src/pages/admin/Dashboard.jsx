@@ -553,7 +553,7 @@ const Dashboard = () => {
   const statCards = [
     { icon: BiPackage, label: t('dashboard.totalProducts'), value: stats?.totalProducts || 0, color: 'primary' },
     { icon: BiCart, label: t('dashboard.totalSales'), value: stats?.monthlySalesCount || 0, color: 'success' },
-    { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), subtitle: t('dashboard.outstandingReceivables'), value: stats?.customerDue || 0, color: 'warning', prefix: '₹' },
+    { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), subtitle: t('dashboard.outstandingReceivables'), value: stats?.customerDue || 0, color: 'danger', prefix: '₹' },
     { icon: BiCar, label: t('dashboard.totalSuppliers'), value: stats?.totalSuppliers || 0, color: 'warning' },
     { icon: BiDollar, label: t('dashboard.todaysRevenue'), value: stats?.todaySales || 0, color: 'primary', prefix: '₹' },
     { icon: BiError, label: t('dashboard.lowStockProducts'), value: stats?.lowStockProducts || 0, color: 'danger' },

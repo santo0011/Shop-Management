@@ -1378,10 +1378,152 @@ const Customers = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // ── Skeleton Loading ────────────────────────────────────────────────
+  const CustomersSkeletonLoader = () => (
+    <div>
+      <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+      {/* Page Header */}
+      <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div style={{ flex: 1 }}>
+          <div style={{
+            height: 28, width: '25%', marginBottom: 8,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 14, width: '18%',
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 6,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{
+            height: 36, width: 130,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 36, width: 140,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        </div>
+      </div>
+
+      {/* Stat Cards row */}
+      <div className="row g-3 mb-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="col-12 col-sm-6 col-xl-4">
+            <div className="premium-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    height: 10, width: '60%', marginBottom: 6,
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 4,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                  <div style={{
+                    height: 20, width: '80%',
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 6,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter Bar */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{
+          height: 36, width: 280,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem' }}>
+        {[1, 2, 3].map((i) => (
+          <div key={i} style={{
+            height: 36, width: 120,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 10,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </div>
+
+      {/* Table skeleton */}
+      <div className="table-container desktop-table" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+        <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
+          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <div key={i} style={{
+              flex: 1, height: 12,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+        {[1, 2, 3, 4, 5].map((r) => (
+          <div key={r} style={{
+            display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
+            borderTop: '1px solid var(--border-color)',
+          }}>
+            {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+              <div key={c} style={{
+                flex: 1, height: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ─── Table Inline Skeleton ─────────────────────────────────────────────
+  const TableSkeletonRows = () => (
+    <>
+      {[1, 2, 3, 4, 5].map((r) => (
+        <tr key={r} style={{ opacity: 0.5 }}>
+          {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+            <td key={c} style={{ padding: '0.75rem 1rem' }}>
+              <div style={{
+                height: 10, width: c === 1 ? 24 : c === 4 ? '45%' : c === 5 ? '40%' : '35%',
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+
   // ── State ────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('all');
   const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -1414,8 +1556,11 @@ const Customers = () => {
 
   // ── Data fetching ────────────────────────────────────────────
   const fetchCustomers = useCallback(async () => {
-    const silent = !isFirstLoad.current;
-    if (silent) setSearching(true); else setLoading(true);
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       const { data } = await api.get(
         `/customers?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${CUSTOMERS_PER_PAGE}`,
@@ -1431,8 +1576,10 @@ const Customers = () => {
         setPage(pages);
       }
     } catch (err) { console.error(err); } finally {
-      if (silent) setSearching(false); else setLoading(false);
-      isFirstLoad.current = false;
+      setInitialLoading(false);
+      setRefreshing(false);
+      setSearching(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
   }, [debouncedSearch, page]);
 
@@ -1545,6 +1692,8 @@ const Customers = () => {
 
   const openDueDetails = (customer) => { setDueDetailsCustomerId(customer._id); setDueDetailsOpen(true); };
 
+  if (initialLoading) return <CustomersSkeletonLoader />;
+
   // ── Render ───────────────────────────────────────────────────
   return (
     <div>
@@ -1607,7 +1756,7 @@ const Customers = () => {
           </div>
 
           {/* Table */}
-          <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
+          <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
             <div className="table-responsive">
               <table className="table-custom mb-0">
                 <thead>
@@ -1622,7 +1771,9 @@ const Customers = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
+                  {refreshing ? (
+                    <TableSkeletonRows />
+                  ) : searching ? (
                     <tr><td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                       <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                     </td></tr>
@@ -1674,9 +1825,13 @@ const Customers = () => {
           </div>
 
           {/* Mobile cards */}
-          <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
-            {loading ? (
+          <div className={`mobile-cards ${searching || refreshing ? 'is-refreshing' : ''}`}>
+            {refreshing ? (
               <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+              </div>
+            ) : searching ? (
+              <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
                 <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
               </div>
             ) : customers.length === 0 ? (

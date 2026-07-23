@@ -1,27 +1,210 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import SAPageHeader from '../../components/common/SAPageHeader';
 import { BiRefresh, BiStore, BiCheckCircle, BiTime, BiDollar } from 'react-icons/bi';
 
+// ─── Skeleton Loader ──────────────────────────────────────────
+const BusinessReportsSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 32, width: 100,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Stat cards skeleton */}
+    <div className="row g-3 mb-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col-md-3 col-6">
+          <div className="sa-stat-card" style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 18, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 12, width: '40%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Table skeleton */}
+    <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+      <div className="table-header">
+        <div style={{
+          height: 22, width: '30%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} style={{
+            flex: 1, height: 12,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </div>
+      {[1, 2, 3, 4, 5].map((r) => (
+        <div key={r} style={{
+          display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          {[1, 2, 3, 4].map((c) => (
+            <div key={c} style={{
+              flex: 1, height: 10,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Inline Content Skeleton ─────────────────────────────────
+const BusinessContentSkeleton = () => (
+  <>
+    <div className="row g-3 mb-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col-md-3 col-6">
+          <div className="sa-stat-card" style={{ padding: '1rem', opacity: 0.5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 18, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 12, width: '40%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div className="table-container">
+      <div className="table-header">
+        <div style={{
+          height: 22, width: '30%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div className="table-responsive">
+        <table className="table-custom">
+          <thead>
+            <tr>
+              <th>Shop</th>
+              <th>Business Type</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[1, 2, 3, 4].map((r) => (
+              <tr key={r} style={{ opacity: 0.5 }}>
+                {[1, 2, 3, 4].map((c) => (
+                  <td key={c} style={{ padding: '0.75rem 1rem' }}>
+                    <div style={{
+                      height: 10, width: c === 1 ? 100 : '35%',
+                      background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                      backgroundSize: '200% 100%', borderRadius: 4,
+                      animation: 'shimmer 1.5s infinite',
+                    }} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </>
+);
+
 const BusinessReports = () => {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const isFirstLoad = useRef(true);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = useCallback(async () => {
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       const { data: result } = await api.get('/super-admin/business-reports', { _skipLoading: true });
       setData(result);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
-  };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (initialLoading) return <BusinessReportsSkeletonLoader />;
 
   return (
     <div>
@@ -35,8 +218,8 @@ const BusinessReports = () => {
         }
       />
 
-      {loading ? (
-        <div className="text-center py-5"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div>
+      {refreshing ? (
+        <BusinessContentSkeleton />
       ) : (
         <>
           <div className="row g-3 mb-4">

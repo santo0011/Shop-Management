@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import api from '../../services/api';
-import { BiSearch, BiPlus, BiStore, BiX, BiUser, BiPhone, BiEnvelope, BiMap, BiLock, BiCheck, BiShow, BiEdit, BiTrash, BiCalendar, BiBriefcase } from 'react-icons/bi';
+import { BiSearch, BiPlus, BiStore, BiX, BiUser, BiPhone, BiEnvelope, BiMap, BiLock, BiCheck, BiShow, BiEdit, BiTrash, BiCalendar, BiBriefcase, BiDollar, BiTime } from 'react-icons/bi';
 import { BUSINESS_TYPE_KEYS, BUSINESS_TYPES } from '../../config/businessTypes';
 
 const REQUIRED_SHOP_FIELDS = ['shopName', 'ownerName', 'phone', 'email', 'password'];
@@ -214,6 +214,107 @@ const safeAddress = (addr, t) => {
   return values.length > 0 ? values.join('') : t('common.notAvailable');
 };
 
+// Format date
+const formatDate = (date) => {
+  if (!date) return 'N/A';
+  return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+// Format currency
+const formatCurrency = (amount) => {
+  if (!amount && amount !== 0) return '₹0';
+  return '₹' + Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+};
+
+// ─── Skeleton Loader ──────────────────────────────────────────
+const ManageShopsSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 36, width: 130,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Search skeleton */}
+    <div className="list-filters-card mb-3">
+      <div style={{
+        height: 36, width: 280,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Table skeleton */}
+    <div className="table-container" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+      <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} style={{
+            flex: 1, height: 12,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </div>
+      {[1, 2, 3, 4, 5].map((r) => (
+        <div key={r} style={{
+          display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          {[1, 2, 3, 4, 5].map((c) => (
+            <div key={c} style={{
+              flex: 1, height: 10,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Inline Table Skeleton Rows ──────────────────────────────
+const TableSkeletonRows = ({ columns = 5 }) => (
+  <>
+    {[1, 2, 3, 4].map((r) => (
+      <tr key={r} style={{ opacity: 0.5 }}>
+        {[1, 2, 3, 4, 5].map((c) => (
+          <td key={c} style={{ padding: '0.75rem 1rem' }}>
+            <div style={{
+              height: 10, width: c === 1 ? 100 : c === 5 ? 120 : '35%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>
+);
+
 const ManageShops = () => {
   const { t } = useTranslation();
   const location = useLocation();
@@ -221,7 +322,7 @@ const ManageShops = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const isFirstLoad = useRef(true);
 
@@ -240,15 +341,19 @@ const ManageShops = () => {
   }, [location.state]);
 
   const fetchShops = useCallback(async () => {
-    const silent = !isFirstLoad.current;
-    if (silent) setSearching(true); else setLoading(true);
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setSearching(true);
+    }
     try {
       const { data } = await api.get(`/shops?search=${debouncedSearch}`, { _skipLoading: true });
       setShops(data.shops || []);
     } catch (err) {
       console.error(err);
     } finally {
-      if (silent) setSearching(false); else setLoading(false);
+      if (isFirstLoad.current) setInitialLoading(false);
+      else setSearching(false);
       isFirstLoad.current = false;
     }
   }, [debouncedSearch]);
@@ -261,6 +366,7 @@ const ManageShops = () => {
   const [viewShopLoading, setViewShopLoading] = useState(false);
   const [viewShopData, setViewShopData] = useState(null);
   const [viewShopError, setViewShopError] = useState(null);
+  const [subscriptionHistory, setSubscriptionHistory] = useState([]);
   const [editShop, setEditShop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -269,9 +375,14 @@ const ManageShops = () => {
     setViewShopLoading(true);
     setViewShopData(null);
     setViewShopError(null);
+    setSubscriptionHistory([]);
     try {
       const { data } = await api.get(`/shops/${shop._id}`, { _skipLoading: true });
       setViewShopData(data);
+      // Fetch subscription history in parallel
+      api.get(`/subscription/history?shopId=${shop._id}&limit=50`, { _skipLoading: true })
+        .then((res) => setSubscriptionHistory(res.data.subscriptions || []))
+        .catch(() => setSubscriptionHistory([]));
     } catch (err) {
       setViewShopError(err.response?.data?.message || t('manageShopsPage.loadShopDetailsFailed'));
     } finally {
@@ -297,6 +408,8 @@ const ManageShops = () => {
       console.error(err);
     }
   };
+
+  if (initialLoading) return <ManageShopsSkeletonLoader />;
 
   return (
     <div>
@@ -329,7 +442,7 @@ const ManageShops = () => {
       </div>
 
       {/* Shops Table */}
-      <div className={`table-container ${searching ? 'is-refreshing' : ''}`}>
+      <div className={`table-container ${searching ? 'is-refreshing' : 'content-visible'}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -342,12 +455,8 @@ const ManageShops = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                  </td>
-                </tr>
+              {searching ? (
+                <TableSkeletonRows columns={5} />
               ) : shops.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
@@ -411,14 +520,14 @@ const ManageShops = () => {
       />
 
       {/* View Shop Details Drawer - Premium Redesign */}
-      <div className={`drawer-overlay ${viewShop ? 'open' : ''}`} onClick={() => { setViewShop(null); setViewShopData(null); }} />
+      <div className={`drawer-overlay ${viewShop ? 'open' : ''}`} onClick={() => { setViewShop(null); setViewShopData(null); setSubscriptionHistory([]); }} />
       <div className={`drawer ${viewShop ? 'open' : ''}`}>
         <div className="drawer-header">
           <h5 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BiStore style={{ color: 'var(--primary)' }} />
             {t('manageShopsPage.shopDetails')}
           </h5>
-          <button className="btn-close-premium" onClick={() => { setViewShop(null); setViewShopData(null); }}><BiX /></button>
+          <button className="btn-close-premium" onClick={() => { setViewShop(null); setViewShopData(null); setSubscriptionHistory([]); }}><BiX /></button>
         </div>
         <div className="drawer-body">
           {viewShopLoading ? (
@@ -559,6 +668,74 @@ const ManageShops = () => {
                   </div>
                 </div>
               ))}
+
+              {/* ========== SUBSCRIPTION HISTORY SECTION ========== */}
+              <div className="premium-card" style={{ border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}>
+                <div style={{
+                  padding: '0.75rem 1.25rem',
+                  borderBottom: '1px solid var(--border-color)',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.5px',
+                }}>
+                  <BiTime style={{ color: 'var(--primary)', flexShrink: 0 }} /> {t('manageShopsPage.subscriptionHistory')}
+                  {subscriptionHistory.length > 0 && (
+                    <span style={{ marginLeft: 'auto', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      {subscriptionHistory.length} records
+                    </span>
+                  )}
+                </div>
+                <div style={{ padding: '1rem 1.25rem' }}>
+                  {subscriptionHistory.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.4 }}>📋</div>
+                      <div style={{ fontSize: '0.82rem' }}>{t('manageShopsPage.noSubscriptionHistory')}</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {subscriptionHistory.map((sub, idx) => (
+                        <div key={sub._id || idx} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: '12px',
+                          padding: '0.75rem',
+                          borderRadius: 'var(--border-radius-md)',
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-light)',
+                        }}>
+                          <div style={{
+                            width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, marginTop: '6px',
+                            background: sub.status === 'active' ? 'var(--secondary)' :
+                                        sub.status === 'queued' ? 'var(--primary)' :
+                                        sub.status === 'cancelled' ? 'var(--danger)' : 'var(--text-muted)',
+                          }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '4px' }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{sub.plan?.name || 'Unknown Plan'}</div>
+                              <span className={`badge ${
+                                sub.status === 'active' ? 'badge-success' :
+                                sub.status === 'queued' ? 'badge-primary' :
+                                sub.status === 'cancelled' ? 'badge-danger' : 'badge-danger'
+                              }`} style={{ fontSize: '0.68rem', flexShrink: 0 }}>
+                                {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <span><BiDollar style={{ verticalAlign: 'middle', marginRight: 2 }} />{formatCurrency(sub.totalAmount || sub.amount)}</span>
+                              <span><BiCalendar style={{ verticalAlign: 'middle', marginRight: 2 }} />{formatDate(sub.startDate)} - {formatDate(sub.endDate)}</span>
+                              {sub.duration && <span><BiTime style={{ verticalAlign: 'middle', marginRight: 2 }} />{sub.duration}</span>}
+                              {sub.assignedBy?.name && (
+                                <span><BiUser style={{ verticalAlign: 'middle', marginRight: 2 }} />{sub.assignedBy.name}</span>
+                              )}
+                              {sub.createdAt && (
+                                <span><BiCalendar style={{ verticalAlign: 'middle', marginRight: 2 }} />{t('manageShopsPage.assignedOn')} {formatDate(sub.createdAt)}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           ) : null}
         </div>

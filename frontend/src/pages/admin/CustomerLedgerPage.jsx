@@ -246,6 +246,178 @@ const ReceivePaymentModal = ({ open, onClose, customer, onSuccess, t }) => {
   );
 };
 
+// ─── Skeleton Loading ────────────────────────────────────────────
+const CustomerLedgerSkeletonLoader = () => (
+  <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Titlebar */}
+    <div className="ledger-titlebar">
+      <div style={{
+        height: 36, width: 100,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 24, width: 180, marginLeft: 16,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Header banner skeleton */}
+    <div className="ledger-header-banner" style={{ padding: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: 12,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{ flex: 1 }}>
+          <div style={{
+            height: 20, width: '40%', marginBottom: 8,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 6,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 14, width: '25%', marginBottom: 6,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 6,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={{
+                height: 24, width: 80,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 20,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* KPI grid skeleton */}
+    <div className="ledger-kpi-grid">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="ledger-kpi-card" style={{ padding: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{ flex: 1 }}>
+              <div style={{
+                height: 18, width: '60%', marginBottom: 6,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{
+                height: 12, width: '40%',
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Filter bar skeleton */}
+    <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+      <div style={{
+        height: 36, width: 400,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 36, width: 150,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 36, width: 150,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Timeline skeleton */}
+    <div>
+      {[1, 2, 3, 4].map((r) => (
+        <div key={r} className="ledger-txn-row" style={{ opacity: 0.5 }}>
+          <div className="ledger-txn-rail">
+            <div style={{
+              width: 12, height: 12, borderRadius: '50%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="ledger-txn-card">
+            <div style={{
+              height: 14, width: '40%', marginBottom: 8,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{
+              height: 10, width: '30%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Inline Timeline Skeleton ──────────────────────────────────────
+const TimelineSkeletonRows = () => (
+  <>
+    {[1, 2, 3, 4].map((r) => (
+      <div key={r} className="ledger-txn-row" style={{ opacity: 0.5 }}>
+        <div className="ledger-txn-rail">
+          <div style={{
+            width: 12, height: 12, borderRadius: '50%',
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        </div>
+        <div className="ledger-txn-card">
+          <div style={{
+            height: 14, width: '40%', marginBottom: 8,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 10, width: '30%',
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        </div>
+      </div>
+    ))}
+  </>
+);
+
 const CustomerLedgerPage = () => {
   const { t } = useTranslation();
   const { customerId } = useParams();
@@ -253,7 +425,8 @@ const CustomerLedgerPage = () => {
 
   const [ledgerData, setLedgerData] = useState({ customer: {}, summary: {}, entries: [] });
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [datePreset, setDatePreset] = useState('all');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -264,12 +437,17 @@ const CustomerLedgerPage = () => {
   const [methodFilter, setMethodFilter] = useState('all');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const isFirstLoad = useRef(true);
 
   const TYPES = typeConfig(t);
 
   const fetchLedger = useCallback(async () => {
     if (!customerId) return;
-    setLoading(true);
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       let params = {};
       if (datePreset === 'custom') {
@@ -285,7 +463,9 @@ const CustomerLedgerPage = () => {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
   }, [customerId, datePreset, customStart, customEnd]);
 
@@ -418,6 +598,8 @@ const CustomerLedgerPage = () => {
   const dueAmount = summary.currentDue || 0;
   const customerForModal = { _id: customerId, name: customer?.name, phone: customer?.phone, dueAmount };
 
+  if (initialLoading) return <CustomerLedgerSkeletonLoader />;
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       {/* ─── Page titlebar with Back button ────────────────────── */}
@@ -489,7 +671,7 @@ const CustomerLedgerPage = () => {
       <div className="ledger-kpi-grid">
         <KpiCard icon={BiCart} label={t('customersPage.totalPurchase')} value={summary.totalPurchase} accent="#6C63FF" glow="rgba(108,99,255,0.12)" />
         <KpiCard icon={BiCreditCard} label={t('customersPage.totalPaid')} value={summary.totalPaid} accent="#00D9A6" glow="rgba(0,217,166,0.12)" />
-        <KpiCard icon={BiWallet} label={t('customersPage.currentDue')} value={summary.currentDue} accent={dueAmount > 0 ? '#FF6B6B' : '#00D9A6'} glow={dueAmount > 0 ? 'rgba(255,107,107,0.12)' : 'rgba(0,217,166,0.12)'} />
+        <KpiCard icon={BiWallet} label={t('customersPage.currentDue')} value={dueAmount} accent={dueAmount > 0 ? '#FF6B6B' : '#00D9A6'} glow={dueAmount > 0 ? 'rgba(255,107,107,0.12)' : 'rgba(0,217,166,0.12)'} />
         <KpiCard icon={BiUndo} label={t('customersPage.totalReturns')} value={totalReturns} accent="#F39C12" glow="rgba(243,156,18,0.12)" />
       </div>
 
@@ -567,10 +749,8 @@ const CustomerLedgerPage = () => {
       )}
 
       {/* ─── Transaction timeline ───────────────────────────────── */}
-      {loading ? (
-        <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-          <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-        </div>
+      {refreshing ? (
+        <TimelineSkeletonRows />
       ) : (
         // Keying on the active filters (re)mounts this branch whenever the debounced
         // search/type/method filters actually change, replaying the fade+slide-in

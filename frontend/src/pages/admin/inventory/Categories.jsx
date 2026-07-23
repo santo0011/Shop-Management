@@ -666,11 +666,115 @@ const SelectAllCheckbox = ({ checked, indeterminate, onChange, ...rest }) => {
 // Fixed page size for the Categories list — server-side pagination via ?page=&limit=.
 const CATEGORIES_PER_PAGE = 10;
 
+// ─── Skeleton Loading ────────────────────────────────────────────────────────
+const CategoriesSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{
+          height: 36, width: 110,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 36, width: 110,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 36, width: 130,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+
+    {/* Filter Bar */}
+    <div style={{ marginBottom: '1rem' }}>
+      <div style={{
+        height: 36, width: 280,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Table skeleton */}
+    <div className="table-container desktop-table" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+      <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} style={{
+            flex: 1, height: 12,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </div>
+      {[1, 2, 3, 4, 5].map((r) => (
+        <div key={r} style={{
+          display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          {[1, 2, 3, 4, 5].map((c) => (
+            <div key={c} style={{
+              flex: 1, height: 10,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Table Inline Skeleton ─────────────────────────────────────────────────────
+const TableSkeletonRows = () => (
+  <>
+    {[1, 2, 3, 4, 5].map((r) => (
+      <tr key={r} style={{ opacity: 0.5 }}>
+        {[1, 2, 3, 4, 5].map((c) => (
+          <td key={c} style={{ padding: '0.75rem 1rem' }}>
+            <div style={{
+              height: 10, width: c === 1 ? 24 : c === 3 ? '45%' : '35%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>
+);
+
 // ─── Main Categories Page ────────────────────────────────────────────────────
 const Categories = () => {
   const { t } = useTranslation();
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -706,9 +810,11 @@ const Categories = () => {
   }, [page, debouncedSearch]);
 
   const fetchCategories = useCallback(async () => {
-    const silent = !isFirstLoad.current;
-    // Always skip global loading overlay — this page uses its own table loader
-    if (silent) setSearching(true); else setLoading(true);
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       const { data } = await api.get(
         `/categories?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${CATEGORIES_PER_PAGE}`,
@@ -726,8 +832,10 @@ const Categories = () => {
     } catch (err) {
       console.error(err);
     } finally {
-      if (silent) setSearching(false); else setLoading(false);
-      isFirstLoad.current = false;
+      setInitialLoading(false);
+      setRefreshing(false);
+      setSearching(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
   }, [debouncedSearch, page]);
 
@@ -836,6 +944,8 @@ const Categories = () => {
     }
   };
 
+  if (initialLoading) return <CategoriesSkeletonLoader />;
+
   return (
     <div>
       {/* Page Header */}
@@ -916,7 +1026,7 @@ const Categories = () => {
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
-      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
+      <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
         <div className="table-responsive">
           <table className="table-custom mb-0">
             <thead>
@@ -939,7 +1049,9 @@ const Categories = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {refreshing ? (
+                <TableSkeletonRows />
+              ) : searching ? (
                 <tr>
                   <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
@@ -988,10 +1100,14 @@ const Categories = () => {
       </div>
 
       {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
-      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
-        {loading ? (
+      <div className={`mobile-cards ${searching || refreshing ? 'is-refreshing' : ''}`}>
+        {refreshing ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+          </div>
+        ) : searching ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : categories.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>

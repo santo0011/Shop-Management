@@ -10,134 +10,93 @@ const { logActivity } = require('../services/activityLogService');
 // @route   GET /api/super-admin/dashboard
 const getDashboardData = async (req, res) => {
   try {
-    const superAdminIds = await User.find({ role: 'super_admin' }).distinct('_id');
+    const superAdminIds = await User.find({ role: 'super_admin' }).distinct('_id').lean();
     const notSuperAdmin = { owner: { $nin: superAdminIds } };
 
-    // === STAT CARDS ===
-    const totalShops = await Shop.countDocuments(notSuperAdmin);
-    const activeShops = await Shop.countDocuments({ ...notSuperAdmin, isActive: true });
-    const inactiveShops = await Shop.countDocuments({ ...notSuperAdmin, isActive: false });
-    const expiredShops = await Shop.countDocuments({ ...notSuperAdmin, subscriptionStatus: 'expired' });
-    const trialShops = await Shop.countDocuments({ ...notSuperAdmin, subscriptionStatus: 'trial' });
-    const activeSubscriptions = await Shop.countDocuments({ ...notSuperAdmin, subscriptionStatus: 'active' });
-    const totalPlans = await Plan.countDocuments();
-
-    // Total and Monthly Revenue
-    const revenueAgg = await Subscription.aggregate([
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-    ]);
-    const totalRevenue = revenueAgg[0]?.total || 0;
-
-    const monthlyRevenue = await Subscription.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          total: { $sum: '$totalAmount' },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    // Expiring soon (subscriptions ending within 7 days)
     const now = new Date();
     const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const expiringSoon = await Subscription.countDocuments({
-      endDate: { $gte: now, $lte: sevenDaysLater },
-      status: 'active',
-    });
 
-    // Shop growth (monthly)
-    const shopGrowth = await Shop.aggregate([
-      { $match: { owner: { $nin: superAdminIds } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          count: { $sum: 1 },
+    // === RUN ALL INDEPENDENT QUERIES IN PARALLEL ===
+    const [
+      totalShops,
+      activeShops,
+      expiredShops,
+      trialShops,
+      activeSubShopCount,
+      revenueAgg,
+      monthlyRevenue,
+      expiringSoon,
+      shopGrowth,
+      planDistribution,
+      recentActivities,
+    ] = await Promise.all([
+      Shop.countDocuments(notSuperAdmin),
+      Shop.countDocuments({ ...notSuperAdmin, isActive: true }),
+      Shop.countDocuments({ ...notSuperAdmin, subscriptionStatus: 'expired' }),
+      Shop.countDocuments({ ...notSuperAdmin, subscriptionStatus: 'trial' }),
+      Shop.countDocuments({ ...notSuperAdmin, subscriptionStatus: 'active' }),
+      Subscription.aggregate([
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+      Subscription.aggregate([
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+            total: { $sum: '$totalAmount' },
+          },
         },
-      },
-      { $sort: { _id: 1 } },
+        { $sort: { _id: 1 } },
+      ]),
+      Subscription.countDocuments({
+        endDate: { $gte: now, $lte: sevenDaysLater },
+        status: 'active',
+      }),
+      Shop.aggregate([
+        { $match: { owner: { $nin: superAdminIds } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Subscription.aggregate([
+        {
+          $group: {
+            _id: '$plan',
+            count: { $sum: 1 },
+            revenue: { $sum: '$totalAmount' },
+          },
+        },
+        {
+          $lookup: { from: 'plans', localField: '_id', foreignField: '_id', as: 'plan' },
+        },
+        { $unwind: { path: '$plan', preserveNullAndEmptyArrays: true } },
+        { $project: { planName: '$plan.name', count: 1, revenue: 1 } },
+      ]),
+      ActivityLog.find()
+        .select('action user createdAt')
+        .populate('user', 'name email role')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
     ]);
 
-    // Plan distribution
-    const planDistribution = await Subscription.aggregate([
-      {
-        $group: {
-          _id: '$plan',
-          count: { $sum: 1 },
-          revenue: { $sum: '$totalAmount' },
-        },
-      },
-      {
-        $lookup: { from: 'plans', localField: '_id', foreignField: '_id', as: 'plan' },
-      },
-      { $unwind: { path: '$plan', preserveNullAndEmptyArrays: true } },
-      { $project: { planName: '$plan.name', count: 1, revenue: 1 } },
-    ]);
+    const totalRevenue = revenueAgg[0]?.total || 0;
 
-    // Active vs Expired shops data
     const activeVsExpired = [
       { name: 'Active', value: activeShops },
       { name: 'Expired', value: expiredShops },
       { name: 'Trial', value: trialShops },
-      { name: 'Inactive', value: inactiveShops },
+      { name: 'Inactive', value: totalShops - activeShops - trialShops },
     ];
 
-    // Monthly new shop registrations (last 12 months)
-    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const monthlyNewShops = await Shop.aggregate([
-      { $match: { owner: { $nin: superAdminIds }, createdAt: { $gte: twelveMonthsAgo } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    // === RECENT ACTIVITIES ===
-    // Recently created shops (last 10)
-    const recentShops = await Shop.find(notSuperAdmin)
-      .populate('owner', 'name email')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    // Recent payments (last 10 subscriptions)
-    const recentPayments = await Subscription.find()
-      .populate('shop', 'name')
-      .populate('plan', 'name duration')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    // Recent activity logs (last 10)
-    const recentActivities = await ActivityLog.find()
-      .populate('user', 'name email role')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    // === QUICK STATISTICS ===
-    const mostPopularPlanAgg = await Subscription.aggregate([
-      { $group: { _id: '$plan', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 1 },
-      { $lookup: { from: 'plans', localField: '_id', foreignField: '_id', as: 'plan' } },
-      { $unwind: '$plan' },
-      { $project: { planName: '$plan.name', count: 1, _id: 0 } },
-    ]);
-    const mostPopularPlan = mostPopularPlanAgg[0]?.planName || 'N/A';
-    const topRevenueMonthAgg = [...monthlyRevenue].sort((a, b) => b.total - a.total);
-    const topRevenueMonth = topRevenueMonthAgg[0]?._id || 'N/A';
-    const avgRevenuePerShop = totalShops > 0 ? (totalRevenue / totalShops) : 0;
-
     res.json({
-      totalShops, activeShops, inactiveShops, expiredShops, trialShops,
-      totalRevenue, monthlyRevenue, totalPlans, activeSubscriptions,
+      totalShops, activeShops, expiredShops, trialShops,
+      totalRevenue, monthlyRevenue, activeSubscriptions: activeSubShopCount,
       expiringSoon, shopGrowth, planDistribution, activeVsExpired,
-      monthlyNewShops, recentShops, recentPayments, recentActivities,
-      mostPopularPlan, topRevenueMonth, avgRevenuePerShop,
+      recentActivities,
     });
   } catch (error) {
     console.error('Super Admin Dashboard Error:', error);
@@ -164,33 +123,31 @@ const getRevenueReports = async (req, res) => {
       default: format = '%Y-%m';
     }
 
-    const revenue = await Subscription.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: { $dateToString: { format, date: '$createdAt' } },
-          total: { $sum: '$totalAmount' },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const totalRevenueAgg = await Subscription.aggregate([
-      { $match: match },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-    ]);
-
-    // Monthly revenue for current period
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthRevenue = await Subscription.aggregate([
-      { $match: { createdAt: { $gte: monthStart } } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-    ]);
 
-    // Paying shops count
-    const payingShops = await Shop.countDocuments({ subscriptionStatus: 'active' });
+    const [revenue, totalRevenueAgg, currentMonthRevenue, payingShops] = await Promise.all([
+      Subscription.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: { $dateToString: { format, date: '$createdAt' } },
+            total: { $sum: '$totalAmount' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Subscription.aggregate([
+        { $match: match },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+      Subscription.aggregate([
+        { $match: { createdAt: { $gte: monthStart } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+      Shop.countDocuments({ subscriptionStatus: 'active' }),
+    ]);
 
     res.json({
       revenue,
@@ -208,18 +165,20 @@ const getRevenueReports = async (req, res) => {
 // @route   GET /api/super-admin/business-reports
 const getBusinessReports = async (req, res) => {
   try {
-    const shops = await Shop.find()
-      .select('name businessType isActive subscriptionStatus createdAt owner')
-      .populate('owner', 'name email')
-      .sort({ createdAt: -1 })
-      .lean();
+    const [shops, totalRevenueAgg] = await Promise.all([
+      Shop.find()
+        .select('name businessType isActive subscriptionStatus createdAt owner')
+        .populate('owner', 'name email')
+        .sort({ createdAt: -1 })
+        .lean(),
+      Subscription.aggregate([
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+    ]);
 
     const totalShops = shops.length;
     const activeShops = shops.filter(s => s.isActive).length;
     const trialShops = shops.filter(s => s.subscriptionStatus === 'trial').length;
-    const totalRevenueAgg = await Subscription.aggregate([
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-    ]);
     const totalRevenue = totalRevenueAgg[0]?.total || 0;
 
     res.json({ totalShops, activeShops, trialShops, totalRevenue, shops });
@@ -246,6 +205,7 @@ const getActivityLogs = async (req, res) => {
 
     const [logs, total] = await Promise.all([
       ActivityLog.find(query)
+        .select('action user createdAt details resource')
         .populate('user', 'name email role')
         .sort({ createdAt: -1 })
         .skip(skip)

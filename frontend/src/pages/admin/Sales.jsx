@@ -53,7 +53,7 @@ const getReturnStyles = (t) => ({
 });
 
 const getStatusOptions = (t) => [
-  { key: '', label: t('salesPage.filters.allStatus') },
+  { key: '', label: t('salesPage.status.all') },
   { key: 'paid', label: t('common.paid') },
   { key: 'partial', label: t('common.partial') },
   { key: 'unpaid', label: t('common.due') },
@@ -328,9 +328,9 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
               {/* Items to return */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><BiCart size={16} /><span>{t('salesPage.returnDrawer.itemsToReturn', { count: returnItems.length })}</span></span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><BiCart size={16} /><span>{t('salesPage.returnDrawer.selectItemsToReturn', { count: returnItems.length })}</span></span>
                   <button onClick={handleReturnAllClick} disabled={processing || allFullyReturned} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--primary)', background: 'transparent', color: 'var(--primary)', fontWeight: 600, fontSize: '0.7rem', cursor: 'pointer', whiteSpace: 'nowrap', opacity: allFullyReturned ? 0.5 : 1 }}>
-                    <BiUndo size={13} style={{ verticalAlign: 'middle' }} /> {t('salesPage.returnDrawer.returnAll')}
+                    <BiUndo size={13} style={{ verticalAlign: 'middle' }} /> {t('salesPage.returnDrawer.returnAllProducts')}
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -847,7 +847,7 @@ const Sales = () => {
         </div>
       </div>
 
-      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
         <div className="sales-table-scroll">
           <table className="sales-table">
             <thead>
@@ -898,14 +898,14 @@ const Sales = () => {
                         {rs.label}
                       </div>
                     </td>
-                    <td className="sales-actions-cell" style={{ width: '110px' }}>
-                      <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
+                    <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                      <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} title={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
                         <BiShow />
                       </button>
-                      <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
+                      <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
                         <BiPrinter />
                       </button>
-                      <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
                         <BiUndo />
                       </button>
                     </td>
@@ -1037,13 +1037,13 @@ const Sales = () => {
               }
               actions={
                 <>
-                  <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
+                  <button className="btn-action btn-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
                     <BiShow />
                   </button>
-                  <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
+                  <button className="btn-action btn-action-toggle" title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
                     <BiPrinter />
                   </button>
-                  <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
+                  <button className="btn-action btn-action-edit" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
                     <BiUndo />
                   </button>
                 </>
