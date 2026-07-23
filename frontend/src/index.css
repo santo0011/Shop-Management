@@ -1683,6 +1683,40 @@ select:-webkit-autofill {
   100% { background-position: -200% 0; }
 }
 
+/* Fade transition when content finishes refreshing */
+.sales-table-container .sales-table-scroll {
+  transition: opacity var(--transition-base);
+}
+
+.sales-table-container.content-visible .sales-table-scroll {
+  opacity: 1;
+}
+
+/* ─── Sales Refreshing Bar ──────────────────────────────────── */
+.sales-refreshing-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.85rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--border-radius-md);
+  background: rgba(var(--primary-rgb), 0.06);
+  border: 1px solid rgba(var(--primary-rgb), 0.12);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary);
+  animation: sales-refresh-fade-in 0.2s ease;
+}
+
+.sales-refreshing-bar .spinner-border {
+  color: var(--primary);
+}
+
+@keyframes sales-refresh-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ==========================================
    GLOBAL SEARCH (Navbar)
    ========================================== */

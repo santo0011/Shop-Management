@@ -179,6 +179,211 @@ const getPersistentData = async (forceRefresh) => {
 
 const clearPersistentCache = () => { cachedPersistentData = null; persistentCacheTime = 0; };
 
+// ─── Skeleton Loading ────────────────────────────────────────
+const ReportsSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '30%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '20%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 36, width: 100,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Summary Cards row */}
+    <div className="row g-3 mb-3">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="col-6 col-md-4">
+          <div className="premium-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 10, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 20, width: '80%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 6,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Filter Bar skeleton */}
+    <div className="premium-card mb-3" style={{ border: '1px solid var(--border-color)' }}>
+      <div className="premium-card-body" style={{ padding: '0.75rem 1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 140,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+            <div style={{
+              height: 32, width: 60,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{
+              height: 32, width: 60,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{
+              height: 32, width: 60,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Charts row */}
+    <div className="row g-3 mb-3">
+      <div className="col-lg-6">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '50%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '90%', height: '80%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 12,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+      <div className="col-lg-6">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '45%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '90%', height: '80%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 12,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Table skeleton */}
+    <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+      <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+        <div style={{
+          height: 16, width: '30%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 4,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ padding: '1rem 1.25rem' }}>
+        {/* Table header */}
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} style={{
+              flex: 1, height: 12,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+        {/* Table rows */}
+        {[1, 2, 3, 4, 5].map((r) => (
+          <div key={r} style={{
+            display: 'flex', gap: '1rem', padding: '0.6rem 0',
+            borderTop: '1px solid var(--border-color)',
+          }}>
+            {[1, 2, 3, 4, 5].map((c) => (
+              <div key={c} style={{
+                flex: 1, height: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 const Reports = () => {
   const { t } = useTranslation();
   const PRESETS = getPresets(t);
@@ -404,6 +609,9 @@ const Reports = () => {
     }
   };
 
+  // Show full-page skeleton on initial load instead of inline spinners
+  if (loading) return <ReportsSkeletonLoader />;
+
   // Show inline spinners instead of blocking the entire page — like Sales page
   if (error) {
     return (
@@ -517,7 +725,7 @@ const Reports = () => {
               <span className="badge badge-primary">{PRESETS.find(p => p.key === filters.preset)?.label || t('common.custom')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
-              {refreshing || loading ? (
+              {refreshing ? (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                   <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                 </div>
@@ -542,7 +750,7 @@ const Reports = () => {
               <span className="badge badge-success">{t('report.byQuantity')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
-              {refreshing || loading ? (
+              {refreshing ? (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                   <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                 </div>
@@ -611,7 +819,7 @@ const Reports = () => {
 
       {/* Top 10 Best Selling Products */}
       <div className="desktop-table mb-3">
-        {loading ? (
+        {refreshing ? (
           <div className="premium-card">
             <div className="premium-card-body text-center py-4" style={{ color: 'var(--text-muted)' }}>
               <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
@@ -643,7 +851,7 @@ const Reports = () => {
           <BiStar size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
           {t('reportsPage.top10Products')}
         </h5>
-        {loading ? (
+        {refreshing ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
@@ -710,7 +918,7 @@ const Reports = () => {
 
       {/* Recent Sales */}
       <div className="desktop-table">
-        {loading ? (
+        {refreshing ? (
           <div className="premium-card">
             <div className="premium-card-body text-center py-4" style={{ color: 'var(--text-muted)' }}>
               <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
@@ -756,7 +964,7 @@ const Reports = () => {
           <BiReceipt size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
           {t('sale.recentSales')}
         </h5>
-        {loading ? (
+        {refreshing ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>

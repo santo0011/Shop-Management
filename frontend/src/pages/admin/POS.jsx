@@ -195,6 +195,54 @@ const CustomQuantityModal = ({ product, initial, reservedBaseQty, onConfirm, onC
   );
 };
 
+// ─── Skeleton Loading ────────────────────────────────────────
+const POSSkeletonLoader = () => (
+  <div className="pos-modern">
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    <div className="pos-products-panel">
+      <div className="pos-search-section">
+        <div className="pos-search-wrapper">
+          <div style={{ width: '100%', height: 42, borderRadius: 'var(--border-radius-lg)', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+        </div>
+      </div>
+      <div className="pos-category-filter" style={{ marginBottom: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} style={{ height: 32, width: `${60 + i * 10}px`, borderRadius: 20, background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+          ))}
+        </div>
+      </div>
+      <div className="pos-product-grid">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          <div key={i} style={{ borderRadius: 'var(--border-radius-lg)', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+            <div style={{ height: 80, background: 'var(--bg-input)' }} />
+            <div style={{ padding: '0.5rem' }}>
+              <div style={{ height: 12, width: '80%', marginBottom: 6, background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} />
+              <div style={{ height: 10, width: '50%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="pos-cart-panel" style={{ padding: '1rem' }}>
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ height: 42, width: '100%', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+      </div>
+      {[1, 2, 3].map((i) => (
+        <div key={i} style={{ height: 60, marginBottom: i < 3 ? '0.5rem' : 0, borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+      ))}
+      <div style={{ marginTop: '1rem' }}>
+        <div style={{ height: 36, marginBottom: '0.5rem', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+        <div style={{ height: 36, marginBottom: '0.5rem', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+        <div style={{ height: 48, borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+      </div>
+      <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ height: 48, width: '100%', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+      </div>
+    </div>
+  </div>
+);
+
 const POS = () => {
   const { t, i18n } = useTranslation();
   const isBn = i18n.language === 'bn';
@@ -239,6 +287,7 @@ const POS = () => {
   const [lastSale, setLastSale] = useState(null);
   const [shopInfo, setShopInfo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [showTopSelling, setShowTopSelling] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmData, setConfirmData] = useState(null);
@@ -321,12 +370,22 @@ const POS = () => {
   const activeProductLimit = isMobileViewport ? mobileProductLimit : desktopProductLimit;
 
   useEffect(() => {
-    loadRecentSales();
-    loadCategorySalesRank();
-    loadProductSoldCounts();
-    api.get('/customers?limit=50', { _skipLoading: true }).then(({ data }) => setCustomers(data.customers || [])).catch(() => {});
-    api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
-    api.get('/categories', { _skipLoading: true }).then(({ data }) => setCategories(Array.isArray(data) ? data : data.categories || [])).catch(() => {});
+    (async () => {
+      try {
+        await Promise.all([
+          loadRecentSales(),
+          loadCategorySalesRank(),
+          loadProductSoldCounts(),
+          api.get('/customers?limit=50', { _skipLoading: true }).then(({ data }) => setCustomers(data.customers || [])),
+          api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)),
+          api.get('/categories', { _skipLoading: true }).then(({ data }) => setCategories(Array.isArray(data) ? data : data.categories || [])),
+        ]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setInitialLoad(false);
+      }
+    })();
   }, []);
 
   // Re-fetches Top Selling whenever the applicable display limit changes —
@@ -697,6 +756,8 @@ const POS = () => {
   const sortedCategories = [...categories].sort(
     (a, b) => (categorySalesRank[b._id] || 0) - (categorySalesRank[a._id] || 0)
   );
+
+  if (initialLoad) return <POSSkeletonLoader />;
 
   return (
     <div className="pos-modern">

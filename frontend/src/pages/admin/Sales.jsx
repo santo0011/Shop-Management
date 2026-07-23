@@ -49,28 +49,16 @@ const getStatusStyles = (t) => ({
 const getReturnStyles = (t) => ({
   none: { bg: 'rgba(158, 158, 158, 0.1)', color: '#9e9e9e', label: t('salesPage.returnStatusLabels.none') },
   partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: t('salesPage.returnStatusLabels.partial') },
-  full: { bg: 'rgba(108, 99, 255, 0.12)', color: '#6C63FF', label: t('salesPage.returnStatusLabels.full') },
-});
-
-const PAYMENT_ICONS = {
-  cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦',
-};
-
-// Translated display label for a payment/refund method key — showing the
-// raw stored value (e.g. "MOBILE_BANKING") would bypass the rename to "Other".
-const getPaymentMethodLabels = (t) => ({
-  cash: t('sale.cash'), card: t('sale.card'), upi: t('sale.upi'),
-  mobile_banking: t('sale.mobileBanking'), due: t('common.due'),
+  full: { bg: 'rgba(108, 99, 255, 0.1)', color: '#6C63FF', label: t('salesPage.returnStatusLabels.full') },
 });
 
 const getStatusOptions = (t) => [
-  { key: '', label: t('salesPage.status.all') },
+  { key: '', label: t('salesPage.filters.allStatus') },
   { key: 'paid', label: t('common.paid') },
   { key: 'partial', label: t('common.partial') },
   { key: 'unpaid', label: t('common.due') },
 ];
 
-// ─── Date Quick Filters ───────────────────────────────────────
 const getDatePresets = (t) => [
   { key: 'today', label: t('common.today') },
   { key: '7d', label: t('common.last7Days') },
@@ -79,53 +67,22 @@ const getDatePresets = (t) => [
   { key: 'custom', label: t('common.customRange') },
 ];
 
-// Local calendar date (no timezone shift) — matches what <input type="date"> produces
-const toDateInputValue = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
+const PAYMENT_METHOD_ICONS = { cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦' };
 
-// ─── Invoice QR Component ────────────────────────────────────
-const SalesInvoiceQR = ({ invoiceNo, size = 60 }) => {
-  const chars = (invoiceNo || 'INV').split('');
-  const cellSize = Math.max(2, Math.floor(size / (chars.length + 4)));
-  const padding = cellSize * 2;
-  const totalSize = padding * 2 + chars.length * cellSize;
-  return (
-    <svg width={totalSize} height={totalSize} viewBox={`0 0 ${totalSize} ${totalSize}`} style={{ display: 'block' }}>
-      <rect width={totalSize} height={totalSize} fill="white" rx="2" />
-      <rect x={padding} y={padding} width={cellSize * 7} height={cellSize * 7} fill="black" rx="1" />
-      <rect x={padding + cellSize} y={padding + cellSize} width={cellSize * 5} height={cellSize * 5} fill="white" />
-      <rect x={padding + cellSize * 2} y={padding + cellSize * 2} width={cellSize * 3} height={cellSize * 3} fill="black" />
-      {chars.map((ch, i) => (
-        <rect key={i} x={padding + (i % chars.length) * cellSize} y={padding + Math.floor(i / chars.length) * cellSize + cellSize * 8} width={cellSize} height={cellSize} fill={ch.charCodeAt(0) % 2 === 0 ? 'black' : 'white'} opacity={0.8} />
-      ))}
-    </svg>
-  );
-};
+const toDateInputValue = (date) => date.toISOString().slice(0, 10);
 
-// ─── View Drawer (uses standard drawer classes with smooth animation) ─────────
+// ─── Sale View Drawer ────────────────────────────────────────
 const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice }) => {
   const { t } = useTranslation();
-  const statusStyles = getStatusStyles(t);
-  const returnStyles = getReturnStyles(t);
-  const paymentMethodLabels = getPaymentMethodLabels(t);
-
-  const st = sale ? (statusStyles[sale.paymentStatus] || statusStyles.paid) : null;
-  const rs = sale ? (returnStyles[sale.returnStatus] || returnStyles.none) : null;
-  const pmtIcon = sale ? (PAYMENT_ICONS[sale.paymentMethod] || '💵') : null;
-  const pmtLabel = sale ? (paymentMethodLabels[sale.paymentMethod] || sale.paymentMethod || t('sale.cash')).toUpperCase() : '';
-  const allReturns = sale?.returns || [];
-  const totalRefunded = allReturns.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
+  const pmtIcon = PAYMENT_METHOD_ICONS[sale?.paymentMethod] || '💵';
+  const pmtLabel = sale?.paymentMethod ? t(`sale.${sale.paymentMethod}`) : '-';
 
   return (
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiReceipt size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />{t('salesPage.drawer.title')}</h5>
+          <h5><BiShow size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />{t('salesPage.drawer.title')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
@@ -140,56 +97,50 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
               }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: '50%',
-                  background: 'var(--gradient-primary)',
+                  background: 'linear-gradient(135deg, #6C63FF, #00D9A6)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#fff', margin: '0 auto 0.6rem',
-                  boxShadow: '0 4px 15px rgba(108,99,255,0.3)',
+                  boxShadow: '0 4px 20px rgba(108,99,255,0.3)',
                 }}>
                   <BiReceipt size={28} />
                 </div>
                 <h4 style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                   {sale.invoiceNo || t('common.notAvailable')}
                 </h4>
-                <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {formatDate(sale.createdAt)}
                 </span>
-                <div style={{ display: 'inline-block', padding: '3px 14px', borderRadius: 20, background: st.bg, color: st.color, fontSize: '0.72rem', fontWeight: 700 }}>
-                  {st.label}
-                </div>
-                <div style={{ display: 'inline-block', padding: '3px 14px', borderRadius: 20, background: rs.bg, color: rs.color, fontSize: '0.72rem', fontWeight: 700, marginTop: 6 }}>
-                  {rs.label}
-                </div>
               </div>
 
-              {/* Info Cards */}
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Shop & Customer Info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: '1.25rem' }}>
+                {shopInfo && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(108,99,255,0.1)', color: '#6C63FF' }}><BiUser size={18} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('sale.customer')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customer?.name || t('dashboard.walkInCustomer')}</span>
-                      {sale.customer?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {sale.customer.phone}</span>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(0,217,166,0.1)', color: '#00D9A6' }}><BiStore size={18} /></div>
+                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(108,99,255,0.1)', color: 'var(--primary)' }}><BiStore size={18} /></div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
                       <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.shop')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.name || shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.name || '-'}</span>
                       {shopInfo?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {shopInfo.phone}</span>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(255,181,69,0.1)', color: '#F39C12' }}><BiCreditCard size={18} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.payment')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {pmtLabel}</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                        {t('common.paid')}: <strong style={{ color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
-                        {sale.dueAmount > 0 && <> | {t('common.due')}: <strong style={{ color: '#FF6B6B' }}>₹{Number(sale.dueAmount).toFixed(2)}</strong></>}
-                      </span>
-                    </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(0,217,166,0.1)', color: '#00D9A6' }}><BiUser size={18} /></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('sale.customer')}</span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
+                    {sale.customer?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {sale.customer.phone}</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(255,181,69,0.1)', color: '#F39C12' }}><BiCreditCard size={18} /></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.payment')}</span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {pmtLabel}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                      {t('common.paid')}: <strong style={{ color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
+                      {sale.dueAmount > 0 && <> | {t('common.due')}: <strong style={{ color: '#FF6B6B' }}>₹{Number(sale.dueAmount).toFixed(2)}</strong></>}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -228,91 +179,26 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                    <span>{t('sale.subtotal')}</span><span>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
+                    <span>{t('sale.subtotal')}</span>
+                    <span>₹{Number(sale.subtotal || sale.totalAmount || 0).toFixed(2)}</span>
                   </div>
-                  {Number(sale.tax || 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                      <span>{t('sale.tax')}</span><span>₹{Number(sale.tax).toFixed(2)}</span>
-                    </div>
-                  )}
-                  {Number(sale.discount || 0) > 0 && (
+                  {sale.discountOnTotal > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#e74c3c' }}>
-                      <span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span>
+                      <span>{t('sale.discount')}</span>
+                      <span>-₹{Number(sale.discountOnTotal).toFixed(2)}</span>
                     </div>
                   )}
-                  {/* sale.totalAmount is already the floored Final Payable amount
-                      (rounded down once at sale creation) — reconstruct the
-                      pre-round Grand Total from the stored roundOff delta so
-                      this preview shows the full Subtotal → Tax → Discount →
-                      Grand Total → Round Off → Payable breakdown. */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                    <span>{t('salesPage.invoice.grandTotal')}</span><span>₹{(Number(sale.totalAmount ?? sale.grandTotal ?? 0) - Number(sale.roundOff || 0)).toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.55rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'rgba(108,99,255,0.06)', border: '1px solid rgba(108,99,255,0.15)', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                    <span>{t('sale.grandTotal')}</span>
+                    <span style={{ fontSize: '1.05rem', color: 'var(--primary)' }}>₹{Number(sale.grandTotal || sale.totalAmount || 0).toFixed(2)}</span>
                   </div>
-                  {Number(sale.roundOff || 0) !== 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      <span>{t('posPage.totals.roundOff')}</span><span>-₹{Math.abs(Number(sale.roundOff)).toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))', fontSize: '0.9rem', color: '#fff', fontWeight: 700, boxShadow: '0 2px 10px rgba(108,99,255,0.2)' }}>
-                    <span>{t('posPage.totals.payable')}</span><span style={{ fontSize: '1.05rem', fontWeight: 800 }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#2ecc71', fontWeight: 600 }}>
-                    <span>{t('common.paid')}</span><span>₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
-                  </div>
-                  {Number(sale.dueAmount || 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#FF6B6B', fontWeight: 600 }}>
-                      <span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span>
-                    </div>
-                  )}
-                  {totalRefunded > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#6C63FF', fontWeight: 600 }}>
-                      <span>{t('salesPage.totalRefund')}</span><span>₹{Number(totalRefunded).toFixed(2)}</span>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Return History */}
-              {allReturns.length > 0 && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                    <BiUndo size={16} /><span>{t('salesPage.drawer.returnHistory', { count: allReturns.length })}</span>
-                  </div>
-                  {allReturns.map((ret, rIdx) => (
-                    <div key={rIdx} style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'rgba(108,99,255,0.04)', border: '1px solid rgba(108,99,255,0.1)', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(108,99,255,0.1)', flexWrap: 'wrap', gap: 4 }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}><BiTime size={12} /> {formatDate(ret.returnDate)}</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 4 }}>{(paymentMethodLabels[ret.refundMethod] || ret.refundMethod || '').toUpperCase()}</span>
-                      </div>
-                      {ret.processedBy?.name && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 4 }}>
-                          <BiUserCircle size={12} /> {t('salesPage.returnDrawer.returnedBy')}: <strong style={{ color: 'var(--text-secondary)' }}>{ret.processedBy.name}</strong>
-                        </div>
-                      )}
-                      {ret.items.map((ritem, riIdx) => (
-                        <div key={riIdx} style={{ padding: '4px 0', borderBottom: riIdx < ret.items.length - 1 ? '1px solid var(--border-light)' : 'none' }}>
-                          <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{ritem.productName || t('salesPage.invoice.item')}</span>
-                          <div style={{ display: 'flex', gap: 12, fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 1 }}>
-                            <span>{t('salesPage.invoice.qty')}: {ritem.quantity}</span>
-                            <span>{t('salesPage.refund')}: ₹{Number(ritem.refundAmount).toFixed(2)}</span>
-                          </div>
-                          {ritem.reason && <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 2 }}>{ritem.reason}</span>}
-                        </div>
-                      ))}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(108,99,255,0.1)' }}>
-                        {t('salesPage.totalRefund')}: <strong style={{ color: 'var(--primary)', marginLeft: 4 }}>₹{Number(ret.totalRefund).toFixed(2)}</strong>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {sale.notes && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                    <BiNote size={16} /><span>{t('common.notes')}</span>
-                  </div>
-                  <p style={{ padding: '0.65rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,181,69,0.06)', border: '1px solid rgba(255,181,69,0.12)', fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{sale.notes}</p>
+              {/* Footer */}
+              {shopInfo?.address && (
+                <div style={{ textAlign: 'center', padding: '0.6rem 0', borderTop: '1px dashed var(--border-color)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  {formatAddress(shopInfo.address)}
                 </div>
               )}
             </>
@@ -320,82 +206,70 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
         </div>
         <div className="drawer-footer">
           <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.close')}</button>
-          {sale && (
-            <>
-              {/* <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice?.(sale.invoiceNo)} title={t('salesPage.copyInvoiceNumber')}><BiCopy size={16} /></button> */}
-              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint?.(sale)}><BiPrinter size={16} /> {t('salesPage.reprint')}</button>
-            </>
-          )}
+          <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice(sale?.invoiceNo)}><BiCopy size={15} /> {t('salesPage.copyInvoiceNumber')}</button>
+          <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint(sale)}><BiPrinter size={15} /> {t('common.print')}</button>
         </div>
       </div>
     </>
   );
 };
 
-// ─── Return Drawer (uses standard drawer classes with smooth animation) ──────
+// ─── Return Drawer ────────────────────────────────────────────
 const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
   const { t } = useTranslation();
   const [returnItems, setReturnItems] = useState([]);
-  const [refundMethod, setRefundMethod] = useState('cash');
   const [reason, setReason] = useState('');
+  const [refundMethod, setRefundMethod] = useState('cash');
   const [processing, setProcessing] = useState(false);
   const [showConfirmReturnAll, setShowConfirmReturnAll] = useState(false);
 
   useEffect(() => {
-    if (sale && open) {
-      setReturnItems((sale.items || []).map(item => ({
-        productId: item.product?._id || item.product,
-        productName: item.product?.name || item.name || t('salesPage.invoice.item'),
-        soldQty: item.quantity || 0,
+    if (sale) {
+      setReturnItems(sale.items?.map((item) => ({
+        productId: item.product?._id || item.productId,
+        productName: item.product?.name || item.name || '',
+        soldQty: item.quantity,
         returnedQty: item.returnedQty || 0,
-        maxReturnable: Math.max(0, (item.quantity || 0) - (item.returnedQty || 0)),
-        price: item.price || 0,
+        maxReturnable: item.quantity - (item.returnedQty || 0),
         returnQty: 0,
         refundAmount: 0,
+        price: item.price || 0,
         itemReason: '',
-      })));
-      setRefundMethod('cash');
+      })) || []);
       setReason('');
+      setRefundMethod('cash');
       setShowConfirmReturnAll(false);
     }
-  }, [sale, open]);
+  }, [sale]);
 
-  const handleQtyChange = (idx, val) => {
-    const newItems = [...returnItems];
-    const qty = Math.max(0, Math.min(val, newItems[idx].maxReturnable));
-    newItems[idx].returnQty = qty;
-    newItems[idx].refundAmount = qty * newItems[idx].price;
-    setReturnItems(newItems);
-  };
-
-  const totalRefund = returnItems.reduce((s, i) => s + (i.refundAmount || 0), 0);
+  const totalRefund = returnItems.reduce((sum, i) => sum + (i.refundAmount || 0), 0);
   const hasItems = returnItems.some(i => i.returnQty > 0);
 
-  // Check if all returnable items are already at max
-  const returnableItems = returnItems.filter(i => i.maxReturnable > 0);
-  const allSelected = returnableItems.length > 0 && returnableItems.every(i => i.returnQty === i.maxReturnable);
-
-  const handleReturnAll = () => {
-    if (allSelected) {
-      // Clear all
-      setReturnItems(prev => prev.map(i => ({ ...i, returnQty: 0, refundAmount: 0 })));
-    } else {
-      // Show confirmation first
-      setShowConfirmReturnAll(true);
-    }
+  const handleQtyChange = (idx, val) => {
+    const next = [...returnItems];
+    const clamped = Math.max(0, Math.min(val, next[idx].maxReturnable));
+    next[idx].returnQty = clamped;
+    next[idx].refundAmount = clamped * next[idx].price;
+    setReturnItems(next);
   };
 
-  const executeReturnAll = () => {
-    setReturnItems(prev => prev.map(i => ({
+  // "Return All" flow
+  const handleReturnAllClick = () => {
+    const next = returnItems.map(i => ({
       ...i,
       returnQty: i.maxReturnable,
       refundAmount: i.maxReturnable * i.price,
-    })));
+    }));
+    setReturnItems(next);
+    setShowConfirmReturnAll(true);
+  };
+
+  const executeReturnAll = () => {
     setShowConfirmReturnAll(false);
   };
 
   const handleSubmit = async () => {
-    if (!hasItems) { showToast.error(t('salesPage.returnDrawer.selectAtLeastOneItem')); return; }
+    if (!sale || !hasItems || processing) return;
     setProcessing(true);
     try {
       const { data } = await api.post(`/sales/${sale._id}/return`, {
@@ -451,53 +325,19 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 </span>
               </div>
 
-              {allFullyReturned ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <BiCheck size={48} style={{ color: 'var(--secondary)', marginBottom: 12 }} />
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{t('salesPage.returnDrawer.allReturnedTitle')}</h4>
-                  <p style={{ fontSize: '0.85rem', margin: 0 }}>{t('salesPage.returnDrawer.allReturnedDesc')}</p>
+              {/* Items to return */}
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><BiCart size={16} /><span>{t('salesPage.returnDrawer.itemsToReturn', { count: returnItems.length })}</span></span>
+                  <button onClick={handleReturnAllClick} disabled={processing || allFullyReturned} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--primary)', background: 'transparent', color: 'var(--primary)', fontWeight: 600, fontSize: '0.7rem', cursor: 'pointer', whiteSpace: 'nowrap', opacity: allFullyReturned ? 0.5 : 1 }}>
+                    <BiUndo size={13} style={{ verticalAlign: 'middle' }} /> {t('salesPage.returnDrawer.returnAll')}
+                  </button>
                 </div>
-              ) : (
-                <>
-                  {/* Return All / Clear All Button */}
-                  {returnableItems.length > 0 && (
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <button
-                        onClick={handleReturnAll}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '7px 14px',
-                          border: 'none',
-                          borderRadius: 'var(--border-radius-sm)',
-                          background: allSelected ? 'rgba(255,107,107,0.1)' : 'rgba(108,99,255,0.1)',
-                          color: allSelected ? 'var(--danger)' : 'var(--primary)',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          fontFamily: 'var(--font-family)',
-                          cursor: 'pointer',
-                          transition: 'all var(--transition-fast)',
-                          width: '100%',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {allSelected ? <><BiTrash size={16} /> {t('salesPage.returnDrawer.clearAll')}</> : <><BiCheck size={16} /> {t('salesPage.returnDrawer.returnAllProducts')}</>}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Items to return */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                      <BiPackage size={16} /><span>{t('salesPage.returnDrawer.selectItemsToReturn')}</span>
-                    </div>
-                    {returnItems.map((item, idx) => (
-                      <div key={idx} style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', marginBottom: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.productName}</span>
-                          {item.maxReturnable <= 0 && <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 10 }}>{t('salesPage.returnStatusLabels.full')}</span>}
-                        </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {returnItems.map((item, idx) => (
+                    item.maxReturnable <= 0 ? null : (
+                      <div key={idx} style={{ padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', marginBottom: 4 }}>{item.productName}</div>
                         <div style={{ display: 'flex', gap: 12, fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
                           <span>{t('salesPage.returnDrawer.sold')} <strong style={{ color: 'var(--text-primary)' }}>{item.soldQty}</strong></span>
                           <span>{t('salesPage.returnDrawer.returned')} <strong style={{ color: 'var(--text-primary)' }}>{item.returnedQty}</strong></span>
@@ -528,36 +368,36 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                           </>
                         )}
                       </div>
-                    ))}
-                  </div>
+                    )
+                  ))}
+                </div>
+              </div>
 
-                  {/* Refund Details */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                      <BiWallet size={16} /><span>{t('salesPage.returnDrawer.refundDetails')}</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(var(--primary-rgb), 0.06)', border: '1px solid rgba(var(--primary-rgb), 0.12)', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                        <span>{t('salesPage.totalRefund')}</span>
-                        <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{totalRefund.toFixed(2)}</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundMethod')}</label>
-                        <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}>
-                          <option value="cash">{t('sale.cash')}</option>
-                          <option value="card">{t('sale.card')}</option>
-                          <option value="upi">{t('sale.upi')}</option>
-                          <option value="mobile_banking">{t('sale.mobileBanking')}</option>
-                        </select>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.overallReasonLabel')}</label>
-                        <input type="text" placeholder={t('salesPage.returnDrawer.reasonExamplePlaceholder')} value={reason} onChange={(e) => setReason(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }} />
-                      </div>
-                    </div>
+              {/* Refund Details */}
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                  <BiWallet size={16} /><span>{t('salesPage.returnDrawer.refundDetails')}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(var(--primary-rgb), 0.06)', border: '1px solid rgba(var(--primary-rgb), 0.12)', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    <span>{t('salesPage.totalRefund')}</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{totalRefund.toFixed(2)}</span>
                   </div>
-                </>
-              )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundMethod')}</label>
+                    <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}>
+                      <option value="cash">{t('sale.cash')}</option>
+                      <option value="card">{t('sale.card')}</option>
+                      <option value="upi">{t('sale.upi')}</option>
+                      <option value="mobile_banking">{t('sale.mobileBanking')}</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.overallReasonLabel')}</label>
+                    <input type="text" placeholder={t('salesPage.returnDrawer.reasonExamplePlaceholder')} value={reason} onChange={(e) => setReason(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }} />
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -649,6 +489,153 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
   );
 };
 
+// ─── Skeleton Loading ────────────────────────────────────────
+const SalesSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 36, width: 180,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Stat Cards row */}
+    <div className="row g-3 mb-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col-6 col-md-3">
+          <div className="premium-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 10, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 20, width: '80%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 6,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Filter Bar */}
+    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{
+        height: 36, width: 200,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 36, width: 90,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 36, width: 90,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 36, width: 90,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+      <div style={{
+        height: 36, width: 140,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Table skeleton */}
+    <div className="sales-table-container desktop-table" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+      {/* Table header */}
+      <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <div key={i} style={{
+            flex: 1, height: 12,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </div>
+      {/* Table rows */}
+      {[1, 2, 3, 4, 5].map((r) => (
+        <div key={r} style={{
+          display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+            <div key={c} style={{
+              flex: 1, height: 10,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Table Inline Skeleton (for filter refreshes) ────────────
+const TableSkeletonRows = () => (
+  <>
+    {[1, 2, 3, 4, 5].map((r) => (
+      <tr key={r} style={{ opacity: 0.5 }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+          <td key={c} style={{ padding: '0.75rem 1rem' }}>
+            <div style={{
+              height: 10, width: c === 3 ? '50%' : c === 2 ? '70%' : '40%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>
+);
+
 // ─── Main Sales Component ────────────────────────────────────
 const Sales = () => {
   const { t } = useTranslation();
@@ -657,7 +644,8 @@ const Sales = () => {
   const STATUS_OPTIONS = getStatusOptions(t);
   const DATE_PRESETS = getDatePresets(t);
   const [sales, setSales] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   // Default to last 30 days on initial load
@@ -687,6 +675,7 @@ const Sales = () => {
   const filtersRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   const isFirstLoad = useRef(true);
+  const dataVersionRef = useRef(0);
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -698,59 +687,47 @@ const Sales = () => {
     api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
   }, []);
 
-  // Only the very first load shows the full-page loader; subsequent fetches
-  // caused by search/filter/pagination stay silent and use the table indicator.
-  // The summary cards are read straight off this same response's `stats`
-  // field — one request, one query on the backend, so the table and the
-  // cards can never disagree about what "the current filter" means, and
-  // there's no separate /sales/stats round-trip to keep in sync or forget.
-  const fetchSales = useCallback(async () => {
-    const silent = !isFirstLoad.current;
-    if (silent) setSearching(true); else setLoading(true);
+  const fetchSales = useCallback(async ({ page: p = 1, isSearch = false } = {}) => {
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+    if (isSearch) setSearching(true);
     try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.append('search', debouncedSearch);
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-      if (paymentStatus) params.append('paymentStatus', paymentStatus);
-      params.append('page', page);
-      params.append('limit', 20);
+      const params = new URLSearchParams({
+        page: p, limit: 20, startDate, endDate,
+        ...(paymentStatus ? { paymentStatus } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+      });
       const { data } = await api.get(`/sales?${params.toString()}`, { _skipLoading: true });
       setSales(data.sales || []);
-      setTotalPages(data.pages || 1);
+      setTotalPages(data.totalPages || 1);
       setTotal(data.total || 0);
       setStats(data.stats || null);
-    } catch (err) { console.error(err); }
-    finally {
-      if (silent) setSearching(false); else setLoading(false);
-      isFirstLoad.current = false;
+      setPage(p);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setInitialLoading(false);
+      setRefreshing(false);
+      setSearching(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
+      dataVersionRef.current += 1;
     }
-  }, [debouncedSearch, startDate, endDate, paymentStatus, page]);
+  }, [startDate, endDate, paymentStatus, debouncedSearch]);
 
-  useEffect(() => { fetchSales(); }, [fetchSales]);
-  useEffect(() => { setPage(1); }, [debouncedSearch, startDate, endDate, paymentStatus]);
-
-  // ESC key closes drawers
   useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        if (drawerOpen) { setDrawerOpen(false); setViewingSale(null); }
-        if (returnDrawerOpen) { setReturnDrawerOpen(false); setReturningSale(null); }
-      }
-    };
-    if (drawerOpen || returnDrawerOpen) {
-      document.addEventListener('keydown', handleEsc);
-      return () => document.removeEventListener('keydown', handleEsc);
-    }
-  }, [drawerOpen, returnDrawerOpen]);
+    fetchSales({ page: 1, isSearch: false });
+  }, [fetchSales, debouncedSearch, startDate, endDate, paymentStatus]);
 
-  const refreshAll = () => {
-    fetchSales();
-  };
+  const refreshAll = useCallback(() => {
+    fetchSales({ page: page, isSearch: false });
+  }, [fetchSales, page]);
 
   const applyDatePreset = (key) => {
     setDatePreset(key);
-    if (key === 'custom') return; // just reveal the manual pickers below; leave existing dates as-is
+    if (key === 'custom') return;
 
     const now = new Date();
     let start = new Date(now);
@@ -763,7 +740,6 @@ const Sales = () => {
     } else if (key === 'month') {
       start = new Date(now.getFullYear(), now.getMonth(), 1);
     }
-    // 'today' needs no adjustment — start and end are both "now"
 
     setStartDate(toDateInputValue(start));
     setEndDate(toDateInputValue(end));
@@ -799,6 +775,8 @@ const Sales = () => {
     { label: t('salesPage.stats.totalProfit'), value: stats?.totalProfit || 0, icon: BiTrendingUp, color: 'warning', isCurrency: true },
     { label: t('salesPage.stats.totalOrders'), value: stats?.totalOrders || 0, icon: BiCart, color: 'danger', isCurrency: false },
   ];
+
+  if (initialLoading) return <SalesSkeletonLoader />;
 
   return (
     <div>
@@ -869,7 +847,7 @@ const Sales = () => {
         </div>
       </div>
 
-      <div className={`sales-table-container table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
         <div className="sales-table-scroll">
           <table className="sales-table">
             <thead>
@@ -884,7 +862,9 @@ const Sales = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {refreshing ? (
+                <TableSkeletonRows />
+              ) : searching ? (
                 <tr><td colSpan={7}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : sales.length === 0 ? (
                 <tr><td colSpan={7}><div className="sales-empty-state"><span className="sales-empty-icon">🧾</span><p>{t('salesPage.noSalesFound')}</p></div></td></tr>
@@ -901,19 +881,33 @@ const Sales = () => {
                       </div>
                     </td>
                     <td>
-                      <div className="sales-customer-cell">
-                        <span className="sales-customer-name">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
-                        {sale.customer?.phone && <span className="sales-customer-phone">{sale.customer.phone}</span>}
+                      <div className="sales-customer-badge">
+                        <BiUserCircle size={16} />
+                        <span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
                       </div>
                     </td>
                     <td><span className="sales-amount">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></td>
-                    <td><span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>{st.label}</span></td>
-                    <td><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>{rs.label}</span></td>
                     <td>
-                      <div className="sales-actions">
-                        <button className="sales-action-btn sales-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow size={16} /></button>
-                        <button className="sales-action-btn sales-action-return" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo size={16} /></button>
+                      <div className="sales-status-badge" style={{ background: st.bg, color: st.color }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color, display: 'inline-block' }} />
+                        {st.label}
                       </div>
+                    </td>
+                    <td>
+                      <div className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>
+                        {rs.label}
+                      </div>
+                    </td>
+                    <td className="sales-actions-cell" style={{ width: '110px' }}>
+                      <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
+                        <BiShow />
+                      </button>
+                      <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
+                        <BiPrinter />
+                      </button>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
+                        <BiUndo />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -923,29 +917,64 @@ const Sales = () => {
         </div>
       </div>
 
-      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
-      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
-        {loading ? (
-          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+      {/* ─── Mobile: Sale Cards ────────────────────────────────────────── */}
+      <div className="mobile-cards">
+        {refreshing ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="expandable-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <div style={{
+                    height: 14, width: '35%',
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 4,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                  <div style={{
+                    height: 14, width: '25%',
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 4,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{
+                    height: 10, width: '40%',
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 4,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                  <div style={{
+                    height: 10, width: '20%',
+                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                    backgroundSize: '200% 100%', borderRadius: 4,
+                    animation: 'shimmer 1.5s infinite',
+                  }} />
+                </div>
+              </div>
+            ))}
+          </>
+        ) : searching ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : sales.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🧾</div>
-            {t('salesPage.noSalesFound')}
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.35 }}>🧾</div>
+            <h5 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t('salesPage.noSalesFound')}</h5>
           </div>
         ) : sales.map((sale) => {
           const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
           const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
-          const hasReturn = sale.returnStatus && sale.returnStatus !== 'none';
+          const hasReturn = (sale.returnStatus && sale.returnStatus !== 'none');
           return (
             <ExpandableCard
               key={sale._id}
               compact={
                 <>
                   <div className="expandable-card__compact-row">
-                    <span className="expandable-card__name" style={{ fontSize: '0.75rem' }}>{sale.invoiceNo || t('common.notAvailable')}</span>
-                    <span className="expandable-card__price" style={{ fontSize: '0.85rem' }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                    <span className="expandable-card__name"><BiHash size={12} style={{ marginRight: 2 }} /> {sale.invoiceNo || t('common.notAvailable')}</span>
+                    <span className="expandable-card__price">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
                   </div>
                   <div className="expandable-card__meta">
                     <span className="expandable-card__meta-item">
