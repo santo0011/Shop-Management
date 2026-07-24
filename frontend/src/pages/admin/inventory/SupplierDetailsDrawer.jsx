@@ -184,6 +184,7 @@ const SupplierDetailsDrawer = ({ open, supplierId, onClose, t }) => {
                   <InfoRow icon={BiPhone} label={t('auth.phone') || 'Phone'} value={supplier.phone} />
                   <InfoRow icon={BiEnvelope} label={t('auth.email') || 'Email'} value={supplier.email} />
                   <InfoRow icon={BiMapPin} label={t('suppliersPage.form.address') || 'Address'} value={supplier.address} />
+                  <InfoRow icon={BiMapPin} label="State" value={supplier.state || 'West Bengal'} />
                   <InfoRow icon={BiHash} label={t('suppliersPage.gstVat') || 'GST/VAT Number'} value={supplier.gstNumber || supplier.vatNumber || '—'} />
                   <InfoRow
                     icon={BiCheckCircle}

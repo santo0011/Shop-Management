@@ -29,6 +29,12 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
   const printCopies = Math.max(1, shopInfo?.settings?.printCopies || 1);
   const footerMsg = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
   const taxName = shopInfo?.settings?.taxName || t('posPage.receipt.defaultTaxName');
+  const gstRate = Number(sale?.gstRate ?? shopInfo?.settings?.defaultGstRate ?? 0);
+  const cgst = Number(sale?.cgst || 0);
+  const sgst = Number(sale?.sgst || 0);
+  const igst = Number(sale?.igst || 0);
+  const gstAmount = Number(sale?.gstAmount || sale?.tax || 0);
+  const isIntrastate = cgst > 0 || sgst > 0;
 
   // sale.totalAmount is already the floored Final Payable amount (rounding
   // happens once, at sale creation) — reconstruct the pre-round Grand Total
@@ -353,7 +359,14 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-divider" />
       <div className="receipt-totals">
         <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {isIntrastate ? (
+          <>
+            {cgst > 0 && <div className="receipt-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
+            {sgst > 0 && <div className="receipt-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
+          </>
+        ) : (
+          igst > 0 && <div className="receipt-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
+        )}
         {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
         <div className="receipt-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
         {roundOff !== 0 && <div className="receipt-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
@@ -415,7 +428,14 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-modern-divider" />
       <div className="receipt-modern-totals">
         <div className="receipt-modern-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-modern-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {isIntrastate ? (
+          <>
+            {cgst > 0 && <div className="receipt-modern-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
+            {sgst > 0 && <div className="receipt-modern-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
+          </>
+        ) : (
+          igst > 0 && <div className="receipt-modern-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
+        )}
         {Number(sale?.discount || 0) > 0 && <div className="receipt-modern-total-row receipt-modern-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
         <div className="receipt-modern-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
         {roundOff !== 0 && <div className="receipt-modern-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
@@ -465,7 +485,14 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-minimal-divider" />
       <div className="receipt-minimal-totals">
         <div className="receipt-minimal-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-minimal-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {isIntrastate ? (
+          <>
+            {cgst > 0 && <div className="receipt-minimal-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
+            {sgst > 0 && <div className="receipt-minimal-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
+          </>
+        ) : (
+          igst > 0 && <div className="receipt-minimal-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
+        )}
         {Number(sale?.discount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
         <div className="receipt-minimal-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
         {roundOff !== 0 && <div className="receipt-minimal-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
@@ -519,7 +546,14 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-grocery-divider" />
       <div className="receipt-grocery-totals">
         <div className="receipt-grocery-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-grocery-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {isIntrastate ? (
+          <>
+            {cgst > 0 && <div className="receipt-grocery-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
+            {sgst > 0 && <div className="receipt-grocery-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
+          </>
+        ) : (
+          igst > 0 && <div className="receipt-grocery-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
+        )}
         {Number(sale?.discount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
         <div className="receipt-grocery-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
         {roundOff !== 0 && <div className="receipt-grocery-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}

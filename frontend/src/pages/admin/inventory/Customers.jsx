@@ -42,7 +42,7 @@ const paymentSourceMeta = (t) => ({
   due_collection: { label: t('customersPage.paymentSourceDueCollection'), bg: 'rgba(255,181,69,0.12)', color: '#F39C12' },
 });
 
-const emptyForm = { name: '', nameBn: '', phone: '', email: '', address: '' };
+const emptyForm = { name: '', nameBn: '', phone: '', email: '', address: '', state: '', gstNumber: '' };
 const REQUIRED_FIELDS = ['name', 'phone'];
 
 const validateField = (t, name, value) => {
@@ -306,6 +306,8 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
       phone: data.phone || '',
       email: data.email || '',
       address: typeof data.address === 'object' ? Object.values(data.address).filter(Boolean).join(', ') : (data.address || ''),
+      state: data.state || '',
+      gstNumber: data.gstNumber || '',
     } : emptyForm);
   }, [open, editing, viewing]);
 
@@ -903,6 +905,27 @@ const CustomerDrawer = ({ open, onClose, onSuccess, editing, viewing, onEditFrom
                 <div>
                   <label className="form-label" style={labelStyle}>{t('customersPage.address')}</label>
                   <input {...field('address')} placeholder={t('customersPage.addressPlaceholder')} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label className="form-label" style={labelStyle}>State</label>
+                  <select
+                    className={`form-control ${errors.state ? 'is-invalid' : ''}`}
+                    value={form.state}
+                    onChange={(e) => handleChange('state', e.target.value)}
+                    disabled={isViewing}
+                    style={isViewing ? { background: 'var(--bg-input)', cursor: 'default', opacity: 0.8 } : inputStyle}
+                  >
+                    <option value="">Select State</option>
+                    {['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'].map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label" style={labelStyle}>GST Number</label>
+                  <input {...field('gstNumber')} placeholder="e.g. 22AAAAA0000A1Z5" />
                 </div>
               </div>
             </div>

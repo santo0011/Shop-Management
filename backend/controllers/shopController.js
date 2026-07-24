@@ -390,7 +390,8 @@ const updateMyShopSettings = async (req, res) => {
     }
 
     const {
-      taxRate, taxName, receiptFooter, invoicePrefix,
+      gstEnabled, gstNumber, defaultGstRate, cgstRate, sgstRate, igstRate, businessState, roundOffEnabled,
+      receiptFooter, invoicePrefix,
       barcodePrefix, barcodeSymbology, autoGenerateBarcode,
       // Printer settings
       paperSize, invoiceTemplate, printMode, autoPrint,
@@ -407,8 +408,14 @@ const updateMyShopSettings = async (req, res) => {
     // unrelated settings in the same payload silently save anyway.
     if (await rejectIfBusinessTypeLocked(res, shop, businessType)) return;
 
-    if (taxRate !== undefined) shop.settings.taxRate = Math.max(0, Math.min(100, Number(taxRate)));
-    if (taxName !== undefined) shop.settings.taxName = taxName;
+    if (gstEnabled !== undefined) shop.settings.gstEnabled = !!gstEnabled;
+    if (gstNumber !== undefined) shop.settings.gstNumber = gstNumber;
+    if (defaultGstRate !== undefined) shop.settings.defaultGstRate = Math.max(0, Math.min(100, Number(defaultGstRate)));
+    if (cgstRate !== undefined) shop.settings.cgstRate = Math.max(0, Math.min(100, Number(cgstRate)));
+    if (sgstRate !== undefined) shop.settings.sgstRate = Math.max(0, Math.min(100, Number(sgstRate)));
+    if (igstRate !== undefined) shop.settings.igstRate = Math.max(0, Math.min(100, Number(igstRate)));
+    if (businessState !== undefined) shop.settings.businessState = businessState;
+    if (roundOffEnabled !== undefined) shop.settings.roundOffEnabled = !!roundOffEnabled;
     if (receiptFooter !== undefined) shop.settings.receiptFooter = receiptFooter;
     if (invoicePrefix !== undefined) shop.settings.invoicePrefix = invoicePrefix;
     if (barcodePrefix !== undefined) shop.settings.barcodePrefix = barcodePrefix;

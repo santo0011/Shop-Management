@@ -35,7 +35,27 @@ const purchaseItemSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
+    type: Number,
+    default: 0,
+  },
+  cgst: {
+    type: Number,
+    default: 0,
+  },
+  sgst: {
+    type: Number,
+    default: 0,
+  },
+  igst: {
+    type: Number,
+    default: 0,
+  },
+  taxableAmount: {
+    type: Number,
+    default: 0,
+  },
+  gstAmount: {
     type: Number,
     default: 0,
   },
@@ -78,7 +98,27 @@ const purchaseSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
+    type: Number,
+    default: 0,
+  },
+  cgst: {
+    type: Number,
+    default: 0,
+  },
+  sgst: {
+    type: Number,
+    default: 0,
+  },
+  igst: {
+    type: Number,
+    default: 0,
+  },
+  taxableAmount: {
+    type: Number,
+    default: 0,
+  },
+  gstAmount: {
     type: Number,
     default: 0,
   },
@@ -122,9 +162,6 @@ const purchaseSchema = new mongoose.Schema({
 // ─── Indexes for performance ──────────────────────────────────
 purchaseSchema.index({ shop: 1, purchaseDate: -1 });
 purchaseSchema.index({ shop: 1, purchaseNo: 1 }, { unique: true });
-// A supplier invoice number only needs to be unique per supplier, and is
-// optional — the partial filter excludes purchases that left it blank so
-// empty strings never collide with each other.
 purchaseSchema.index(
   { shop: 1, supplier: 1, supplierInvoiceNo: 1 },
   { unique: true, partialFilterExpression: { supplierInvoiceNo: { $ne: '' } } }

@@ -202,25 +202,209 @@ const getSupplierDueReport = async (req, res) => {
   }
 };
 
-const getTaxReport = async (req, res) => {
+const getGstReport = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
     const shopId = req.user.shop;
-    let dateFilter = {};
+    const { startDate, endDate, type, gstRate, state, customer, supplier } = req.query;
 
+    let dateFilter = {};
     if (startDate && endDate) {
-      dateFilter = { saleDate: { $gte: new Date(startDate), $lte: new Date(endDate) } };
+      dateFilter = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
 
-    const taxData = await Sale.aggregate([
-      { $match: { shop: shopId, ...dateFilter } },
-      { $group: { _id: null, totalTax: { $sum: '$tax' }, totalSales: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+    // ─── Sales GST ────────────────────────────────────────────────
+    const salesMatch = { shop: shopId };
+    if (startDate && endDate) salesMatch.saleDate = dateFilter;
+    if (gstRate) salesMatch.gstRate = Number(gstRate);
+    if (customer) salesMatch.customer = customer;
+
+    const salesGstAgg = await Sale.aggregate([
+      { $match: salesMatch },
+      {
+        $lookup: {
+          from: 'customers',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customerData',
+        },
+      },
+      { $unwind: { path: '$customerData', preserveNullAndEmptyArrays: true } },
+      { $match: state ? { 'customerData.state': state } : {} },
+      {
+        $group: {
+          _id: null,
+          totalTaxable: { $sum: '$taxableAmount' },
+          totalCgst: { $sum: '$cgst' },
+          totalSgst: { $sum: '$sgst' },
+          totalIgst: { $sum: '$igst' },
+          totalGst: { $sum: '$gstAmount' },
+          totalSales: { $sum: '$totalAmount' },
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
-    res.json(taxData[0] || { totalTax: 0, totalSales: 0, count: 0 });
+    const salesGstDetail = await Sale.aggregate([
+      { $match: salesMatch },
+      {
+        $lookup: {
+          from: 'customers',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customerData',
+        },
+      },
+      { $unwind: { path: '$customerData', preserveNullAndEmptyArrays: true } },
+      { $match: state ? { 'customerData.state': state } : {} },
+      { $sort: { saleDate: -1 } },
+      { $limit: 500 },
+      {
+        $project: {
+          _id: 1,
+          invoiceNo: 1,
+          saleDate: 1,
+          customerName: { $ifNull: ['$customerData.name', 'Walk-in'] },
+          customerState: { $ifNull: ['$customerData.state', ''] },
+          taxableAmount: 1,
+          gstRate: 1,
+          cgst: 1,
+          sgst: 1,
+          igst: 1,
+          gstAmount: 1,
+          totalAmount: 1,
+          paymentStatus: 1,
+        },
+      },
+    ]);
+
+    // ─── Purchase GST ──────────────────────────────────────────────
+    const purchaseMatch = { shop: shopId };
+    if (startDate && endDate) purchaseMatch.purchaseDate = dateFilter;
+    if (gstRate) purchaseMatch.gstRate = Number(gstRate);
+    if (supplier) purchaseMatch.supplier = supplier;
+
+    const purchaseGstAgg = await Purchase.aggregate([
+      { $match: purchaseMatch },
+      {
+        $lookup: {
+          from: 'suppliers',
+          localField: 'supplier',
+          foreignField: '_id',
+          as: 'supplierData',
+        },
+      },
+      { $unwind: { path: '$supplierData', preserveNullAndEmptyArrays: true } },
+      { $match: state ? { 'supplierData.state': state } : {} },
+      {
+        $group: {
+          _id: null,
+          totalTaxable: { $sum: '$taxableAmount' },
+          totalCgst: { $sum: '$cgst' },
+          totalSgst: { $sum: '$sgst' },
+          totalIgst: { $sum: '$igst' },
+          totalGst: { $sum: '$gstAmount' },
+          totalPurchases: { $sum: '$totalAmount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const purchaseGstDetail = await Purchase.aggregate([
+      { $match: purchaseMatch },
+      {
+        $lookup: {
+          from: 'suppliers',
+          localField: 'supplier',
+          foreignField: '_id',
+          as: 'supplierData',
+        },
+      },
+      { $unwind: { path: '$supplierData', preserveNullAndEmptyArrays: true } },
+      { $match: state ? { 'supplierData.state': state } : {} },
+      { $sort: { purchaseDate: -1 } },
+      { $limit: 500 },
+      {
+        $project: {
+          _id: 1,
+          purchaseNo: 1,
+          purchaseDate: 1,
+          supplierName: { $ifNull: ['$supplierData.name', ''] },
+          supplierState: { $ifNull: ['$supplierData.state', ''] },
+          taxableAmount: 1,
+          gstRate: 1,
+          cgst: 1,
+          sgst: 1,
+          igst: 1,
+          gstAmount: 1,
+          totalAmount: 1,
+        },
+      },
+    ]);
+
+    // ─── Summary ───────────────────────────────────────────────────
+    const salesSummary = salesGstAgg[0] || { totalTaxable: 0, totalCgst: 0, totalSgst: 0, totalIgst: 0, totalGst: 0, totalSales: 0, count: 0 };
+    const purchaseSummary = purchaseGstAgg[0] || { totalTaxable: 0, totalCgst: 0, totalSgst: 0, totalIgst: 0, totalGst: 0, totalPurchases: 0, count: 0 };
+
+    const summary = {
+      totalTaxableValue: salesSummary.totalTaxable + purchaseSummary.totalTaxable,
+      totalCgst: salesSummary.totalCgst + purchaseSummary.totalCgst,
+      totalSgst: salesSummary.totalSgst + purchaseSummary.totalSgst,
+      totalIgst: salesSummary.totalIgst + purchaseSummary.totalIgst,
+      totalGst: salesSummary.totalGst + purchaseSummary.totalGst,
+      outputGst: salesSummary.totalGst,
+      inputGst: purchaseSummary.totalGst,
+      netGst: salesSummary.totalGst - purchaseSummary.totalGst,
+    };
+
+    // ─── Monthly GST ───────────────────────────────────────────────
+    const monthlySalesGst = await Sale.aggregate([
+      { $match: salesMatch },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$saleDate' } },
+          taxableAmount: { $sum: '$taxableAmount' },
+          cgst: { $sum: '$cgst' },
+          sgst: { $sum: '$sgst' },
+          igst: { $sum: '$igst' },
+          gstAmount: { $sum: '$gstAmount' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const monthlyPurchaseGst = await Purchase.aggregate([
+      { $match: purchaseMatch },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$purchaseDate' } },
+          taxableAmount: { $sum: '$taxableAmount' },
+          cgst: { $sum: '$cgst' },
+          sgst: { $sum: '$sgst' },
+          igst: { $sum: '$igst' },
+          gstAmount: { $sum: '$gstAmount' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    res.json({
+      sales: {
+        summary: salesSummary,
+        details: salesGstDetail,
+      },
+      purchases: {
+        summary: purchaseSummary,
+        details: purchaseGstDetail,
+      },
+      summary,
+      monthly: {
+        sales: monthlySalesGst,
+        purchases: monthlyPurchaseGst,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-module.exports = { getReportsAnalytics, getStockReport, getCustomerDueReport, getSupplierDueReport, getTaxReport };
+module.exports = { getReportsAnalytics, getStockReport, getCustomerDueReport, getSupplierDueReport, getGstReport };

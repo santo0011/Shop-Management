@@ -37,9 +37,6 @@ const productSchema = new mongoose.Schema({
     required: true,
   },
   unit: {
-    // Free-text, validated in productController against the shop's allowed
-    // unit set (global catalog + shop.settings.customUnits) rather than a
-    // fixed enum here — lets shops add their own units without a migration.
     type: String,
     default: 'piece',
     trim: true,
@@ -62,7 +59,7 @@ const productSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
     type: Number,
     default: 0,
   },
@@ -96,9 +93,6 @@ const productSchema = new mongoose.Schema({
   expiryDate: {
     type: Date,
   },
-  // Optional business-type-specific fields — shown/hidden in the UI per
-  // shop.settings.enabledModules, but always present on the schema so
-  // toggling a module back on never loses previously-entered data.
   size: { type: String, trim: true },
   color: { type: String, trim: true },
   brand: { type: String, trim: true },
@@ -115,11 +109,6 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-  // OFF (default) — sellable only in whole units of `unit` (the Base Unit),
-  // e.g. 1 Piece, 1 Bag. ON — POS may sell any quantity/sub-unit of `unit`
-  // (e.g. 200 ml of a Litre-based product); purchasePrice/sellingPrice
-  // always stay priced per Base Unit either way, so this never needs its
-  // own price fields.
   allowCustomQuantity: {
     type: Boolean,
     default: false,

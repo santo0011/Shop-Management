@@ -17,9 +17,20 @@ import {
 import * as XLSX from 'xlsx';
 import { showToast } from '../../../utils/toast';
 
-const emptyForm = { name: '', nameBn: '', company: '', email: '', phone: '', address: '' };
-const REQUIRED_FIELDS = ['name', 'phone'];
-const IMPORT_TEMPLATE_COLS = ['name', 'phone', 'email', 'address', 'company', 'nameBn'];
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
+
+const emptyForm = { name: '', nameBn: '', company: '', email: '', phone: '', address: '', state: 'West Bengal' };
+const REQUIRED_FIELDS = ['name', 'phone', 'state'];
+const IMPORT_TEMPLATE_COLS = ['name', 'phone', 'email', 'state', 'address', 'company', 'nameBn'];
 
 const validateField = (name, value, t) => {
   switch (name) {
@@ -47,6 +58,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
       email: editing.email || '',
       phone: editing.phone || '',
       address: editing.address || '',
+      state: editing.state || 'West Bengal',
     } : emptyForm);
   }, [open, editing]);
 
@@ -161,6 +173,21 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
                   <input {...field('address')} placeholder={t('suppliersPage.form.addressPlaceholder')} />
                 </div>
               </div>
+              {/* State dropdown */}
+              <div>
+                <label className="form-label" style={labelStyle}>State <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <select
+                  className={`form-control ${errors.state ? 'is-invalid' : ''}`}
+                  value={form.state}
+                  onChange={(e) => handleChange('state', e.target.value)}
+                  style={inputStyle}
+                >
+                  {INDIAN_STATES.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+                {errors.state && <div className="invalid-feedback-premium" style={errorStyle}>{errors.state}</div>}
+              </div>
             </div>
           </form>
         </div>
@@ -274,6 +301,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
             acc[key.toLowerCase().trim()] = row[key];
             return acc;
           }, {});
+          const stateVal = (keys.state || keys['state'] || '').trim();
           return {
             name: keys.name || keys['supplier name'] || keys['supplier_name'] || '',
             phone: String(keys.phone || keys['phone number'] || keys['phone_number'] || keys.mobile || ''),
@@ -281,6 +309,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
             address: keys.address || keys['address'] || '',
             company: keys.company || keys['company name'] || keys['company_name'] || '',
             nameBn: keys.namebn || keys['name_bn'] || keys['bangla name'] || keys['bangla_name'] || '',
+            state: stateVal || 'West Bengal',
             previousDue: parseFloat(keys.previousdue || keys['previous due'] || keys['previous_due'] || keys.due || 0) || 0,
           };
         });
@@ -299,8 +328,8 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   // ─── Download Sample Template ───────────────────────────────────────────
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
-      { name: 'ABC Traders', phone: '01711111111', email: 'abc@gmail.com', address: 'Dhaka', company: 'ABC Group', nameBn: 'এবিসি ট্রেডার্স' },
-      { name: 'XYZ Foods', phone: '01822222222', email: 'xyz@gmail.com', address: 'Kolkata', company: 'XYZ Ltd', nameBn: 'এক্সওয়াইজেড ফুডস' },
+      { name: 'ABC Traders', phone: '01711111111', email: 'abc@gmail.com', state: 'West Bengal', address: 'Kolkata', company: 'ABC Group', nameBn: 'এবিসি ট্রেডার্স' },
+      { name: 'XYZ Foods', phone: '01822222222', email: 'xyz@gmail.com', state: 'West Bengal', address: 'Kolkata', company: 'XYZ Ltd', nameBn: 'এক্সওয়াইজেড ফুডস' },
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Suppliers');
@@ -321,14 +350,16 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     line.includes('|') ? line.split('|') :
                     line.split(',');
       const cleanParts = parts.map(p => p.trim());
+      const stateVal = cleanParts[3] || '';
       return {
         name: cleanParts[0] || '',
         phone: cleanParts[1] || '',
         email: cleanParts[2] || '',
-        address: cleanParts[3] || '',
-        previousDue: parseFloat(cleanParts[4]) || 0,
-        company: cleanParts[5] || '',
-        nameBn: cleanParts[6] || '',
+        state: stateVal || 'West Bengal',
+        address: cleanParts[4] || '',
+        previousDue: parseFloat(cleanParts[5]) || 0,
+        company: cleanParts[6] || '',
+        nameBn: cleanParts[7] || '',
       };
     });
 
@@ -404,6 +435,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           email: row.email || '',
           phone: row.phone,
           address: row.address || '',
+          state: row.state || 'West Bengal',
         };
 
         if (existing && !skipDuplicates) {
@@ -500,7 +532,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   />
                   <div className="bulk-import-format-info">
                     <BiInfoCircle />
-                    <small>{t('suppliersPage.bulkImport.formatInfo')}</small>
+                    <small>{t('suppliersPage.bulkImport.formatInfo') || 'Supported columns: Name, Phone, Email, State, Address, Company, Name (BN)'}</small>
                   </div>
                 </div>
               </div>
@@ -1088,6 +1120,7 @@ const Suppliers = () => {
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
                 <th>{t('auth.email')}</th>
+                <th>State</th>
                 <th>{t('common.due')}</th>
                 <th style={{ width: '120px' }}>{t('common.actions')}</th>
               </tr>
@@ -1097,13 +1130,13 @@ const Suppliers = () => {
                 <TableSkeletonRows />
               ) : searching ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                   </td>
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
                     {t('empty.noSuppliers')}
                   </td>
@@ -1125,6 +1158,7 @@ const Suppliers = () => {
                   </td>
                   <td>{supplier.phone}</td>
                   <td>{supplier.email || '-'}</td>
+                  <td>{supplier.state || 'West Bengal'}</td>
                   <td>
                     <span style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : {}}>
                       ₹{supplier.dueAmount || 0}
@@ -1210,6 +1244,11 @@ const Suppliers = () => {
                   <span className="expandable-card__row-label">{t('suppliersPage.form.address')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{supplier.address || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">State</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{supplier.state || 'West Bengal'}</span>
                 </div>
                 <div className="expandable-card__row">
                   <span className="expandable-card__row-label">{t('suppliersPage.dueAmount')}</span>

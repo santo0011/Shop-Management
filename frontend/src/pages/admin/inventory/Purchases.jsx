@@ -34,7 +34,7 @@ const paymentMethodLabel = (method, t) => {
   return map[method] || '-';
 };
 
-const ROW_FIELDS = ['batchNumber', 'expiryDate', 'quantity', 'purchasePrice', 'sellingPrice', 'discount', 'tax'];
+const ROW_FIELDS = ['batchNumber', 'expiryDate', 'quantity', 'purchasePrice', 'sellingPrice', 'discount'];
 
 let rowKeySeq = 0;
 const makeRowKey = () => `row-${Date.now()}-${rowKeySeq++}`;
@@ -48,7 +48,6 @@ const emptyRow = () => ({
   purchasePrice: '',
   sellingPrice: '',
   discount: '',
-  tax: '',
 });
 
 const emptyHeader = () => ({
@@ -61,8 +60,7 @@ const emptyHeader = () => ({
 
 const rowBase = (row) => Number(row.purchasePrice || 0) * Number(row.quantity || 0);
 const rowDiscountAmt = (row) => rowBase(row) * (Number(row.discount || 0) / 100);
-const rowTaxAmt = (row) => (rowBase(row) - rowDiscountAmt(row)) * (Number(row.tax || 0) / 100);
-const rowTotal = (row) => rowBase(row) - rowDiscountAmt(row) + rowTaxAmt(row);
+const rowTotal = (row) => rowBase(row) - rowDiscountAmt(row);
 
 const money = (val) => `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -195,19 +193,6 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
                 disabled={isViewMode}
               />
             </div>
-            <div className="purchase-mobile-product-card__field">
-              <label className="purchase-mobile-product-card__label">{t('purchasesPage.taxPercent')}</label>
-              <input
-                ref={setFieldRef(row.key, 'tax')}
-                type="number"
-                min="0"
-                className="purchase-mobile-product-card__input"
-                placeholder={t('purchasesPage.taxPercent')}
-                value={row.tax}
-                onChange={(e) => updateRow(row.key, { tax: e.target.value })}
-                disabled={isViewMode}
-              />
-            </div>
           </div>
 
           <div className="purchase-mobile-product-card__total">
@@ -243,6 +228,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const [saving, setSaving] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [shopSettings, setShopSettings] = useState(null);
 
   const [productDrawer, setProductDrawer] = useState({ open: false, rowKey: null, initialName: '' });
   const [mobileOpenCards, setMobileOpenCards] = useState({});
@@ -257,6 +243,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     setSubmitError(null);
     fetchSuppliers();
     fetchCategories();
+    fetchShopSettings();
     setMobileOpenCards({});
 
     if (viewing) {
@@ -276,7 +263,6 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         purchasePrice: i.purchasePrice,
         sellingPrice: i.sellingPrice,
         discount: i.discount || 0,
-        tax: i.tax || 0,
       })));
       setPaidAmount(viewing.paidAmount || 0);
     } else {
@@ -304,10 +290,30 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     } catch (err) { console.error(err); }
   };
 
+  const fetchShopSettings = async () => {
+    try {
+      const { data } = await api.get('/shops/my', { _skipLoading: true });
+      const s = data.shop || data;
+      setShopSettings(s.settings || {});
+    } catch (err) { console.error(err); }
+  };
+
   const selectedSupplierData = useMemo(
     () => suppliers.find((s) => s._id === header.supplier) || (viewing?.supplier && typeof viewing.supplier === 'object' ? viewing.supplier : null),
     [suppliers, header.supplier, viewing]
   );
+
+  // ─── GST Logic ──────────────────────────────────────────────────────
+  const companyState = shopSettings?.businessState || 'West Bengal';
+  const supplierState = selectedSupplierData?.state || '';
+  const isIntraState = supplierState && companyState && supplierState === companyState;
+  const gstEnabled = shopSettings?.gstEnabled !== false;
+
+  const cgstRate = gstEnabled ? (shopSettings?.cgstRate ?? 9) : 0;
+  const sgstRate = gstEnabled ? (shopSettings?.sgstRate ?? 9) : 0;
+  const igstRate = gstEnabled ? (shopSettings?.igstRate ?? 18) : 0;
+
+  const gstType = isIntraState ? 'intra' : (supplierState ? 'inter' : 'none');
 
   const handleHeaderChange = (name, value) => {
     setHeader((prev) => ({ ...prev, [name]: value }));
@@ -370,8 +376,15 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const totalItems = useMemo(() => validRows.reduce((sum, r) => sum + Number(r.quantity || 0), 0), [validRows]);
   const subtotal = useMemo(() => validRows.reduce((sum, r) => sum + rowBase(r), 0), [validRows]);
   const discountTotal = useMemo(() => validRows.reduce((sum, r) => sum + rowDiscountAmt(r), 0), [validRows]);
-  const taxTotal = useMemo(() => validRows.reduce((sum, r) => sum + rowTaxAmt(r), 0), [validRows]);
-  const grandTotal = subtotal - discountTotal + taxTotal;
+  const taxableAmount = subtotal - discountTotal;
+
+  // GST calculations
+  const cgstAmount = gstType === 'intra' ? taxableAmount * (cgstRate / 100) : 0;
+  const sgstAmount = gstType === 'intra' ? taxableAmount * (sgstRate / 100) : 0;
+  const igstAmount = gstType === 'inter' ? taxableAmount * (igstRate / 100) : 0;
+  const totalGst = cgstAmount + sgstAmount + igstAmount;
+
+  const grandTotal = taxableAmount + totalGst;
   const previousDue = selectedSupplierData?.dueAmount || 0;
   const currentDue = Math.max(0, grandTotal - Number(paidAmount || 0));
 
@@ -380,6 +393,9 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     const newErrors = {};
     if (!header.supplier) newErrors.supplier = t('purchasesPage.supplierRequired');
     if (validRows.length === 0) newErrors.items = t('purchasesPage.itemsRequired');
+    if (gstEnabled && !supplierState) {
+      newErrors.supplierState = 'Supplier state is required to calculate GST. Please select a supplier with a valid state.';
+    }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -403,12 +419,18 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
           purchasePrice: Number(r.purchasePrice) || 0,
           sellingPrice: Number(r.sellingPrice) || 0,
           discount: Number(r.discount) || 0,
-          tax: Number(r.tax) || 0,
           total: rowTotal(r),
         })),
         subtotal,
         discount: discountTotal,
-        tax: taxTotal,
+        gstType: gstType === 'intra' ? 'intra' : (gstType === 'inter' ? 'inter' : 'none'),
+        cgstRate: cgstRate,
+        sgstRate: sgstRate,
+        igstRate: igstRate,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        totalGst,
         totalAmount: grandTotal,
         paidAmount: Number(paidAmount) || 0,
       };
@@ -451,6 +473,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                 {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>
               {errors.supplier && <div className="invalid-feedback-premium">{errors.supplier}</div>}
+              {errors.supplierState && <div className="invalid-feedback-premium">{errors.supplierState}</div>}
             </div>
 
             <div className="form-group mb-0">
@@ -510,6 +533,23 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
             </div>
           </div>
 
+          {/* ─── GST Info Banner ────────────────────────────────────── */}
+          {!isViewMode && gstEnabled && selectedSupplierData && (
+            <div style={{
+              marginTop: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: 'var(--border-radius-sm)',
+              background: isIntraState ? 'rgba(0, 217, 166, 0.08)' : 'rgba(108, 99, 255, 0.08)',
+              color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500,
+            }}>
+              {!supplierState ? (
+                <span style={{ color: 'var(--danger)' }}>Supplier state is required to calculate GST.</span>
+              ) : isIntraState ? (
+                <span>Intra-state: CGST ({cgstRate}%) + SGST ({sgstRate}%) — supplier is from {supplierState}</span>
+              ) : (
+                <span>Inter-state: IGST ({igstRate}%) — supplier is from {supplierState}</span>
+              )}
+            </div>
+          )}
+
           {/* ─── Desktop Product Table ─────────────────────────────── */}
           <div className="purchase-desktop-section">
             <div className="purchase-items-header">
@@ -533,7 +573,6 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                     <th style={{ width: 80 }}>{t('product.purchasePrice')}</th>
                     <th style={{ width: 80 }}>{t('product.sellingPrice')}</th>
                     <th style={{ width: 65 }}>{t('purchasesPage.discountPercent')}</th>
-                    <th style={{ width: 55 }}>{t('purchasesPage.taxPercent')}</th>
                     <th style={{ width: 75 }}>{t('common.total')}</th>
                     {!isViewMode && <th style={{ width: 32 }} />}
                   </tr>
@@ -630,18 +669,6 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                           disabled={isViewMode}
                         />
                       </td>
-                      <td>
-                        <input
-                          ref={setFieldRef(row.key, 'tax')}
-                          type="number"
-                          min="0"
-                          className="form-control form-control-sm"
-                          value={row.tax}
-                          onChange={(e) => updateRow(row.key, { tax: e.target.value })}
-                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'tax'))}
-                          disabled={isViewMode}
-                        />
-                      </td>
                       <td className="purchase-row-total">{money(rowTotal(row))}</td>
                       {!isViewMode && (
                         <td>
@@ -708,13 +735,31 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
               <span className="purchase-summary-row__value">{totalItems}</span>
             </div>
             <div className="purchase-summary-row">
+              <span className="purchase-summary-row__label">Subtotal</span>
+              <span className="purchase-summary-row__value">{money(subtotal)}</span>
+            </div>
+            <div className="purchase-summary-row">
               <span className="purchase-summary-row__label">{t('sale.discount')}</span>
               <span className="purchase-summary-row__value purchase-summary-row__value--danger">-{money(discountTotal)}</span>
             </div>
-            <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">{t('sale.tax')}</span>
-              <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(taxTotal)}</span>
-            </div>
+            {gstType === 'intra' && (
+              <>
+                <div className="purchase-summary-row">
+                  <span className="purchase-summary-row__label">CGST ({cgstRate}%)</span>
+                  <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(cgstAmount)}</span>
+                </div>
+                <div className="purchase-summary-row">
+                  <span className="purchase-summary-row__label">SGST ({sgstRate}%)</span>
+                  <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(sgstAmount)}</span>
+                </div>
+              </>
+            )}
+            {gstType === 'inter' && (
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">IGST ({igstRate}%)</span>
+                <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(igstAmount)}</span>
+              </div>
+            )}
             <div className="purchase-summary-divider" />
             <div className="purchase-summary-row purchase-summary-row--grand">
               <span className="purchase-summary-row__label purchase-summary-row__label--grand">{t('purchasesPage.grandTotal')}</span>
@@ -1571,11 +1616,6 @@ const Purchases = () => {
           </p>
         </div>
         <div className="d-flex gap-2">
-          {/* Bulk Import temporarily hidden — re-enable by uncommenting this button.
-          <button className="btn-premium btn-premium-secondary" onClick={() => setBulkImportOpen(true)}>
-            <BiUpload /> {t('purchasesPage.bulkImportButton')}
-          </button>
-          */}
           <button className="btn-premium btn-premium-primary" onClick={() => { setViewing(null); setDrawerOpen(true); }}>
             <BiPlus /> {t('common.add')} <span className="purchase-btn-full-label">{t('purchasesPage.purchase')}</span>
           </button>
@@ -1784,9 +1824,6 @@ const Purchases = () => {
               <>
                 <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(purchase)}>
                   <BiShow />
-                </button>
-                <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => { setViewing(purchase); setDrawerOpen(true); }}>
-                  <BiCheck />
                 </button>
                 <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(purchase)}>
                   <BiTrash />

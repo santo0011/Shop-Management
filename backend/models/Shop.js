@@ -1,14 +1,6 @@
 const mongoose = require('mongoose');
 const { BUSINESS_TYPE_KEYS, MODULE_KEYS } = require('../config/businessTypes');
 
-// No `default` here deliberately: shops created before this feature existed
-// have no settings.enabledModules in the database at all. If each key
-// defaulted to `false`, Mongoose would materialize a fully-false object for
-// every legacy shop the moment it's read — silently hiding every module
-// (including the ones its business type should enable by default) until the
-// owner manually re-toggles each one. Leaving keys genuinely `undefined`
-// when unset lets the frontend fall back to the business type's defaults
-// for anything the shop has never explicitly touched (see useBusinessConfig).
 const enabledModulesSchema = MODULE_KEYS.reduce((acc, key) => {
   acc[key] = { type: Boolean };
   return acc;
@@ -53,11 +45,11 @@ const shopSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'BDT',
+    default: 'INR',
   },
   timezone: {
     type: String,
-    default: 'Asia/Dhaka',
+    default: 'Asia/Kolkata',
   },
   isActive: {
     type: Boolean,
@@ -74,21 +66,26 @@ const shopSchema = new mongoose.Schema({
   },
   trialEndsAt: {
     type: Date,
-    default: () => new Date(+new Date() + 14 * 24 * 60 * 60 * 1000), // 14 days trial
+    default: () => new Date(+new Date() + 14 * 24 * 60 * 60 * 1000),
   },
   settings: {
-    taxRate: { type: Number, default: 0 },
-    taxName: { type: String, default: 'VAT' },
+    gstEnabled: { type: Boolean, default: true },
+    gstNumber: { type: String, default: '' },
+    defaultGstRate: { type: Number, default: 18 },
+    cgstRate: { type: Number, default: 9 },
+    sgstRate: { type: Number, default: 9 },
+    igstRate: { type: Number, default: 18 },
+    businessState: { type: String, default: 'West Bengal' },
+    roundOffEnabled: { type: Boolean, default: true },
     invoicePrefix: { type: String, default: 'INV-' },
     receiptFooter: { type: String, default: 'Thank you for your purchase!' },
     lowStockThreshold: { type: Number, default: 10 },
     enableLoyalty: { type: Boolean, default: false },
-    loyaltyPointsPerAmount: { type: Number, default: 100 }, // points per 100 currency
-    loyaltyRedeemRate: { type: Number, default: 1 }, // 1 point = 1 currency
+    loyaltyPointsPerAmount: { type: Number, default: 100 },
+    loyaltyRedeemRate: { type: Number, default: 1 },
     barcodePrefix: { type: String, default: '' },
     barcodeSymbology: { type: String, enum: ['CODE128', 'EAN13', 'UPC', 'CODE39'], default: 'CODE128' },
     autoGenerateBarcode: { type: Boolean, default: false },
-    // Printer settings
     paperSize: { type: String, enum: ['58mm', '80mm', 'a4'], default: '80mm' },
     invoiceTemplate: { type: String, enum: ['classic', 'modern', 'minimal', 'grocery'], default: 'modern' },
     printMode: { type: String, enum: ['thermal', 'normal'], default: 'thermal' },
@@ -103,19 +100,11 @@ const shopSchema = new mongoose.Schema({
     showBarcode: { type: Boolean, default: false },
     showHeader: { type: Boolean, default: true },
     showFooter: { type: Boolean, default: true },
-    // POS product list display limits — how many products (ranked by total
-    // quantity sold) show per category, configured separately for desktop
-    // and mobile. Applies to every category tab including Top Selling;
-    // Product Search always ignores this and searches everything.
     posDisplayLimit: {
       desktop: { type: Number, default: 20 },
       mobile: { type: Number, default: 10 },
     },
-    // Multi-business configuration — which optional product modules this
-    // shop uses, initialized from the business type's defaults at creation
-    // time but independently editable afterward from Settings.
     enabledModules: enabledModulesSchema,
-    // Shop-defined units in addition to the global unit catalog.
     customUnits: {
       type: [{
         key: { type: String, required: true, trim: true },
@@ -129,7 +118,6 @@ const shopSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Indexes for dashboard and frequent queries
 shopSchema.index({ owner: 1 });
 shopSchema.index({ isActive: 1, subscriptionStatus: 1 });
 shopSchema.index({ subscriptionStatus: 1 });

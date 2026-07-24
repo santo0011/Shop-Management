@@ -1,6 +1,8 @@
 const Purchase = require('../models/Purchase');
 const Product = require('../models/Product');
 const Supplier = require('../models/Supplier');
+const Shop = require('../models/Shop');
+const { calculateItemTotals, calculateInvoiceGst } = require('../utils/gstCalculation');
 
 const getPurchases = async (req, res) => {
   try {
@@ -29,7 +31,7 @@ const getPurchases = async (req, res) => {
     }
 
     const purchases = await Purchase.find(query)
-      .populate('supplier', 'name phone')
+      .populate('supplier', 'name phone state')
       .populate('items.product', 'name nameBn')
       .sort({ purchaseDate: -1 })
       .skip(skip)
@@ -45,7 +47,7 @@ const getPurchases = async (req, res) => {
 const getPurchase = async (req, res) => {
   try {
     const purchase = await Purchase.findOne({ _id: req.params.id, shop: req.user.shop })
-      .populate('supplier', 'name phone address dueAmount')
+      .populate('supplier', 'name phone address state dueAmount')
       .populate('items.product', 'name nameBn sku unit');
     if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
     res.json(purchase);
@@ -63,7 +65,7 @@ const generatePurchaseNo = async (shopId) => {
 
 const createPurchase = async (req, res) => {
   try {
-    const { supplier, supplierInvoiceNo, purchaseDate, items, subtotal, discount, tax, shipping, totalAmount, paidAmount, paymentMethod, notes } = req.body;
+    const { supplier, supplierInvoiceNo, purchaseDate, items, subtotal, discount, shipping, totalAmount, paidAmount, paymentMethod, notes } = req.body;
 
     // A supplier invoice number only needs to be unique for that supplier —
     // the same number from two different suppliers is not a conflict.
@@ -74,7 +76,54 @@ const createPurchase = async (req, res) => {
       }
     }
 
+    // Get business state from shop settings
+    const shop = await Shop.findById(req.user.shop);
+    const businessState = shop?.settings?.businessState || 'West Bengal';
+
+    // Get supplier state
+    const supplierData = await Supplier.findById(supplier);
+    const supplierState = supplierData?.state || '';
+
     const purchaseNo = await generatePurchaseNo(req.user.shop);
+
+    // Calculate GST for each line item and the invoice
+    const calculatedItems = (items || []).map(item => {
+      const gstRate = Number(item.gstRate) || Number(item.tax) || 0;
+      const lineGst = calculateItemTotals(
+        item.quantity,
+        item.purchasePrice,
+        item.discount || 0,
+        gstRate,
+        businessState,
+        supplierState
+      );
+      return {
+        product: item.product,
+        batchNumber: item.batchNumber || '',
+        expiryDate: item.expiryDate || undefined,
+        quantity: Number(item.quantity) || 1,
+        unit: item.unit || 'piece',
+        purchasePrice: Number(item.purchasePrice) || 0,
+        sellingPrice: Number(item.sellingPrice) || 0,
+        discount: Number(item.discount) || 0,
+        gstRate,
+        cgst: lineGst.cgst,
+        sgst: lineGst.sgst,
+        igst: lineGst.igst,
+        taxableAmount: lineGst.taxableAmount,
+        gstAmount: lineGst.gstAmount,
+        total: lineGst.total,
+      };
+    });
+
+    const calculatedSubtotal = calculatedItems.reduce((sum, item) => sum + item.taxableAmount + Number(item.discount > 0 ? item.taxableAmount * item.discount / (100 - item.discount) : 0), 0);
+    const calcDiscountTotal = calculatedItems.reduce((sum, item) => sum + (item.taxableAmount * item.discount / (100 - item.discount || 1)), 0);
+    const calcTaxableAmount = calculatedItems.reduce((sum, item) => sum + item.taxableAmount, 0);
+    const calcGstAmount = calculatedItems.reduce((sum, item) => sum + item.gstAmount, 0);
+    const calcCgst = calculatedItems.reduce((sum, item) => sum + item.cgst, 0);
+    const calcSgst = calculatedItems.reduce((sum, item) => sum + item.sgst, 0);
+    const calcIgst = calculatedItems.reduce((sum, item) => sum + item.igst, 0);
+    const calcTotalAmount = calculatedItems.reduce((sum, item) => sum + item.total, 0);
 
     const purchase = await Purchase.create({
       shop: req.user.shop,
@@ -82,22 +131,27 @@ const createPurchase = async (req, res) => {
       purchaseNo,
       supplierInvoiceNo: supplierInvoiceNo || '',
       purchaseDate: purchaseDate || Date.now(),
-      items,
-      subtotal,
-      discount: discount || 0,
-      tax: tax || 0,
+      items: calculatedItems,
+      subtotal: calculatedSubtotal,
+      discount: calcDiscountTotal,
+      gstRate: (items[0]?.gstRate || items[0]?.tax || 0),
+      cgst: calcCgst,
+      sgst: calcSgst,
+      igst: calcIgst,
+      taxableAmount: calcTaxableAmount,
+      gstAmount: calcGstAmount,
       shipping: shipping || 0,
-      totalAmount,
+      totalAmount: calcTotalAmount,
       paidAmount: paidAmount || 0,
-      dueAmount: totalAmount - (paidAmount || 0),
-      paymentStatus: paidAmount >= totalAmount ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid',
+      dueAmount: calcTotalAmount - (paidAmount || 0),
+      paymentStatus: paidAmount >= calcTotalAmount ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid',
       paymentMethod: paymentMethod || 'cash',
       notes,
       createdBy: req.user._id,
     });
 
     // Sync each product's stock and latest pricing/batch info
-    for (const item of items) {
+    for (const item of calculatedItems) {
       const productUpdate = {
         $inc: { stock: item.quantity },
         purchasePrice: item.purchasePrice,
@@ -109,9 +163,9 @@ const createPurchase = async (req, res) => {
     }
 
     // Update supplier due
-    const dueAmount = totalAmount - (paidAmount || 0);
+    const dueAmount = calcTotalAmount - (paidAmount || 0);
     await Supplier.findByIdAndUpdate(supplier, {
-      $inc: { totalPurchases: totalAmount, totalPaid: paidAmount || 0, dueAmount: dueAmount },
+      $inc: { totalPurchases: calcTotalAmount, totalPaid: paidAmount || 0, dueAmount: dueAmount },
     });
 
     res.status(201).json(purchase);

@@ -36,6 +36,16 @@ const customerSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  state: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  gstNumber: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   shop: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shop',

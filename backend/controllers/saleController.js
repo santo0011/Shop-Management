@@ -3,12 +3,10 @@ const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const CustomerPayment = require('../models/CustomerPayment');
+const Shop = require('../models/Shop');
+const { calculateItemTotals } = require('../utils/gstCalculation');
 
 // ─── Shared filter builder ──────────────────────────────────────
-// Single source of truth for turning the Sales page's filters (search,
-// date range, customer, payment method/status) into a Mongo query — used by
-// BOTH getSales (the table) and the stats aggregation below, so the summary
-// cards can never drift out of sync with what the table is actually showing.
 const buildSalesQuery = async (req) => {
   const { startDate, endDate, customer, paymentMethod, paymentStatus, search } = req.query;
 
@@ -31,7 +29,6 @@ const buildSalesQuery = async (req) => {
   if (paymentMethod) query.paymentMethod = paymentMethod;
   if (paymentStatus) query.paymentStatus = paymentStatus;
   if (search) {
-    // Find customer IDs matching name or phone
     const matchingCustomers = await Customer.find({
       shop: req.user.shop,
       $or: [
@@ -49,11 +46,6 @@ const buildSalesQuery = async (req) => {
   return query;
 };
 
-// Aggregates the 4 Sales-page summary cards (+ due, for completeness) for
-// whatever query is passed in — always the same `query` object used to fetch
-// the table rows, so cards and table are guaranteed to reflect the same
-// filtered dataset. Profit mirrors the existing Reports page formula
-// (revenue net of refunds, minus cost of goods sold via Product.purchasePrice).
 const aggregateSalesStats = async (query) => {
   const [totalsAgg, costAgg] = await Promise.all([
     Sale.aggregate([
@@ -99,7 +91,7 @@ const getSales = async (req, res) => {
 
     const [sales, total, stats] = await Promise.all([
       Sale.find(query)
-        .populate('customer', 'name phone')
+        .populate('customer', 'name phone state')
         .populate('items.product', 'name nameBn unit')
         .populate('returns.processedBy', 'name')
         .sort({ createdAt: -1 })
@@ -118,7 +110,7 @@ const getSales = async (req, res) => {
 const getSale = async (req, res) => {
   try {
     const sale = await Sale.findOne({ _id: req.params.id, shop: req.user.shop })
-      .populate('customer', 'name phone')
+      .populate('customer', 'name phone state')
       .populate('items.product', 'name nameBn unit sellingPrice')
       .populate('returns.processedBy', 'name');
     if (!sale) return res.status(404).json({ message: 'Sale not found' });
@@ -130,7 +122,6 @@ const getSale = async (req, res) => {
 
 const createSale = async (req, res) => {
   try {
-    // Validate items up front — everything below depends on this array existing.
     if (!req.body.items || req.body.items.length === 0) {
       return res.status(400).json({ message: 'Sale must contain at least one item' });
     }
@@ -138,10 +129,6 @@ const createSale = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields: paymentMethod' });
     }
 
-    // Quantity must be a positive number (covers both whole Base Unit sales
-    // and fractional Custom Quantity sales, e.g. 0.2 Litre) and can never
-    // exceed what's actually in stock — checked against the live Product
-    // record so a stale client-side cart can't oversell.
     for (const item of req.body.items) {
       const qty = Number(item.quantity);
       if (!(qty > 0)) {
@@ -166,26 +153,69 @@ const createSale = async (req, res) => {
     const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
     req.body.invoiceNo = `${shopPrefix}-${dateStr}-${(count + 1).toString().padStart(4, '0')}`;
 
-    // Calculate totals — Subtotal → Tax → Discount → Grand Total → Round Off
-    // (always down) → Final Payable. The floored Payable is what's actually
-    // stored as totalAmount, so every downstream consumer (due/paid
-    // calculations, invoice printing, reports, ledgers) automatically uses
-    // the rounded figure without needing its own rounding logic.
-    const subtotal = req.body.items.reduce((sum, item) => sum + (item.total || item.price * item.quantity), 0);
-    req.body.subtotal = subtotal;
-    const rawGrandTotal = Math.max(0, subtotal - (req.body.discount || 0) + (req.body.tax || 0));
-    req.body.totalAmount = Math.floor(rawGrandTotal);
-    req.body.roundOff = req.body.totalAmount - rawGrandTotal; // always <= 0
+    // Get business state from shop settings
+    const shop = await Shop.findById(req.user.shop);
+    const businessState = shop?.settings?.businessState || 'West Bengal';
 
-    // Set paid and due amounts — dueAmount is always derived from the SAME
-    // clamped paidAmount so `Due = Grand Total - Paid Amount` holds exactly,
-    // covers full/partial/zero payment, and can never go negative.
+    // Get customer state if customer is selected
+    let customerState = '';
+    if (req.body.customer) {
+      const customer = await Customer.findById(req.body.customer);
+      customerState = customer?.state || '';
+    }
+
+    // Calculate GST for each item
+    const calculatedItems = (req.body.items || []).map(item => {
+      const gstRate = Number(item.gstRate) || Number(item.tax) || 0;
+      const lineGst = calculateItemTotals(
+        item.quantity,
+        item.price,
+        item.discount || 0,
+        gstRate,
+        businessState,
+        customerState
+      );
+      return {
+        ...item,
+        gstRate,
+        cgst: lineGst.cgst,
+        sgst: lineGst.sgst,
+        igst: lineGst.igst,
+        taxableAmount: lineGst.taxableAmount,
+        gstAmount: lineGst.gstAmount,
+        total: lineGst.total,
+      };
+    });
+
+    const subtotal = calculatedItems.reduce((sum, item) => sum + (item.taxableAmount + (item.taxableAmount * item.discount / (100 - item.discount || 1))), 0);
+    const discountTotal = calculatedItems.reduce((sum, item) => sum + (item.taxableAmount * item.discount / (100 - item.discount || 1)), 0);
+    const taxableAmount = calculatedItems.reduce((sum, item) => sum + item.taxableAmount, 0);
+    const gstAmount = calculatedItems.reduce((sum, item) => sum + item.gstAmount, 0);
+    const cgst = calculatedItems.reduce((sum, item) => sum + item.cgst, 0);
+    const sgst = calculatedItems.reduce((sum, item) => sum + item.sgst, 0);
+    const igst = calculatedItems.reduce((sum, item) => sum + item.igst, 0);
+    const totalAmount = calculatedItems.reduce((sum, item) => sum + item.total, 0);
+
+    req.body.subtotal = subtotal;
+    req.body.discount = discountTotal;
+    req.body.gstRate = (req.body.items[0]?.gstRate || req.body.items[0]?.tax || 0);
+    req.body.cgst = cgst;
+    req.body.sgst = sgst;
+    req.body.igst = igst;
+    req.body.taxableAmount = taxableAmount;
+    req.body.gstAmount = gstAmount;
+    req.body.items = calculatedItems;
+
+    // Round off logic
+    const rawGrandTotal = Math.max(0, subtotal - discountTotal + gstAmount);
+    req.body.totalAmount = Math.floor(rawGrandTotal);
+    req.body.roundOff = req.body.totalAmount - rawGrandTotal;
+
     const totalAmt = req.body.totalAmount;
     const requestedPaid = Math.max(0, Number(req.body.paidAmount) || 0);
     req.body.paidAmount = Math.min(requestedPaid, totalAmt);
     req.body.dueAmount = Math.max(0, totalAmt - req.body.paidAmount);
 
-    // Set payment status
     if (req.body.dueAmount === 0) {
       req.body.paymentStatus = 'paid';
     } else if (req.body.paidAmount > 0) {
@@ -194,7 +224,6 @@ const createSale = async (req, res) => {
       req.body.paymentStatus = 'unpaid';
     }
 
-    // A due balance must be traceable to a real customer to collect later.
     if (req.body.dueAmount > 0) {
       if (!req.body.customer) {
         return res.status(400).json({ message: 'Customer name and phone number are required for due sales.' });
@@ -207,14 +236,10 @@ const createSale = async (req, res) => {
 
     const sale = await Sale.create(req.body);
 
-    // Update product stock
     for (const item of req.body.items) {
       await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } });
     }
 
-    // Keep the customer's aggregate totals (purchases/paid/due) in sync so the
-    // Customer list, Customer Ledger, Reports, and Dashboard all reflect this
-    // sale immediately — this was previously never updated on sale creation.
     if (sale.customer) {
       await Customer.findByIdAndUpdate(sale.customer, {
         $inc: {
@@ -225,11 +250,6 @@ const createSale = async (req, res) => {
       });
     }
 
-    // Record the amount collected at checkout as an actual payment so it shows
-    // up in the customer's Payment History — previously only money collected
-    // later via the separate "Receive Payment" flow ever created a
-    // CustomerPayment record, so any customer who only ever paid at checkout
-    // had a payment history that looked empty even though they'd clearly paid.
     if (sale.customer && sale.paidAmount > 0) {
       await CustomerPayment.create({
         customer: sale.customer,
@@ -266,13 +286,9 @@ const updateSalePayment = async (req, res) => {
   }
 };
 
-// ─── Get Top Selling Products ──────────────────────────────────────────────
 const getTopSellingProducts = async (req, res) => {
   try {
     const { limit, category } = req.query;
-    // A missing/blank/non-numeric/zero limit must never silently collapse
-    // the Mongo aggregation's $limit to 0 (or NaN) — always fall back to a
-    // sane default instead.
     const limitNum = Math.max(1, parseInt(limit, 10) || 20);
 
     const pipeline = [
@@ -280,9 +296,6 @@ const getTopSellingProducts = async (req, res) => {
       { $unwind: '$items' },
     ];
 
-    // Restrict candidates to one category's products BEFORE grouping/limiting,
-    // so "top N in category X" reflects that category's own sales ranking —
-    // not just whichever of the global top N happen to belong to it.
     if (category) {
       pipeline.push(
         {
@@ -343,12 +356,6 @@ const getTopSellingProducts = async (req, res) => {
 
     const topProducts = await Sale.aggregate(pipeline);
 
-    // Sales history alone can easily fall short of the requested count (a
-    // brand-new shop, a category nothing's been sold from yet, etc.) — a
-    // category/Top-Selling view must never look empty just because nothing
-    // has sold. Backfill the remainder with the shop's other active
-    // products (same category, if one was requested), so up to `limitNum`
-    // products always show whenever that many actually exist.
     if (topProducts.length < limitNum) {
       const excludeIds = topProducts.map((p) => p._id);
       const fallbackQuery = { shop: req.user.shop, isActive: true, _id: { $nin: excludeIds } };
@@ -380,11 +387,6 @@ const getTopSellingProducts = async (req, res) => {
   }
 };
 
-// ─── Get Categories Ranked by Total Quantity Sold ───────────────────────────
-// Same all-time, returns-aware ranking basis as getTopSellingProducts above
-// (net quantity = sold - returned, no date-range restriction) — just grouped
-// one level up, by each product's category instead of the product itself.
-// Used to order the POS category filter chips by real sales volume.
 const getTopSellingCategories = async (req, res) => {
   try {
     const topCategories = await Sale.aggregate([
@@ -437,11 +439,6 @@ const getTopSellingCategories = async (req, res) => {
   }
 };
 
-// ─── Get Sold Quantity Per Product (all products, not just the top N) ──────
-// Same net-quantity basis as getTopSellingProducts (sold - returned, all-
-// time) but unlimited and with a minimal projection — used to show a live
-// "Sold: N" count on every product card in POS, not only the ones that make
-// the Top Selling list.
 const getProductSoldCounts = async (req, res) => {
   try {
     const soldCounts = await Sale.aggregate([
@@ -467,7 +464,6 @@ const getProductSoldCounts = async (req, res) => {
   }
 };
 
-// ─── Get Recently Sold Products ────────────────────────────────────────────
 const getRecentSales = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
@@ -484,13 +480,6 @@ const getRecentSales = async (req, res) => {
   }
 };
 
-// ─── Get Sales Stats ─────────────────────────────────────────────────────
-// Same filters (search/date range/customer/paymentMethod/paymentStatus) and
-// the same aggregation as the stats embedded in getSales — kept as a
-// standalone endpoint for API completeness, but the Sales page itself now
-// reads `stats` straight off the getSales response instead of calling this
-// separately, so the table and cards can never end up on two different
-// requests (and therefore two different results) for the same filter change.
 const getSalesStats = async (req, res) => {
   try {
     const query = await buildSalesQuery(req);
@@ -501,13 +490,11 @@ const getSalesStats = async (req, res) => {
   }
 };
 
-// ─── Delete Sale ────────────────────────────────────────────────────────────
 const deleteSale = async (req, res) => {
   try {
     const sale = await Sale.findOne({ _id: req.params.id, shop: req.user.shop });
     if (!sale) return res.status(404).json({ message: 'Sale not found' });
 
-    // Restore product stock
     for (const item of sale.items) {
       await Product.findByIdAndUpdate(item.product, { $inc: { stock: +item.quantity } });
     }
@@ -519,7 +506,6 @@ const deleteSale = async (req, res) => {
   }
 };
 
-// ─── Process Return ──────────────────────────────────────────────────────────
 const processReturn = async (req, res) => {
   try {
     const sale = await Sale.findOne({ _id: req.params.id, shop: req.user.shop });
@@ -548,10 +534,8 @@ const processReturn = async (req, res) => {
         });
       }
 
-      // Update returned quantity in sale item
       saleItem.returnedQty = alreadyReturned + ret.quantity;
 
-      // Restore stock
       await Product.findByIdAndUpdate(ret.productId, { $inc: { stock: +ret.quantity } });
 
       const refundAmt = ret.refundAmount || (saleItem.price * ret.quantity);
@@ -566,22 +550,15 @@ const processReturn = async (req, res) => {
       });
     }
 
-    // Snapshot pre-return totals so the customer's aggregates can be adjusted
-    // by the exact delta below, regardless of how the refund math below plays out.
     const prevTotalAmount = sale.totalAmount || 0;
     const prevPaidAmount = sale.paidAmount || 0;
     const prevDueAmount = sale.dueAmount || 0;
 
-    // Update sale totals — re-floor totalAmount so a return can never leave
-    // behind a fractional payable/due amount (refundAmt itself, tracked in
-    // sale.returns for the record, is unaffected).
     sale.paidAmount = Math.max(0, (sale.paidAmount || 0) - totalRefund);
     sale.totalAmount = Math.floor(Math.max(0, (sale.totalAmount || 0) - totalRefund));
 
-    // Recalculate due amount
     sale.dueAmount = Math.max(0, sale.totalAmount - sale.paidAmount);
 
-    // Update payment status
     if (sale.dueAmount === 0 && sale.paidAmount > 0) {
       sale.paymentStatus = 'paid';
     } else if (sale.paidAmount > 0) {
@@ -590,7 +567,6 @@ const processReturn = async (req, res) => {
       sale.paymentStatus = 'unpaid';
     }
 
-    // Add return entry
     sale.returns.push({
       items: returnItems,
       totalRefund,
@@ -602,8 +578,6 @@ const processReturn = async (req, res) => {
 
     await sale.save();
 
-    // Keep the customer's aggregate totals in sync by the exact delta this
-    // return caused (mirrors the sync done on sale creation).
     if (sale.customer) {
       await Customer.findByIdAndUpdate(sale.customer, {
         $inc: {
@@ -614,7 +588,6 @@ const processReturn = async (req, res) => {
       });
     }
 
-    // Populate and return
     const updatedSale = await Sale.findById(sale._id)
       .populate('customer', 'name phone')
       .populate('items.product', 'name nameBn unit')
