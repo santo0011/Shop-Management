@@ -19,7 +19,7 @@ import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 
 // ─── Helpers ───────────────────────────────────────────────────
-const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
+const formatCurrency = (val) => `₹${Number(val || 0).toFixed(2)}`;
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const formatDateTime = (d) =>
@@ -83,6 +83,14 @@ const TabBtn = ({ active, onClick, icon, label }) => (
   </button>
 );
 
+// ─── Payment method config (icons & colors matching POS) ────────
+const paymentMethodConfig = (t) => [
+  { key: 'cash', icon: '💵', label: t('sale.cash'), color: '#2ecc71' },
+  { key: 'card', icon: '💳', label: t('sale.card'), color: '#6C63FF' },
+  { key: 'upi', icon: '📱', label: t('sale.upi'), color: '#00D9A6' },
+  { key: 'mobile_banking', icon: '🏦', label: t('sale.mobileBanking'), color: '#FF6B9D' },
+];
+
 // ─── Payment Drawer ────────────────────────────────────────────
 const PaymentDrawer = ({ open, onClose, customer, onSuccess, t }) => {
   const [amount, setAmount] = useState('');
@@ -90,6 +98,9 @@ const PaymentDrawer = ({ open, onClose, customer, onSuccess, t }) => {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const dueAmount = customer?.dueAmount || 0;
+  const methods = paymentMethodConfig(t);
 
   useEffect(() => {
     if (open) {
@@ -104,7 +115,7 @@ const PaymentDrawer = ({ open, onClose, customer, onSuccess, t }) => {
     e.preventDefault();
     const val = parseFloat(amount);
     if (!val || val <= 0) { setError(t('customersPage.invalidAmount')); return; }
-    if (val > (customer?.dueAmount || 0)) { setError(t('customersPage.amountExceedsDue')); return; }
+    if (val > dueAmount) { setError(t('customersPage.amountExceedsDue')); return; }
     setSaving(true);
     setError('');
     try {
@@ -139,7 +150,7 @@ const PaymentDrawer = ({ open, onClose, customer, onSuccess, t }) => {
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{customer.phone}</div>
               <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t('customersPage.currentDue')}:</span>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(customer.dueAmount)}</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(dueAmount)}</span>
               </div>
             </div>
           )}
@@ -152,43 +163,86 @@ const PaymentDrawer = ({ open, onClose, customer, onSuccess, t }) => {
           )}
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Payment Amount with Exact button */}
               <div>
                 <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.2rem' }}>
                   {t('customersPage.paymentAmount')} <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px' }}
-                />
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
+                  <input
+                    type="number" step="0.01" className="form-control"
+                    value={amount} onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px', flex: 1 }}
+                  />
+                  {dueAmount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setAmount(String(dueAmount))}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 600,
+                        borderRadius: 'var(--border-radius-md)',
+                        border: '1.5px solid var(--primary)',
+                        background: 'transparent',
+                        color: 'var(--primary)',
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease',
+                        fontFamily: 'var(--font-family)',
+                        minHeight: '40px',
+                      }}
+                      onMouseEnter={(e) => { e.target.style.background = 'rgba(108,99,255,0.08)'; }}
+                      onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
+                    >
+                      <BiCheck style={{ fontSize: '1rem' }} /> {t('posPage.payment.exact')}
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Card-style Payment Method selector (matching POS) */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+                <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.4rem' }}>
                   {t('sale.paymentMethod')}
                 </label>
-                <select
-                  className="form-control"
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value)}
-                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px' }}
-                >
-                  {paymentMethods.map((pm) => (
-                    <option key={pm} value={pm}>{t(`sale.${paymentMethodKey(pm)}`)}</option>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                  gap: '0.5rem',
+                }}>
+                  {methods.map((pm) => (
+                    <button
+                      key={pm.key}
+                      type="button"
+                      onClick={() => setMethod(pm.key)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                        padding: '0.6rem 0.4rem',
+                        borderRadius: 'var(--border-radius-md)',
+                        border: `1.5px solid ${method === pm.key ? pm.color : 'var(--border-color)'}`,
+                        background: method === pm.key ? `${pm.color}10` : 'var(--bg-card)',
+                        color: method === pm.key ? pm.color : 'var(--text-secondary)',
+                        cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600,
+                        transition: 'all 0.15s ease',
+                        fontFamily: 'var(--font-family)',
+                        minHeight: '60px',
+                        boxShadow: method === pm.key ? `0 2px 8px ${pm.color}30` : 'none',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{pm.icon}</span>
+                      <span>{pm.label}</span>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
+
               <div>
                 <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.2rem' }}>
                   {t('common.notes')} ({t('common.optional')})
                 </label>
                 <textarea
                   className="form-control"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  value={note} onChange={(e) => setNote(e.target.value)}
                   rows={2}
                   placeholder={t('customersPage.paymentNotePlaceholder')}
                   style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', resize: 'vertical' }}

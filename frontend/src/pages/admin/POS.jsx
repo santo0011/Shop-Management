@@ -40,6 +40,182 @@ const formatShortDate = (dateStr) => {
   return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+// ─── Premium Generating Overlay ──────────────────────────────────
+const PROGRESS_STEPS = [
+  { key: 'preparing', icon: '📦' },
+  { key: 'saving', icon: '💾' },
+  { key: 'generating', icon: '📄' },
+];
+
+const PremiumGeneratingOverlay = ({ t, progressStep, isFadingOut }) => (
+  <div className={`pos-premium-overlay ${isFadingOut ? 'pos-premium-fade-out' : ''}`}>
+    <div className="pos-premium-modal">
+      <div className="pos-premium-spinner-ring">
+        <svg viewBox="0 0 60 60" className="pos-premium-svg">
+          <circle cx="30" cy="30" r="26" fill="none" strokeWidth="3" className="pos-premium-track" />
+          <circle cx="30" cy="30" r="26" fill="none" strokeWidth="3" className="pos-premium-arc" />
+        </svg>
+        <div className="pos-premium-spinner-icon">
+          <BiReceipt size={22} />
+        </div>
+      </div>
+      <h4 className="pos-premium-title">{t('posPage.generating.title')}</h4>
+      <p className="pos-premium-subtitle">{t('posPage.generating.subtitle')}</p>
+      <div className="pos-premium-steps">
+        {PROGRESS_STEPS.map((step, idx) => {
+          const isActive = idx <= progressStep;
+          const isCurrent = idx === progressStep;
+          return (
+            <div key={step.key} className={`pos-premium-step ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
+              <div className="pos-premium-step-dot">
+                {isCurrent ? (
+                  <span className="pos-premium-step-spinner-sm" />
+                ) : isActive ? (
+                  <BiCheck size={14} />
+                ) : (
+                  <span className="pos-premium-step-dot-empty" />
+                )}
+              </div>
+              <span className="pos-premium-step-label">
+                {t(`posPage.confirmSale.${step.key}Sale`)}
+              </span>
+              {idx < PROGRESS_STEPS.length - 1 && <div className={`pos-premium-step-line ${isActive ? 'active' : ''}`} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+    <style>{`
+      .pos-premium-overlay {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(255,255,255,0.35);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        animation: posPremFadeIn 0.2s ease;
+        transition: opacity 0.3s ease;
+      }
+      .pos-premium-overlay.pos-premium-fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      @keyframes posPremFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .pos-premium-modal {
+        display: flex; flex-direction: column; align-items: center;
+        padding: 36px 44px 32px;
+        background: var(--bg-card, #fff);
+        border-radius: 16px;
+        box-shadow: 0 8px 40px rgba(108,99,255,0.15), 0 2px 8px rgba(0,0,0,0.08);
+        animation: posPremScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        min-width: 280px;
+        max-width: 360px;
+      }
+      @keyframes posPremScaleIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      .pos-premium-spinner-ring {
+        position: relative; width: 60px; height: 60px; margin-bottom: 16px;
+      }
+      .pos-premium-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+      .pos-premium-track { stroke: var(--border-color, #e8e8f0); }
+      .pos-premium-arc {
+        stroke: #6C63FF;
+        stroke-linecap: round;
+        stroke-dasharray: 163.36;
+        stroke-dashoffset: 130;
+        animation: posPremSpin 1.2s ease-in-out infinite;
+        transform-origin: center;
+      }
+      @keyframes posPremSpin {
+        0% { stroke-dashoffset: 130; transform: rotate(0deg); }
+        50% { stroke-dashoffset: 40; transform: rotate(180deg); }
+        100% { stroke-dashoffset: 130; transform: rotate(360deg); }
+      }
+      .pos-premium-spinner-icon {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        color: #6C63FF;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .pos-premium-title {
+        margin: 0 0 4px; font-size: 1.05rem; font-weight: 700;
+        color: var(--text-primary, #1a1a2e);
+        text-align: center;
+      }
+      .pos-premium-subtitle {
+        margin: 0 0 20px; font-size: 0.82rem; font-weight: 400;
+        color: var(--text-secondary, #6b7280);
+        text-align: center;
+      }
+      .pos-premium-steps {
+        display: flex; flex-direction: column; gap: 0;
+        width: 100%;
+      }
+      .pos-premium-step {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 0;
+        position: relative;
+      }
+      .pos-premium-step-dot {
+        width: 22px; height: 22px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        background: var(--bg-input, #f3f4f6);
+        color: var(--text-secondary, #9ca3af);
+        transition: all 0.35s ease;
+      }
+      .pos-premium-step.active .pos-premium-step-dot {
+        background: #6C63FF;
+        color: #fff;
+      }
+      .pos-premium-step.current .pos-premium-step-dot {
+        box-shadow: 0 0 0 3px rgba(108,99,255,0.25);
+      }
+      .pos-premium-step-dot-empty {
+        display: block; width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--text-secondary, #9ca3af);
+        opacity: 0.4;
+      }
+      .pos-premium-step-spinner-sm {
+        display: block; width: 12px; height: 12px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: posPremSpinSm 0.6s linear infinite;
+      }
+      @keyframes posPremSpinSm { to { transform: rotate(360deg); } }
+      .pos-premium-step-label {
+        font-size: 0.85rem; font-weight: 500;
+        color: var(--text-secondary, #6b7280);
+        transition: color 0.3s ease;
+      }
+      .pos-premium-step.active .pos-premium-step-label {
+        color: var(--text-primary, #1a1a2e);
+      }
+      .pos-premium-step-line {
+        position: absolute; left: 10px; top: 30px;
+        width: 2px; height: 16px;
+        background: var(--border-color, #e8e8f0);
+        transition: background 0.4s ease;
+      }
+      .pos-premium-step-line.active {
+        background: #6C63FF;
+      }
+
+      /* Dark mode overrides */
+      [data-theme="dark"] .pos-premium-overlay {
+        background: rgba(0,0,0,0.35);
+      }
+      [data-theme="dark"] .pos-premium-modal {
+        background: #1e1e2e;
+        box-shadow: 0 8px 40px rgba(108,99,255,0.2), 0 2px 8px rgba(0,0,0,0.3);
+      }
+      [data-theme="dark"] .pos-premium-step-dot {
+        background: #2a2a3e;
+      }
+    `}</style>
+  </div>
+);
+
 const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
   const { t } = useTranslation();
   const [selectedPayment, setSelectedPayment] = useState(data.paymentMethod || 'cash');
@@ -55,18 +231,18 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
   // Grand Total → Round Off → Final Payable.
   const summaryCards = [
     { key: 'totalItems', icon: <BiShoppingBag size={16} />, label: t('posPage.confirmSale.totalItems'), value: t('posPage.confirmSale.itemsCount', { count: data.totalItems }), color: '#6C63FF' },
-    { key: 'subtotal', icon: <BiDollar size={16} />, label: t('sale.subtotal'), value: `₹${data.subtotal.toFixed(2)}`, color: '#17A2B8' },
-    { key: 'tax', icon: <BiFile size={16} />, label: t('sale.tax'), value: `₹${data.tax.toFixed(2)}`, color: '#6C63FF' },
-    { key: 'discount', icon: <BiTag size={16} />, label: t('sale.discount'), value: `-₹${data.discount.toFixed(2)}`, color: data.discount > 0 ? '#FF6B6B' : '#9a9ab0' },
-    { key: 'grandTotal', icon: <BiCrown size={16} />, label: t('posPage.totals.grandTotal'), value: `₹${data.grandTotal.toFixed(2)}`, color: '#6C63FF' },
-    { key: 'roundOff', icon: <BiRefresh size={16} />, label: t('posPage.totals.roundOff'), value: `${data.roundOff < 0 ? '-' : ''}₹${Math.abs(data.roundOff).toFixed(2)}`, color: '#9a9ab0' },
-    { key: 'payableAmount', icon: <BiCrown size={16} />, label: t('posPage.totals.payable'), value: `₹${data.payableAmount.toFixed(2)}`, color: '#6C63FF', highlight: !includesPreviousDue },
+    { key: 'subtotal', icon: <BiDollar size={16} />, label: t('sale.subtotal'), value: `₹${Number(data.subtotal || 0).toFixed(2)}`, color: '#17A2B8' },
+    { key: 'tax', icon: <BiFile size={16} />, label: t('sale.tax'), value: `₹${Number(data.tax || 0).toFixed(2)}`, color: '#6C63FF' },
+    { key: 'discount', icon: <BiTag size={16} />, label: t('sale.discount'), value: `-₹${Number(data.discount || 0).toFixed(2)}`, color: Number(data.discount) > 0 ? '#FF6B6B' : '#9a9ab0' },
+    { key: 'grandTotal', icon: <BiCrown size={16} />, label: t('posPage.totals.grandTotal'), value: `₹${Number(data.grandTotal || 0).toFixed(2)}`, color: '#6C63FF' },
+    { key: 'roundOff', icon: <BiRefresh size={16} />, label: t('posPage.totals.roundOff'), value: `${Number(data.roundOff || 0) < 0 ? '-' : ''}₹${Math.abs(Number(data.roundOff || 0)).toFixed(2)}`, color: '#9a9ab0' },
+    { key: 'payableAmount', icon: <BiCrown size={16} />, label: t('posPage.totals.payable'), value: `₹${Number(data.payableAmount || 0).toFixed(2)}`, color: '#6C63FF', highlight: !includesPreviousDue },
     ...(includesPreviousDue ? [
-      { key: 'previousDue', icon: <BiErrorCircle size={16} />, label: t('posPage.previousDue.title'), value: `₹${data.previousDueAmount.toFixed(2)}`, color: '#F39C12' },
-      { key: 'totalPayable', icon: <BiCrown size={16} />, label: t('posPage.previousDue.totalPayable'), value: `₹${data.totalPayable.toFixed(2)}`, color: '#6C63FF', highlight: true },
+      { key: 'previousDue', icon: <BiErrorCircle size={16} />, label: t('posPage.previousDue.title'), value: `₹${Number(data.previousDueAmount || 0).toFixed(2)}`, color: '#F39C12' },
+      { key: 'totalPayable', icon: <BiCrown size={16} />, label: t('posPage.previousDue.totalPayable'), value: `₹${Number(data.totalPayable || 0).toFixed(2)}`, color: '#6C63FF', highlight: true },
     ] : []),
-    { key: 'paidAmount', icon: <BiCheckCircle size={16} />, label: t('sale.paidAmount'), value: `₹${data.paidAmount.toFixed(2)}`, color: '#2ecc71' },
-    { key: 'dueAmount', icon: <BiErrorCircle size={16} />, label: t('sale.dueAmount'), value: `₹${data.dueAmount.toFixed(2)}`, color: data.dueAmount > 0 ? '#FF6B6B' : '#2ecc71' },
+    { key: 'paidAmount', icon: <BiCheckCircle size={16} />, label: t('sale.paidAmount'), value: `₹${Number(data.paidAmount || 0).toFixed(2)}`, color: '#2ecc71' },
+    { key: 'dueAmount', icon: <BiErrorCircle size={16} />, label: t('sale.dueAmount'), value: `₹${Number(data.dueAmount || 0).toFixed(2)}`, color: Number(data.dueAmount) > 0 ? '#FF6B6B' : '#2ecc71' },
     { key: 'paymentMethod', icon: <BiWallet size={16} />, label: t('sale.paymentMethod'), value: (paymentMethods.find((pm) => pm.key === selectedPayment)?.label || selectedPayment).toUpperCase(), badge: true, color: '#6C63FF' },
   ];
   return (
@@ -85,7 +261,16 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
           ))}</div>
 
           <div className="confirm-sale-actions">
-            <button className="confirm-sale-btn confirm-sale-btn-primary" onClick={() => onConfirm(selectedPayment)} disabled={loading}>{loading ? <span className="confirm-sale-btn-loading"><span className="spinner-border spinner-border-sm" /> {t('posPage.confirmSale.processing')}</span> : <><BiPrinter size={18} /><span>{t('posPage.confirmSale.generateAndPrint')}</span></>}</button>
+            <button className="confirm-sale-btn confirm-sale-btn-primary" onClick={() => onConfirm(selectedPayment)} disabled={loading}>
+              {loading ? (
+                <span className="confirm-sale-btn-loading">
+                  <span className="spinner-border spinner-border-sm" style={{ marginRight: 6 }} />
+                  {t('posPage.confirmSale.generating')}
+                </span>
+              ) : (
+                <><BiPrinter size={18} /><span>{t('posPage.confirmSale.generateAndPrint')}</span></>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -298,6 +483,12 @@ const POS = () => {
   const [discountValue, setDiscountValue] = useState('');
   const [customerNote, setCustomerNote] = useState('');
   const searchRef = useRef(null);
+
+  // ─── Premium loading state ──────────────────────────────────
+  const [progressStep, setProgressStep] = useState(0);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+  const progressTimerRef = useRef(null);
+  const fadeTimerRef = useRef(null);
 
   // Close customer dropdown when clicking outside
   useEffect(() => {
@@ -604,10 +795,6 @@ const POS = () => {
   // what actually gets sent to/stored by the backend as totalAmount.
   const payableAmount = Math.floor(grandTotal);
   const roundOff = payableAmount - grandTotal; // always <= 0
-  // Current-bill due — formula is unchanged regardless of the previous-due
-  // toggle, since paying against the current bill is always allocated first.
-  const dueAmount = Math.max(0, payableAmount - Number(paidAmount || 0));
-  const change = Math.max(0, Number(paidAmount || 0) - payableAmount);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const hasPreviousDue = !!(previousDue && previousDue.dueAmount > 0);
@@ -615,11 +802,30 @@ const POS = () => {
   // The amount the cashier is actually being asked to collect right now —
   // the current bill alone, or current bill + previous due once opted in.
   const totalPayable = includePreviousDue && hasPreviousDue ? payableAmount + previousDueAmount : payableAmount;
-  // Any amount paid beyond the current bill is applied to the previous due
-  // (current bill is always settled first), capped so it never exceeds it.
+  // ─── FIFO Payment Allocation ──────────────────────────────────
+  // Payments are applied to the oldest outstanding due FIRST, then to
+  // the current invoice. This follows proper accounting rules.
+  const rawPaid = Number(paidAmount || 0);
+  // 1. Pay off previous due first (up to the full previous due amount)
   const paidTowardPreviousDue = includePreviousDue && hasPreviousDue
-    ? Math.min(Math.max(0, Number(paidAmount || 0) - payableAmount), previousDueAmount)
+    ? Math.min(rawPaid, previousDueAmount)
     : 0;
+  // 2. Remaining payment goes to the current invoice
+  const remainingAfterPrevDue = rawPaid - paidTowardPreviousDue;
+  const paidTowardCurrentInvoice = Math.min(remainingAfterPrevDue, payableAmount);
+  // 3. Remaining due on current invoice
+  const currentInvoiceDue = payableAmount - paidTowardCurrentInvoice;
+  // 4. Remaining previous due (what wasn't paid off)
+  const remainingPreviousDue = previousDueAmount - paidTowardPreviousDue;
+  // 5. Total remaining due across both
+  const dueAmount = remainingPreviousDue + currentInvoiceDue;
+  // Change is only returned if payment exceeds total payable
+  const change = Math.max(0, rawPaid - totalPayable);
+  // The amount actually recorded as paid on the current sale (never exceeds
+  // the current invoice amount, since previous due is a separate payment)
+  const confirmedPaidAmount = paidTowardCurrentInvoice;
+  // The amount recorded as a separate payment against the previous due
+  const confirmedPrevDuePayment = paidTowardPreviousDue;
 
   // Paid Amount is intentionally never auto-filled as the bill total changes —
   // it stays exactly what the cashier typed (or empty) until they either type
@@ -643,6 +849,20 @@ const POS = () => {
     setShowConfirmModal(true);
   };
 
+  // ─── Premium progress animation ─────────────────────────────
+  const startProgressAnimation = () => {
+    setProgressStep(0);
+    setIsFadingOut(false);
+    // Step 0 → 1 after 800ms
+    progressTimerRef.current = setTimeout(() => setProgressStep(1), 800);
+    // Step 1 → 2 after 1600ms
+    // (we'll chain from the first timeout)
+  };
+
+  const advanceProgressToStep2 = () => {
+    setProgressStep(2);
+  };
+
   const handleProcessSale = async (selectedPayment) => {
     if (cart.length === 0) return;
     if (customerRequiredForDue) {
@@ -650,17 +870,14 @@ const POS = () => {
       return;
     }
     setLoading(true);
+    setShowConfirmModal(false);
+    startProgressAnimation();
+
     try {
-      // The amount actually entered/confirmed by the cashier — clamped to
-      // [0, payableAmount] (the rounded-down total) so it can never
-      // manufacture a fake full payment (previously this was force-raised to
-      // the total, which made every sale look fully paid and silently erased
-      // the due amount). The current bill is always settled first; anything
-      // paid beyond it is a separate payment against the previous due (see
-      // paidTowardPreviousDue below) — the sale itself never knows about the
-      // customer's older invoices.
-      const confirmedPaidAmount = Math.min(Math.max(0, Number(paidAmount) || 0), payableAmount);
-      const previousDuePayment = paidTowardPreviousDue; // snapshot before cart/customer reset
+      // FIFO Payment Allocation (computed above as derived values):
+      //   confirmedPaidAmount = amount paid toward THIS invoice
+      //   confirmedPrevDuePayment = amount paid toward previous due
+      //   dueAmount = total remaining due (previous due + current invoice)
       const targetCustomerId = customer;
       const payload = {
         customer: customer || null,
@@ -675,7 +892,11 @@ const POS = () => {
         // exactly what was shown here at checkout.
         subtotal, discount: totalDiscount, tax, totalAmount: payableAmount, paidAmount: confirmedPaidAmount, dueAmount: Math.max(0, payableAmount - confirmedPaidAmount), paymentMethod: selectedPayment, posType: 'pos', notes: customerNote,
       };
-      const { data } = await api.post('/sales', payload);
+      const { data } = await api.post('/sales', payload, { _skipLoading: true });
+
+      // Advance to step 2 (generating invoice) after the API call succeeds
+      advanceProgressToStep2();
+
       const saleDetail = await api.get(`/sales/${data._id || data.sale}`);
       const saleData = saleDetail.data.sale || saleDetail.data;
       setLastSale({ ...saleData, invoiceNo: data.invoiceNo || saleData.invoiceNo, totalAmount: data.totalAmount || saleData.totalAmount || payableAmount, roundOff: data.roundOff ?? saleData.roundOff ?? roundOff, paidAmount: data.paidAmount || saleData.paidAmount || paidAmount, dueAmount: data.dueAmount || saleData.dueAmount || dueAmount, paymentMethod: selectedPayment, notes: customerNote });
@@ -684,10 +905,10 @@ const POS = () => {
       // to also settle some/all of the previous due, record that as a normal
       // customer payment (same endpoint used by "Receive Payment" elsewhere) so
       // it shows up correctly in the customer ledger and payment history.
-      if (previousDuePayment > 0 && targetCustomerId) {
+      if (confirmedPrevDuePayment > 0 && targetCustomerId) {
         try {
           await api.post(`/customers/${targetCustomerId}/payment`, {
-            amount: previousDuePayment,
+            amount: confirmedPrevDuePayment,
             paymentMethod: selectedPayment,
             notes: `Previous due settled during POS checkout (Invoice ${data.invoiceNo || ''})`,
           });
@@ -696,27 +917,47 @@ const POS = () => {
         }
       }
 
-      setShowConfirmModal(false);
-      setShowInvoice(true);
-      resetCartFieldsForNextSale();
-      loadTopSelling(activeProductLimit);
-      loadRecentSales();
-      loadCategorySalesRank();
-      loadProductSoldCounts();
-      // Quantity-sold rankings just shifted — every cached category list is
-      // now potentially stale. Drop the cache and, if a category is
-      // currently open, quietly refresh it in place (same no-spinner swap
-      // as any other cache miss).
-      categoryCache.current = {};
-      if (selectedCategory) {
-        fetchCategoryProducts(selectedCategory, activeProductLimit).then((list) => {
-          if (list !== null) setCategoryProducts(list);
-        });
-      }
-      showToast.success(t('posPage.toast.invoiceGenerated', { invoiceNo: data.invoiceNo || '' }));
-    } catch (err) { showToast.error(err.response?.data?.message || t('posPage.toast.checkoutFailed')); }
-    finally { setLoading(false); }
+      // Smooth fade-out before showing invoice
+      setIsFadingOut(true);
+      fadeTimerRef.current = setTimeout(() => {
+        setLoading(false);
+        setProgressStep(0);
+        setIsFadingOut(false);
+        setShowInvoice(true);
+        resetCartFieldsForNextSale();
+        loadTopSelling(activeProductLimit);
+        loadRecentSales();
+        loadCategorySalesRank();
+        loadProductSoldCounts();
+        // Quantity-sold rankings just shifted — every cached category list is
+        // now potentially stale. Drop the cache and, if a category is
+        // currently open, quietly refresh it in place (same no-spinner swap
+        // as any other cache miss).
+        categoryCache.current = {};
+        if (selectedCategory) {
+          fetchCategoryProducts(selectedCategory, activeProductLimit).then((list) => {
+            if (list !== null) setCategoryProducts(list);
+          });
+        }
+        showToast.success(t('posPage.toast.invoiceGenerated', { invoiceNo: data.invoiceNo || '' }));
+      }, 400);
+    } catch (err) {
+      // Clean up on error
+      if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+      setLoading(false);
+      setProgressStep(0);
+      setIsFadingOut(false);
+      showToast.error(err.response?.data?.message || t('posPage.toast.checkoutFailed'));
+    }
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    };
+  }, []);
 
   const handleReprint = () => { if (lastSale) setShowInvoice(true); else showToast.warning(t('posPage.totals.noPreviousInvoice')); };
   const quickAmounts = [100, 200, 500, 1000];
@@ -941,6 +1182,7 @@ const POS = () => {
               </div>
             )}
           </div>
+
           <div className="pos-customer-header-right">
             <button className="pos-customer-add-btn-icon" onClick={() => setShowAddCustomer(true)} title={t('posPage.customer.add')}>
               <BiPlus size={18} />
@@ -1056,7 +1298,7 @@ const POS = () => {
                       <button className="pos-qty-btn pos-qty-plus" onClick={() => updateQty(item.key, 1)}><BiPlus /></button>
                     </div>
                   )}
-                  <div className="pos-cart-item-total">₹{item.total.toFixed(2)}</div>
+                  <div className="pos-cart-item-total">₹{Number(item.total || 0).toFixed(2)}</div>
                   <button className="pos-cart-item-remove" onClick={() => removeItem(item.key)}><BiTrash /></button>
                 </div>
               </div>
@@ -1166,6 +1408,9 @@ const POS = () => {
           </div>
         </div>
       </div>
+
+      {/* Premium loading overlay — keeps POS visible with backdrop blur */}
+      {loading && <PremiumGeneratingOverlay t={t} progressStep={progressStep} isFadingOut={isFadingOut} />}
 
       {showConfirmModal && confirmData && (
         <ConfirmSaleModal data={confirmData} onConfirm={handleProcessSale} onCancel={() => setShowConfirmModal(false)} loading={loading} />

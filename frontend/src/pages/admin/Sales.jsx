@@ -16,7 +16,8 @@ import {
   BiQr, BiIdCard,
 } from 'react-icons/bi';
 import PrintPreview from '../../components/common/PrintPreview';
-
+import Pagination from '../../components/common/Pagination';
+  
 // ─── Format helpers ─────────────────────────────────────────
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -69,7 +70,12 @@ const getDatePresets = (t) => [
 
 const PAYMENT_METHOD_ICONS = { cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦' };
 
-const toDateInputValue = (date) => date.toISOString().slice(0, 10);
+const toDateInputValue = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 
 // ─── Sale View Drawer ────────────────────────────────────────
 const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice }) => {
@@ -137,10 +143,18 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.payment')}</span>
                     <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {pmtLabel}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                      {t('common.paid')}: <strong style={{ color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
-                      {sale.dueAmount > 0 && <> | {t('common.due')}: <strong style={{ color: '#FF6B6B' }}>₹{Number(sale.dueAmount).toFixed(2)}</strong></>}
-                    </span>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'rgba(46,204,113,0.08)', padding: '2px 10px', borderRadius: 6 }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>{t('common.paid')}:</span>
+                        <strong style={{ color: '#2ecc71', fontSize: '0.78rem' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
+                      </span>
+                      {sale.dueAmount > 0 && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'rgba(255,107,107,0.08)', padding: '2px 10px', borderRadius: 6 }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>{t('common.due')}:</span>
+                          <strong style={{ color: '#FF6B6B', fontSize: '0.78rem' }}>₹{Number(sale.dueAmount || 0).toFixed(2)}</strong>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -185,11 +199,11 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                   {sale.discountOnTotal > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#e74c3c' }}>
                       <span>{t('sale.discount')}</span>
-                      <span>-₹{Number(sale.discountOnTotal).toFixed(2)}</span>
+                      <span>-₹{Number(sale.discountOnTotal || 0).toFixed(2)}</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.55rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'rgba(108,99,255,0.06)', border: '1px solid rgba(108,99,255,0.15)', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                    <span>{t('sale.grandTotal')}</span>
+                    <span>{t('salesPage.invoice.grandTotal')}</span>
                     <span style={{ fontSize: '1.05rem', color: 'var(--primary)' }}>₹{Number(sale.grandTotal || sale.totalAmount || 0).toFixed(2)}</span>
                   </div>
                 </div>
@@ -206,7 +220,6 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
         </div>
         <div className="drawer-footer">
           <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.close')}</button>
-          <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice(sale?.invoiceNo)}><BiCopy size={15} /> {t('salesPage.copyInvoiceNumber')}</button>
           <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint(sale)}><BiPrinter size={15} /> {t('common.print')}</button>
         </div>
       </div>
@@ -381,7 +394,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(var(--primary-rgb), 0.06)', border: '1px solid rgba(var(--primary-rgb), 0.12)', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
                     <span>{t('salesPage.totalRefund')}</span>
-                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{totalRefund.toFixed(2)}</span>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{Number(totalRefund || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundMethod')}</label>
@@ -405,7 +418,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
           <div className="drawer-footer">
             <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.cancel')}</button>
             <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={handleSubmit} disabled={!hasItems || processing}>
-              {processing ? <><span className="spinner-border spinner-border-sm" /> {t('salesPage.returnDrawer.processing')}</> : <><BiUndo size={16} /> {t('salesPage.returnDrawer.processReturn', { amount: totalRefund.toFixed(2) })}</>}
+              {processing ? <><span className="spinner-border spinner-border-sm" /> {t('salesPage.returnDrawer.processing')}</> : <><BiUndo size={16} /> {t('salesPage.returnDrawer.processReturn', { amount: Number(totalRefund || 0).toFixed(2) })}</>}
             </button>
           </div>
         )}
@@ -702,7 +715,7 @@ const Sales = () => {
       });
       const { data } = await api.get(`/sales?${params.toString()}`, { _skipLoading: true });
       setSales(data.sales || []);
-      setTotalPages(data.totalPages || 1);
+      setTotalPages(data.pages || 1);
       setTotal(data.total || 0);
       setStats(data.stats || null);
       setPage(p);
@@ -1053,15 +1066,13 @@ const Sales = () => {
         })}
       </div>
 
-      {totalPages > 1 && (
-        <div className="sales-pagination">
-          <span className="sales-pagination-info">{t('salesPage.pagination.info', { page, totalPages, total })}</span>
-          <div className="sales-pagination-btns">
-            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><BiChevronLeft size={16} /> {t('salesPage.pagination.previous')}</button>
-            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>{t('salesPage.pagination.next')} <BiChevronRight size={16} /></button>
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalCount={total}
+        pageSize={20}
+        onPageChange={setPage}
+      />
 
       <SaleViewDrawer open={drawerOpen} onClose={() => { setDrawerOpen(false); setViewingSale(null); }} sale={viewingSale} shopInfo={shopInfo} onPrint={handlePrintClick} onCopyInvoice={handleCopyInvoice} />
       <ReturnDrawer open={returnDrawerOpen} onClose={() => { setReturnDrawerOpen(false); setReturningSale(null); }} sale={returningSale} onReturnProcessed={handleReturnProcessed} />

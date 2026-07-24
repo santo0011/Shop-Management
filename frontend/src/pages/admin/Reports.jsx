@@ -486,8 +486,8 @@ const Reports = () => {
   }), [analytics.daily, theme, chartColors]);
 
   const trendSeries = useMemo(() => [
-    { name: t('nav.sales'), data: analytics.daily.map(d => Number((d.sales || 0).toFixed(2))) },
-    { name: t('product.profit'), data: analytics.daily.map(d => Number((d.profit || 0).toFixed(2))) },
+    { name: t('nav.sales'), data: analytics.daily.map(d => Number(Number(d.sales || 0).toFixed(2))) },
+    { name: t('product.profit'), data: analytics.daily.map(d => Number(Number(d.profit || 0).toFixed(2))) },
   ], [analytics.daily, t]);
 
   const isDark = theme === 'dark';
@@ -536,7 +536,7 @@ const Reports = () => {
     if (!range) return;
     const rows = [
       [t('common.date'), t('dashboard.ordersLabel'), t('nav.sales'), t('product.profit')],
-      ...analytics.daily.map(d => [d.date, d.orders, d.sales.toFixed(2), d.profit.toFixed(2)]),
+      ...analytics.daily.map(d => [d.date, d.orders, Number(d.sales || 0).toFixed(2), Number(d.profit || 0).toFixed(2)]),
     ];
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     downloadBlob(csv, 'text/csv;charset=utf-8;', `sales-report-${fileTag()}.csv`);

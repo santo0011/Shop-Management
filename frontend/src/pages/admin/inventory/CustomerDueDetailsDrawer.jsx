@@ -8,7 +8,7 @@ import {
 } from 'react-icons/bi';
 
 // ─── Helpers ───────────────────────────────────────────────────
-const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
+const formatCurrency = (val) => `₹${Number(val || 0).toFixed(2)}`;
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
@@ -35,10 +35,10 @@ const EmptyState = ({ icon, text }) => (
 );
 
 // ─── Customer Due Details Drawer ────────────────────────────────
-// Read-only view built entirely from existing endpoints (getCustomer,
-// getCustomerDueSummary, getSale) — no new business logic.
-// "View Invoice" / "Print" reuse the existing PrintPreview component
-// already used by POS and Sales.
+// Shows invoice-wise due information with proper payment status badges.
+// Uses recentPurchases (last 10 sales) from the due-summary endpoint so
+// every invoice — paid, partial, or unpaid — is listed with its own
+// Invoice Due column and status.
 const CustomerDueDetailsDrawer = ({ open, customerId, onClose, t }) => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -142,14 +142,20 @@ const CustomerDueDetailsDrawer = ({ open, customerId, onClose, t }) => {
                 ))}
               </div>
 
-              {/* ─── Due Invoice List ───────────────────────────── */}
+              {/* ─── Due Invoice List (invoice-wise) ────────────── */}
               {activeSection === 'invoices' && (
-                dueDetails.unpaidInvoices.length === 0 ? (
+                (dueDetails.recentPurchases || []).length === 0 ? (
                   <EmptyState icon="🎉" text={t('customersPage.noUnpaidInvoices')} />
                 ) : (
                   <div className="due-details-list">
-                    {dueDetails.unpaidInvoices.map((inv) => {
-                      const st = STATUS[inv.paymentStatus] || STATUS.unpaid;
+                    {(dueDetails.recentPurchases || []).map((inv) => {
+                      // Determine status from this invoice's own amounts
+                      const invDue = inv.dueAmount || 0;
+                      const invPaid = inv.paidAmount || 0;
+                      let paymentStatus = 'paid';
+                      if (invDue > 0 && invPaid > 0) paymentStatus = 'partial';
+                      else if (invPaid === 0) paymentStatus = 'unpaid';
+                      const st = STATUS[paymentStatus] || STATUS.paid;
                       return (
                         <div key={inv._id} className="due-invoice-card">
                           <div className="due-invoice-top">
@@ -164,11 +170,11 @@ const CustomerDueDetailsDrawer = ({ open, customerId, onClose, t }) => {
                             </div>
                             <div className="due-invoice-amount-item">
                               <span className="due-invoice-amount-label">{t('common.paid')}</span>
-                              <span className="due-amount-paid">{formatCurrency(inv.paidAmount)}</span>
+                              <span className="due-amount-paid">{formatCurrency(invPaid)}</span>
                             </div>
                             <div className="due-invoice-amount-item">
-                              <span className="due-invoice-amount-label">{t('customersPage.remainingDue')}</span>
-                              <span className="due-amount-remaining">{formatCurrency(inv.dueAmount)}</span>
+                              <span className="due-invoice-amount-label">{t('customersPage.invoiceDue')}</span>
+                              <span className="due-amount-remaining">{formatCurrency(invDue)}</span>
                             </div>
                           </div>
                           <div className="due-invoice-actions">

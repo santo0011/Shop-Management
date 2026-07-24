@@ -145,7 +145,7 @@ const NotificationDropdown = () => {
             {notifications.length === 0 ? (
               <div className="text-center py-4 text-muted">
                 <BiBell size={32} className="mb-2" />
-                <p className="mb-0">{t('common.noNotifications')}</p>
+                <p className="mb-0">{t('empty.noNotifications')}</p>
               </div>
             ) : (
               notifications.map((notification) => (

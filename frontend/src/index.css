@@ -3997,7 +3997,7 @@ select:-webkit-autofill {
 
 /* ─── Body ────────────────────────────────────────────── */
 .confirm-sale-body {
-  padding: 16px 20px 20px;
+  padding: 12px 16px 16px;
 }
 
 /* ─── Summary Cards Grid ──────────────────────────────── */
@@ -6756,7 +6756,7 @@ select:-webkit-autofill {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: var(--shadow-card);
 }
 

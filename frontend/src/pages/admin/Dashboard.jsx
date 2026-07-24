@@ -86,13 +86,16 @@ const CustomLineTooltip = ({ active, payload, label }) => {
   return (
     <div className="dashboard-tooltip">
       <div className="dashboard-tooltip-date">{label}</div>
-      {payload.map((entry, idx) => (
-        <div key={idx} className="dashboard-tooltip-row" style={{ color: entry.color }}>
-          <span className="dashboard-tooltip-dot" style={{ background: entry.color }} />
-          <span>{entry.name}: </span>
-          <strong>{formatCurrency(entry.value)}</strong>
-        </div>
-      ))}
+      {payload.map((entry, idx) => {
+        const isCurrency = entry.dataKey !== 'Orders';
+        return (
+          <div key={idx} className="dashboard-tooltip-row" style={{ color: entry.color }}>
+            <span className="dashboard-tooltip-dot" style={{ background: entry.color }} />
+            <span>{entry.name}: </span>
+            <strong>{isCurrency ? formatCurrency(entry.value) : Number(entry.value).toLocaleString('en-IN')}</strong>
+          </div>
+        );
+      })}
     </div>
   );
 };

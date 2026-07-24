@@ -8,7 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 // ─── Helpers ───────────────────────────────────────────────────
-const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
+const formatCurrency = (val) => `₹${Number(val || 0).toFixed(2)}`;
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const formatDateTime = (d) =>

@@ -353,13 +353,13 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-divider" />
       <div className="receipt-totals">
         <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{rawGrandTotal.toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Math.abs(roundOff).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.payable')}</span><span className="receipt-grand-total">₹{payableAmount.toFixed(2)}</span></div>
+        {Number(sale?.tax || 0) > 0 && <div className="receipt-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
+        <div className="receipt-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
+        {roundOff !== 0 && <div className="receipt-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
+        <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.payable')}</span><span className="receipt-grand-total">₹{Number(payableAmount || 0).toFixed(2)}</span></div>
         <div className="receipt-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
         <div className="receipt-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-payment-method">{paymentMethodLabel(sale?.paymentMethod)}</span></div>
       </div>
       {showFooter && (
@@ -415,13 +415,13 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-modern-divider" />
       <div className="receipt-modern-totals">
         <div className="receipt-modern-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-modern-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-modern-total-row receipt-modern-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-modern-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{rawGrandTotal.toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-modern-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Math.abs(roundOff).toFixed(2)}</span></div>}
-        <div className="receipt-modern-grand-total"><span>{t('posPage.totals.payable')}</span><span className="receipt-modern-grand-amount">₹{payableAmount.toFixed(2)}</span></div>
+        {Number(sale?.tax || 0) > 0 && <div className="receipt-modern-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-modern-total-row receipt-modern-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
+        <div className="receipt-modern-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
+        {roundOff !== 0 && <div className="receipt-modern-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
+        <div className="receipt-modern-grand-total"><span>{t('posPage.totals.payable')}</span><span className="receipt-modern-grand-amount">₹{Number(payableAmount || 0).toFixed(2)}</span></div>
         <div className="receipt-modern-total-row"><span>{t('common.paid')}</span><span className="receipt-modern-paid">₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-modern-total-row"><span>{t('common.due')}</span><span className="receipt-modern-due">₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-modern-total-row"><span>{t('common.due')}</span><span className="receipt-modern-due">₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
         <div className="receipt-modern-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-modern-payment-badge">{paymentMethodLabel(sale?.paymentMethod)}</span></div>
       </div>
       {showFooter && (
@@ -465,13 +465,13 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-minimal-divider" />
       <div className="receipt-minimal-totals">
         <div className="receipt-minimal-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-minimal-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-minimal-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{rawGrandTotal.toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-minimal-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Math.abs(roundOff).toFixed(2)}</span></div>}
-        <div className="receipt-minimal-total-row receipt-minimal-grand"><span>{t('posPage.totals.payable')}</span><span>₹{payableAmount.toFixed(2)}</span></div>
+        {Number(sale?.tax || 0) > 0 && <div className="receipt-minimal-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
+        <div className="receipt-minimal-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
+        {roundOff !== 0 && <div className="receipt-minimal-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
+        <div className="receipt-minimal-total-row receipt-minimal-grand"><span>{t('posPage.totals.payable')}</span><span>₹{Number(payableAmount || 0).toFixed(2)}</span></div>
         <div className="receipt-minimal-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
       </div>
       {showFooter && (
         <div className="receipt-minimal-footer">
@@ -519,13 +519,13 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-grocery-divider" />
       <div className="receipt-grocery-totals">
         <div className="receipt-grocery-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {Number(sale?.tax || 0) > 0 && <div className="receipt-grocery-total-row"><span>{taxName}</span><span>₹{Number(sale.tax).toFixed(2)}</span></div>}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{rawGrandTotal.toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-grocery-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Math.abs(roundOff).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row receipt-grocery-grand"><span>{t('posPage.totals.payable')}</span><span>₹{payableAmount.toFixed(2)}</span></div>
+        {Number(sale?.tax || 0) > 0 && <div className="receipt-grocery-total-row"><span>{taxName}</span><span>₹{Number(sale?.tax || 0).toFixed(2)}</span></div>}
+        {Number(sale?.discount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
+        <div className="receipt-grocery-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
+        {roundOff !== 0 && <div className="receipt-grocery-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
+        <div className="receipt-grocery-total-row receipt-grocery-grand"><span>{t('posPage.totals.payable')}</span><span>₹{Number(payableAmount || 0).toFixed(2)}</span></div>
         <div className="receipt-grocery-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-due"><span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span></div>}
+        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
         <div className="receipt-grocery-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-grocery-payment">{paymentMethodLabel(sale?.paymentMethod)}</span></div>
       </div>
       <div className="receipt-grocery-divider" />

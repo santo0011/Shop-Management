@@ -484,11 +484,20 @@
   },
   "posPage": {
     "confirmSale": {
-      "generateAndPrint": "তৈরি করে প্রিন্ট করুন",
+      "generateAndPrint": "জেনারেট ও প্রিন্ট",
+      "generating": "জেনারেট হচ্ছে...",
+      "generatingInvoice": "চালান তৈরি হচ্ছে...",
       "itemsCount": "{{count}}টি পণ্য",
       "processing": "প্রক্রিয়া চলছে...",
       "title": "বিক্রয় নিশ্চিত করুন",
-      "totalItems": "মোট পণ্য"
+      "totalItems": "মোট পণ্য",
+      "preparingSale": "বিক্রয় প্রস্তুত করা হচ্ছে...",
+      "savingTransaction": "লেনদেন সংরক্ষণ করা হচ্ছে...",
+      "generatingInvoiceFile": "চালান তৈরি করা হচ্ছে..."
+    },
+    "generating": {
+      "title": "চালান তৈরি হচ্ছে",
+      "subtitle": "অনুগ্রহ করে একটু অপেক্ষা করুন..."
     },
     "customer": {
       "add": "যোগ করুন",
@@ -1501,6 +1510,7 @@
     "unpaidInvoicesCount": "{{count}}টি অপরিশোধিত চালান",
     "unpaidInvoices": "অপরিশোধিত চালান",
     "dueInvoices": "বকেয়া চালান",
+    "invoiceDue": "ইনভয়েস বকেয়া",
     "remainingDue": "অবশিষ্ট বকেয়া",
     "viewInvoice": "চালান দেখুন",
     "noUnpaidInvoices": "কোন অপরিশোধিত চালান নেই",
