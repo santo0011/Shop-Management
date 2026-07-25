@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   BiArrowBack, BiCart, BiDollar, BiWallet,
   BiPhone, BiCalendar, BiReceipt, BiBuilding,
-  BiCheckCircle, BiErrorCircle,
+  BiCheckCircle, BiErrorCircle, BiShow, BiChevronUp,
 } from 'react-icons/bi';
 import api from '../../services/api';
 import ExpandableCard from '../../components/common/ExpandableCard';
@@ -18,6 +18,185 @@ const statusMeta = {
   paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: 'Paid' },
   partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: 'Partial' },
   unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: 'Unpaid' },
+};
+
+// GST type isn't a stored enum on Purchase — derived purely for display from
+// whichever tax amounts are actually present (no calculation, just a label).
+const gstTypeLabel = (data, t) => {
+  if ((data.cgst || 0) > 0 || (data.sgst || 0) > 0) return t('suppliersPage.gstTypeIntra');
+  if ((data.igst || 0) > 0) return t('suppliersPage.gstTypeInter');
+  return t('suppliersPage.gstTypeNone');
+};
+
+// ─── Expandable Purchase Details (Sections 1–5) ──────────────────
+// Renders from the full purchase doc (GET /purchases/:id) — every figure
+// here is either a direct field or a simple derived display value, exactly
+// mirroring the same math already used in the Add Purchase drawer. No
+// backend calculation is touched.
+const PurchaseExpandDetails = ({ data, loading, t, previousDueUsed, runningBalance }) => {
+  if (loading) {
+    return (
+      <div className="ledger-expand-loading">
+        <span className="spinner-border spinner-border-sm" /> {t('common.loading')}
+      </div>
+    );
+  }
+  if (!data) return null;
+
+  const st = statusMeta[data.paymentStatus] || statusMeta.unpaid;
+
+  return (
+    <div className="ledger-expand-panel">
+      {/* Section 1 — Purchase Information */}
+      <div className="ledger-expand-section">
+        <div className="ledger-expand-section__title">{t('suppliersPage.purchaseInfo')}</div>
+        <div className="ledger-expand-info-grid">
+          <div className="ledger-expand-info-item">
+            <span className="ledger-expand-info-item__label">{t('purchasesPage.supplierInvoiceNo')}</span>
+            <span className="ledger-expand-info-item__value">{data.supplierInvoiceNo || '-'}</span>
+          </div>
+          <div className="ledger-expand-info-item">
+            <span className="ledger-expand-info-item__label">{t('purchasesPage.purchaseDate')}</span>
+            <span className="ledger-expand-info-item__value">{formatDate(data.purchaseDate)}</span>
+          </div>
+          <div className="ledger-expand-info-item">
+            <span className="ledger-expand-info-item__label">{t('purchase.supplier')}</span>
+            <span className="ledger-expand-info-item__value">{data.supplier?.name || '-'}</span>
+          </div>
+          <div className="ledger-expand-info-item">
+            <span className="ledger-expand-info-item__label">{t('suppliersPage.gstType')}</span>
+            <span className="ledger-expand-info-item__value">{gstTypeLabel(data, t)}</span>
+          </div>
+          <div className="ledger-expand-info-item">
+            <span className="ledger-expand-info-item__label">{t('common.status')}</span>
+            <span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+          </div>
+          {previousDueUsed > 0 && (
+            <div className="ledger-expand-info-item">
+              <span className="ledger-expand-info-item__label">{t('suppliersPage.previousDueUsed')}</span>
+              <span className="ledger-expand-info-item__value">{formatCurrency(previousDueUsed)}</span>
+            </div>
+          )}
+          {runningBalance !== undefined && (
+            <div className="ledger-expand-info-item">
+              <span className="ledger-expand-info-item__label">{t('suppliersPage.runningBalance')}</span>
+              <span className="ledger-expand-info-item__value">{formatCurrency(runningBalance)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Section 2 — Product Details */}
+      <div className="ledger-expand-section">
+        <div className="ledger-expand-section__title">{t('purchasesPage.products')}</div>
+        <div className="ledger-expand-table-scroll">
+          <table className="purchase-items-table">
+            <thead>
+              <tr>
+                <th>{t('purchasesPage.product')}</th>
+                <th>{t('product.sku')}</th>
+                <th>{t('purchasesPage.qty')}</th>
+                <th>{t('product.unit')}</th>
+                <th>{t('product.purchasePrice')}</th>
+                <th>{t('sale.discount')}</th>
+                <th>{t('sale.tax')}</th>
+                <th>{t('purchasesPage.lineTotal')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.items || []).map((item, idx) => (
+                <tr key={item.product?._id || idx}>
+                  <td>{item.product?.name || t('purchasesPage.unknownProduct')}</td>
+                  <td>{item.product?.sku || '-'}</td>
+                  <td>{item.quantity}</td>
+                  <td>{item.unit}</td>
+                  <td>{formatCurrency(item.purchasePrice)}</td>
+                  <td>{item.discount ? `${item.discount}%` : '-'}</td>
+                  <td>{formatCurrency(item.gstAmount)}</td>
+                  <td style={{ fontWeight: 700 }}>{formatCurrency(item.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Section 3 — Payment Summary (kept short: just paid & due) */}
+      <div className="ledger-expand-section">
+        <div className="ledger-expand-section__title">{t('purchasesPage.paymentSummary')}</div>
+        <div className="ledger-mini-card-grid">
+          <div className="ledger-mini-card ledger-mini-card--success">
+            <span className="ledger-mini-card__label">{t('sale.paidAmount')}</span>
+            <span className="ledger-mini-card__value">{formatCurrency(data.paidAmount)}</span>
+          </div>
+          <div className="ledger-mini-card ledger-mini-card--danger">
+            <span className="ledger-mini-card__label">{t('purchasesPage.dueAmount')}</span>
+            <span className="ledger-mini-card__value">{formatCurrency(data.dueAmount)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 4 — GST Summary */}
+      <div className="ledger-expand-section">
+        <div className="ledger-expand-section__title">{t('suppliersPage.gstSummary')}</div>
+        <div className="ledger-mini-card-grid">
+          <div className="ledger-mini-card ledger-mini-card--info">
+            <span className="ledger-mini-card__label">{t('purchasesPage.taxableAmount')}</span>
+            <span className="ledger-mini-card__value">{formatCurrency(data.taxableAmount)}</span>
+          </div>
+          {(data.cgst > 0 || data.sgst > 0) && (
+            <>
+              <div className="ledger-mini-card ledger-mini-card--primary">
+                <span className="ledger-mini-card__label">CGST</span>
+                <span className="ledger-mini-card__value">{formatCurrency(data.cgst)}</span>
+              </div>
+              <div className="ledger-mini-card ledger-mini-card--primary">
+                <span className="ledger-mini-card__label">SGST</span>
+                <span className="ledger-mini-card__value">{formatCurrency(data.sgst)}</span>
+              </div>
+            </>
+          )}
+          {data.igst > 0 && (
+            <div className="ledger-mini-card ledger-mini-card--primary">
+              <span className="ledger-mini-card__label">IGST</span>
+              <span className="ledger-mini-card__value">{formatCurrency(data.igst)}</span>
+            </div>
+          )}
+          <div className="ledger-mini-card ledger-mini-card--success">
+            <span className="ledger-mini-card__label">{t('purchasesPage.grandTotal')}</span>
+            <span className="ledger-mini-card__value">{formatCurrency(data.totalAmount)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 5 — Payment History (if available) */}
+      {data.paidAmount > 0 && (
+        <div className="ledger-expand-section">
+          <div className="ledger-expand-section__title">{t('suppliersPage.paymentHistory')}</div>
+          <div className="ledger-expand-table-scroll">
+            <table className="purchase-items-table">
+              <thead>
+                <tr>
+                  <th>{t('suppliersPage.paymentDate')}</th>
+                  <th>{t('suppliersPage.paymentAmount')}</th>
+                  <th>{t('sale.paymentMethod')}</th>
+                  <th>{t('common.notes')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{formatDate(data.purchaseDate || data.createdAt)}</td>
+                  <td>{formatCurrency(data.paidAmount)}</td>
+                  <td style={{ textTransform: 'capitalize' }}>{(data.paymentMethod || '-').replace(/_/g, ' ')}</td>
+                  <td>{data.notes || '-'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─── KPI Card ─────────────────────────────────────────────────
@@ -156,22 +335,22 @@ const SupplierLedgerSkeletonLoader = () => (
   </div>
 );
 
-// ─── Inline Table Skeleton Rows ──────────────────────────────────
-const TableSkeletonRows = ({ columns = 6 }) => (
+// ─── Inline Grid Skeleton Rows ────────────────────────────────────
+const GridSkeletonRows = () => (
   <>
     {[1, 2, 3, 4].map((r) => (
-      <tr key={r} style={{ opacity: 0.5 }}>
-        {[1, 2, 3, 4, 5, 6].map((c) => (
-          <td key={c} style={{ padding: '0.75rem 1rem' }}>
+      <div key={r} className="ledger-grid-row" style={{ opacity: 0.5 }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+          <div key={c} className="ledger-grid-cell">
             <div style={{
-              height: 10, width: c === 1 ? 60 : c === 6 ? 50 : '35%',
+              height: 10, width: c === 7 ? 24 : c === 1 ? '70%' : '55%',
               background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
               backgroundSize: '200% 100%', borderRadius: 4,
               animation: 'shimmer 1.5s infinite',
             }} />
-          </td>
+          </div>
         ))}
-      </tr>
+      </div>
     ))}
   </>
 );
@@ -184,8 +363,34 @@ const SupplierLedgerPage = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [supplier, setSupplier] = useState(null);
-  const [purchases, setPurchases] = useState([]);
+  const [ledgerEntries, setLedgerEntries] = useState([]);
+  const [ledgerSummary, setLedgerSummary] = useState(null);
   const isFirstLoad = useRef(true);
+
+  // Accordion state for the "View" details row — only one purchase expanded
+  // at a time. Fetched lazily from the existing GET /purchases/:id endpoint
+  // (no backend changes) and cached per-id so re-toggling doesn't re-fetch.
+  const [expandedPurchaseId, setExpandedPurchaseId] = useState(null);
+  const [expandedPurchaseCache, setExpandedPurchaseCache] = useState({});
+  const [loadingExpandedId, setLoadingExpandedId] = useState(null);
+
+  const toggleExpand = async (purchaseId) => {
+    if (expandedPurchaseId === purchaseId) {
+      setExpandedPurchaseId(null);
+      return;
+    }
+    setExpandedPurchaseId(purchaseId);
+    if (expandedPurchaseCache[purchaseId]) return;
+    setLoadingExpandedId(purchaseId);
+    try {
+      const { data } = await api.get(`/purchases/${purchaseId}`, { _skipLoading: true });
+      setExpandedPurchaseCache((prev) => ({ ...prev, [purchaseId]: data }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingExpandedId(null);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!supplierId) return;
@@ -195,12 +400,15 @@ const SupplierLedgerPage = () => {
       setRefreshing(true);
     }
     try {
-      const [supplierRes, purchasesRes] = await Promise.all([
+      const [supplierRes, ledgerRes] = await Promise.all([
         api.get(`/suppliers/${supplierId}`, { _skipLoading: true }),
-        api.get(`/purchases?supplier=${supplierId}&limit=500`, { _skipLoading: true }),
+        api.get(`/suppliers/${supplierId}/ledger`, { _skipLoading: true }),
       ]);
       setSupplier(supplierRes.data);
-      setPurchases(purchasesRes.data.purchases || []);
+      // Ledger endpoint returns entries oldest-first (for correct running-balance
+      // math) — reverse for the newest-first display this page already used.
+      setLedgerEntries([...(ledgerRes.data.entries || [])].reverse());
+      setLedgerSummary(ledgerRes.data.summary || null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -220,10 +428,10 @@ const SupplierLedgerPage = () => {
 
   if (initialLoading) return <SupplierLedgerSkeletonLoader />;
 
-  const totalPurchaseAmount = purchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
-  const totalPaid = purchases.reduce((sum, p) => sum + (p.paidAmount || 0), 0);
-  const currentDue = supplier?.dueAmount || 0;
-  const totalPurchases = purchases.length;
+  const totalPurchaseAmount = ledgerSummary?.totalPurchaseAmount || 0;
+  const totalPaid = ledgerSummary?.totalPaid || 0;
+  const currentDue = ledgerSummary?.currentDue ?? (supplier?.dueAmount || 0);
+  const totalPurchases = ledgerSummary?.totalPurchases || 0;
 
   return (
     <div className="supplier-ledger-page">
@@ -321,7 +529,7 @@ const SupplierLedgerPage = () => {
         </div>
       </div>
 
-      {purchases.length === 0 && !refreshing ? (
+      {ledgerEntries.length === 0 && !refreshing ? (
         <div className="ledger-empty-state">
           <div className="ledger-empty-icon"><BiCart /></div>
           <div className="ledger-empty-title">{t('purchasesPage.noPurchasesFound') || 'No purchases found'}</div>
@@ -329,55 +537,77 @@ const SupplierLedgerPage = () => {
         </div>
       ) : (
         <>
-          {/* ─── Desktop Table ──────────────────────────────────── */}
-          <div className={`table-container desktop-table ${refreshing ? 'is-refreshing' : 'content-visible'}`}>
-            <div className="table-responsive">
-              <table className="table-custom mb-0">
-                <thead>
-                  <tr>
-                    <th>{t('purchasesPage.purchaseNo') || 'Purchase No'}</th>
-                    <th>{t('purchasesPage.purchaseDate') || 'Date'}</th>
-                    <th>{t('common.total')}</th>
-                    <th>{t('sale.paidAmount') || 'Paid'}</th>
-                    <th>{t('purchasesPage.dueAmount') || 'Due'}</th>
-                    <th>{t('purchasesPage.paymentStatus') || 'Status'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {refreshing ? (
-                    <TableSkeletonRows columns={6} />
-                  ) : (
-                    purchases.map((p) => {
-                      const st = statusMeta[p.paymentStatus] || statusMeta.unpaid;
-                      return (
-                        <tr key={p._id}>
-                          <td>
-                            <span className="sales-invoice-badge">{p.purchaseNo}</span>
-                          </td>
-                          <td>
-                            <div className="sales-date-cell">
-                              <span className="sales-date-text">{formatDate(p.purchaseDate || p.createdAt)}</span>
-                            </div>
-                          </td>
-                          <td><span className="sales-amount">{formatCurrency(p.totalAmount)}</span></td>
-                          <td><span className="sales-amount" style={{ color: 'var(--secondary)' }}>{formatCurrency(p.paidAmount)}</span></td>
-                          <td>
-                            <span className="sales-amount" style={{ color: p.dueAmount > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
-                              {formatCurrency(p.dueAmount)}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>
-                              {st.label}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+          {/* ─── Desktop List ───────────────────────────────────────
+              A CSS Grid, not an HTML <table> — deliberately. A real
+              <table> lets a wide nested element (the accordion's product
+              table) inflate the whole table's auto-layout column widths,
+              which forces a page-wide horizontal scrollbar. Grid cells
+              truncate with ellipsis instead of forcing width, so this
+              structurally cannot overflow horizontally. */}
+          <div className="ledger-grid-table desktop-table">
+            <div className="ledger-grid-header">
+              <div className="ledger-grid-cell">{t('purchasesPage.purchaseNo') || 'Purchase No'}</div>
+              <div className="ledger-grid-cell">{t('purchasesPage.purchaseDate') || 'Date'}</div>
+              <div className="ledger-grid-cell">{t('common.total')}</div>
+              <div className="ledger-grid-cell">{t('sale.paidAmount') || 'Paid'}</div>
+              <div className="ledger-grid-cell">{t('purchasesPage.dueAmount') || 'Due'}</div>
+              <div className="ledger-grid-cell">{t('purchasesPage.paymentStatus') || 'Status'}</div>
+              <div className="ledger-grid-cell ledger-grid-cell--actions">{t('common.actions')}</div>
             </div>
+            {refreshing ? (
+              <GridSkeletonRows />
+            ) : (
+              ledgerEntries.map((e) => {
+                const st = statusMeta[e.status] || statusMeta.unpaid;
+                const isExpanded = expandedPurchaseId === e.purchaseId;
+                return (
+                  <React.Fragment key={e.purchaseId}>
+                    <div className={`ledger-grid-row ${isExpanded ? 'ledger-row--expanded' : ''}`}>
+                      <div className="ledger-grid-cell">
+                        <span className="sales-invoice-badge">{e.purchaseNo}</span>
+                        {e.previousDueIncluded && (
+                          <span className="ledger-fifo-chip" title={t('purchasesPage.previousDueIncludedLabel')}>{t('suppliersPage.previousDueChip')}</span>
+                        )}
+                      </div>
+                      <div className="ledger-grid-cell">{formatDate(e.date)}</div>
+                      <div className="ledger-grid-cell"><span className="sales-amount">{formatCurrency(e.purchaseAmount)}</span></div>
+                      <div className="ledger-grid-cell"><span className="sales-amount" style={{ color: 'var(--secondary)' }}>{formatCurrency(e.paymentReceived)}</span></div>
+                      <div className="ledger-grid-cell">
+                        <span className="sales-amount" style={{ color: e.remainingInvoiceDue > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                          {formatCurrency(e.remainingInvoiceDue)}
+                        </span>
+                      </div>
+                      <div className="ledger-grid-cell">
+                        <span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>
+                          {st.label}
+                        </span>
+                      </div>
+                      <div className="ledger-grid-cell ledger-grid-cell--actions">
+                        <button
+                          type="button"
+                          className={`btn-action btn-action-view ${isExpanded ? 'is-active' : ''}`}
+                          data-tooltip={t('common.view')}
+                          onClick={() => toggleExpand(e.purchaseId)}
+                        >
+                          {isExpanded ? <BiChevronUp /> : <BiShow />}
+                        </button>
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div className="ledger-expand-wrap">
+                        <PurchaseExpandDetails
+                          data={expandedPurchaseCache[e.purchaseId]}
+                          loading={loadingExpandedId === e.purchaseId}
+                          t={t}
+                          previousDueUsed={e.previousDueUsed}
+                          runningBalance={e.runningBalance}
+                        />
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
           </div>
 
           {/* ─── Mobile Cards ───────────────────────────────────── */}
@@ -387,21 +617,22 @@ const SupplierLedgerPage = () => {
                 <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
               </div>
             ) : (
-              purchases.map((p) => {
-                const st = statusMeta[p.paymentStatus] || statusMeta.unpaid;
+              ledgerEntries.map((e) => {
+                const st = statusMeta[e.status] || statusMeta.unpaid;
+                const isExpanded = expandedPurchaseId === e.purchaseId;
                 return (
                   <ExpandableCard
-                    key={p._id}
+                    key={e.purchaseId}
                     compact={
                       <>
                         <div className="expandable-card__compact-row">
-                          <span className="expandable-card__name">{p.purchaseNo}</span>
-                          <span className="expandable-card__price">{formatCurrency(p.totalAmount)}</span>
+                          <span className="expandable-card__name">{e.purchaseNo}</span>
+                          <span className="expandable-card__price">{formatCurrency(e.purchaseAmount)}</span>
                         </div>
                         <div className="expandable-card__meta">
                           <span className="expandable-card__meta-item">
                             <BiCalendar />
-                            <span>{formatDate(p.purchaseDate || p.createdAt)}</span>
+                            <span>{formatDate(e.date)}</span>
                           </span>
                           <span className="expandable-card__stock" style={{ color: st.color }}>
                             {st.label}
@@ -414,25 +645,55 @@ const SupplierLedgerPage = () => {
                         <div className="expandable-card__row">
                           <span className="expandable-card__row-label">{t('common.total')}</span>
                           <span className="expandable-card__row-dots" />
-                          <span className="expandable-card__row-value">{formatCurrency(p.totalAmount)}</span>
+                          <span className="expandable-card__row-value">{formatCurrency(e.purchaseAmount)}</span>
                         </div>
+                        {e.previousDueUsed > 0 && (
+                          <div className="expandable-card__row">
+                            <span className="expandable-card__row-label">{t('suppliersPage.previousDueUsed')}</span>
+                            <span className="expandable-card__row-dots" />
+                            <span className="expandable-card__row-value" style={{ color: 'var(--secondary)' }}>{formatCurrency(e.previousDueUsed)}</span>
+                          </div>
+                        )}
                         <div className="expandable-card__row">
                           <span className="expandable-card__row-label">{t('sale.paidAmount') || 'Paid'}</span>
                           <span className="expandable-card__row-dots" />
-                          <span className="expandable-card__row-value" style={{ color: 'var(--secondary)' }}>{formatCurrency(p.paidAmount)}</span>
+                          <span className="expandable-card__row-value" style={{ color: 'var(--secondary)' }}>{formatCurrency(e.paymentReceived)}</span>
                         </div>
                         <div className="expandable-card__row">
                           <span className="expandable-card__row-label">{t('purchasesPage.dueAmount') || 'Due'}</span>
                           <span className="expandable-card__row-dots" />
-                          <span className="expandable-card__row-value" style={{ color: p.dueAmount > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
-                            {formatCurrency(p.dueAmount)}
+                          <span className="expandable-card__row-value" style={{ color: e.remainingInvoiceDue > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                            {formatCurrency(e.remainingInvoiceDue)}
+                          </span>
+                        </div>
+                        <div className="expandable-card__row">
+                          <span className="expandable-card__row-label">{t('suppliersPage.runningBalance')}</span>
+                          <span className="expandable-card__row-dots" />
+                          <span className="expandable-card__row-value" style={{ color: e.runningBalance > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                            {formatCurrency(e.runningBalance)}
                           </span>
                         </div>
                         <div className="expandable-card__row">
                           <span className="expandable-card__row-label">{t('purchasesPage.purchaseDate') || 'Date'}</span>
                           <span className="expandable-card__row-dots" />
-                          <span className="expandable-card__row-value">{formatDate(p.purchaseDate || p.createdAt)}</span>
+                          <span className="expandable-card__row-value">{formatDate(e.date)}</span>
                         </div>
+                        <button
+                          type="button"
+                          className={`btn-premium btn-premium-secondary ledger-mobile-view-btn ${isExpanded ? 'is-active' : ''}`}
+                          onClick={(ev) => { ev.stopPropagation(); toggleExpand(e.purchaseId); }}
+                        >
+                          {isExpanded ? <><BiChevronUp /> {t('common.close')}</> : <><BiShow /> {t('common.view')}</>}
+                        </button>
+                        {isExpanded && (
+                          <PurchaseExpandDetails
+                            data={expandedPurchaseCache[e.purchaseId]}
+                            loading={loadingExpandedId === e.purchaseId}
+                            t={t}
+                            previousDueUsed={e.previousDueUsed}
+                            runningBalance={e.runningBalance}
+                          />
+                        )}
                       </div>
                     }
                   />

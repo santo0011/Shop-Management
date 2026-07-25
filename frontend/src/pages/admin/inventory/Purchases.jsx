@@ -10,6 +10,7 @@ import {
   BiSearch, BiPlus, BiTrash, BiX, BiCheck, BiShow, BiCalendar, BiNote,
   BiCreditCard, BiHash, BiUser, BiChevronDown,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable, BiError, BiRefresh, BiInfoCircle,
+  BiImage, BiUndo,
 } from 'react-icons/bi';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
@@ -60,7 +61,8 @@ const emptyHeader = () => ({
 
 const rowBase = (row) => Number(row.purchasePrice || 0) * Number(row.quantity || 0);
 const rowDiscountAmt = (row) => rowBase(row) * (Number(row.discount || 0) / 100);
-const rowTotal = (row) => rowBase(row) - rowDiscountAmt(row);
+const rowTaxAmt = (row) => Number(row.tax || 0);
+const rowTotal = (row) => rowBase(row) - rowDiscountAmt(row) + rowTaxAmt(row);
 
 const money = (val) => `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -99,7 +101,7 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
                 onEnter={() => handleRowFieldEnter(row.key, 'product')}
               />
               {row.product && (
-                <div className="purchase-mobile-product-card__hint">
+                <div className="purchase-mobile-product-card__hint purchase-stock-hint">
                   {t('purchasesPage.unitStockHint', { unit: row.product.unit, stock: row.product.stock ?? 0 })}
                 </div>
               )}
@@ -150,6 +152,11 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
                 onChange={(e) => updateRow(row.key, { quantity: e.target.value })}
                 disabled={isViewMode}
               />
+              {row.returnedQty > 0 && (
+                <div className="purchase-row-hint purchase-row-hint--returned">
+                  {t('purchasesPage.returnedQtyHint', { qty: row.returnedQty })}
+                </div>
+              )}
             </div>
             <div className="purchase-mobile-product-card__field">
               <label className="purchase-mobile-product-card__label">{t('product.purchasePrice')}</label>
@@ -223,15 +230,26 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const [header, setHeader] = useState(emptyHeader);
   const [rows, setRows] = useState([emptyRow()]);
   const [paidAmount, setPaidAmount] = useState('');
+  const [previousDuePaymentAmount, setPreviousDuePaymentAmount] = useState('');
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [categories, setCategories] = useState([]);
   const [shopSettings, setShopSettings] = useState(null);
+  const [dueSummary, setDueSummary] = useState(null);
+  const [includePreviousDue, setIncludePreviousDue] = useState(false);
+  const [invoiceImage, setInvoiceImage] = useState('');
+  const [savingInvoiceImage, setSavingInvoiceImage] = useState(false);
+  const [viewingOverride, setViewingOverride] = useState(null);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnQuantities, setReturnQuantities] = useState({});
+  const [returnReason, setReturnReason] = useState('');
+  const [submittingReturn, setSubmittingReturn] = useState(false);
 
   const [productDrawer, setProductDrawer] = useState({ open: false, rowKey: null, initialName: '' });
   const [mobileOpenCards, setMobileOpenCards] = useState({});
+  const invoiceImageInputRef = useRef(null);
 
   const fieldRefs = useRef({});
   const setFieldRef = (rowKey, field) => (el) => { fieldRefs.current[`${rowKey}::${field}`] = el; };
@@ -263,14 +281,32 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         purchasePrice: i.purchasePrice,
         sellingPrice: i.sellingPrice,
         discount: i.discount || 0,
+        returnedQty: i.returnedQty || 0,
       })));
       setPaidAmount(viewing.paidAmount || 0);
+      setInvoiceImage(viewing.invoiceImage || '');
     } else {
       setHeader(emptyHeader());
       setRows([emptyRow()]);
       setPaidAmount('');
+      setInvoiceImage('');
     }
+    // Never carry the previous-due toggle across drawer sessions or suppliers —
+    // it must always be an explicit, per-purchase opt-in.
+    setDueSummary(null);
+    setIncludePreviousDue(false);
+    setPreviousDuePaymentAmount('');
+    setViewingOverride(null);
+    setReturnModalOpen(false);
+    setReturnQuantities({});
+    setReturnReason('');
   }, [open, viewing]);
+
+  // The purchase doc as currently known — either the prop from the parent,
+  // or (after processing a return in this drawer session) the fresher copy
+  // returned by the return endpoint, without needing a round-trip through
+  // the parent's own state.
+  const effectiveViewing = viewingOverride || viewing;
 
   const toggleMobileCard = (key) => {
     setMobileOpenCards((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -282,6 +318,31 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
       setSuppliers(Array.isArray(data) ? data : data.suppliers || []);
     } catch (err) { console.error(err); }
   };
+
+  // Fetch the selected supplier's outstanding due whenever it changes, so the
+  // "Previous Due" card can appear. Create-mode only — view mode shows the
+  // frozen snapshot recorded on the purchase itself, not today's live due.
+  useEffect(() => {
+    if (isViewMode || !open || !header.supplier) {
+      setDueSummary(null);
+      setIncludePreviousDue(false);
+      setPreviousDuePaymentAmount('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get(`/suppliers/${header.supplier}/due-summary`, { _skipLoading: true });
+        if (!cancelled) setDueSummary(data);
+      } catch (err) {
+        if (!cancelled) setDueSummary(null);
+        console.error(err);
+      }
+    })();
+    setIncludePreviousDue(false);
+    setPreviousDuePaymentAmount('');
+    return () => { cancelled = true; };
+  }, [header.supplier, isViewMode, open]);
 
   const fetchCategories = async () => {
     try {
@@ -298,20 +359,133 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     } catch (err) { console.error(err); }
   };
 
+  // Downscale + JPEG-compress before encoding, so a phone photo of an
+  // invoice doesn't balloon the stored document (no file-storage infra in
+  // this app — see the model comment — so the image lives as a data URI).
+  const MAX_INVOICE_IMAGE_DIM = 1400;
+  const readAndCompressImage = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode failed'));
+      img.onload = () => {
+        const scale = Math.min(1, MAX_INVOICE_IMAGE_DIM / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Handles both the create-mode "attach invoice photo" flow (stays local
+  // until Save) and the view-mode "replace invoice photo" flow (saves
+  // immediately via PUT, since that purchase already exists).
+  const handleInvoiceImageFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const dataUrl = await readAndCompressImage(file);
+      if (isViewMode && viewing?._id) {
+        setSavingInvoiceImage(true);
+        const { data } = await api.put(`/purchases/${viewing._id}/invoice-image`, { invoiceImage: dataUrl }, { _skipLoading: true });
+        setInvoiceImage(data.invoiceImage || '');
+        showToast.success(t('purchasesPage.invoiceImageUpdated'));
+      } else {
+        setInvoiceImage(dataUrl);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast.error(t('purchasesPage.invoiceImageSaveFailed'));
+    } finally {
+      setSavingInvoiceImage(false);
+    }
+  };
+
+  const handleRemoveInvoiceImage = async () => {
+    if (isViewMode && viewing?._id) {
+      try {
+        setSavingInvoiceImage(true);
+        await api.put(`/purchases/${viewing._id}/invoice-image`, { invoiceImage: '' }, { _skipLoading: true });
+        setInvoiceImage('');
+        showToast.success(t('purchasesPage.invoiceImageUpdated'));
+      } catch (err) {
+        showToast.error(t('purchasesPage.invoiceImageSaveFailed'));
+      } finally {
+        setSavingInvoiceImage(false);
+      }
+    } else {
+      setInvoiceImage('');
+    }
+  };
+
+  // ─── Purchase Return (view mode only) ────────────────────────────────
+  const openReturnModal = () => {
+    setReturnQuantities({});
+    setReturnReason('');
+    setReturnModalOpen(true);
+  };
+
+  const handleReturnQtyChange = (productId, value, maxReturnable) => {
+    const num = Number(value);
+    if (value !== '' && num > maxReturnable) {
+      setReturnQuantities((prev) => ({ ...prev, [productId]: String(maxReturnable) }));
+    } else {
+      setReturnQuantities((prev) => ({ ...prev, [productId]: value }));
+    }
+  };
+
+  const handleSubmitReturn = async () => {
+    const items = Object.entries(returnQuantities)
+      .filter(([, qty]) => Number(qty) > 0)
+      .map(([productId, qty]) => {
+        const row = rows.find((r) => r.product?._id === productId);
+        return { productId, productName: row?.product?.name || '', quantity: Number(qty) };
+      });
+    if (items.length === 0 || !effectiveViewing?._id) return;
+
+    setSubmittingReturn(true);
+    try {
+      const { data } = await api.post(`/purchases/${effectiveViewing._id}/return`, { items, reason: returnReason }, { _skipLoading: true });
+      setRows((prev) => prev.map((r) => {
+        const updated = (data.items || []).find((i) => (i.product?._id || i.product) === r.product?._id);
+        return updated ? { ...r, returnedQty: updated.returnedQty || 0 } : r;
+      }));
+      setViewingOverride(data);
+      showToast.success(t('purchasesPage.returnProcessed'));
+      setReturnModalOpen(false);
+      onSuccess();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('purchasesPage.returnFailed'));
+    } finally {
+      setSubmittingReturn(false);
+    }
+  };
+
   const selectedSupplierData = useMemo(
     () => suppliers.find((s) => s._id === header.supplier) || (viewing?.supplier && typeof viewing.supplier === 'object' ? viewing.supplier : null),
     [suppliers, header.supplier, viewing]
   );
 
   // ─── GST Logic ──────────────────────────────────────────────────────
+  // All GST percentages come from Settings → Tax & GST. Never hardcoded.
   const companyState = shopSettings?.businessState || 'West Bengal';
   const supplierState = selectedSupplierData?.state || '';
   const isIntraState = supplierState && companyState && supplierState === companyState;
   const gstEnabled = shopSettings?.gstEnabled !== false;
 
-  const cgstRate = gstEnabled ? (shopSettings?.cgstRate ?? 9) : 0;
-  const sgstRate = gstEnabled ? (shopSettings?.sgstRate ?? 9) : 0;
-  const igstRate = gstEnabled ? (shopSettings?.igstRate ?? 18) : 0;
+  // Derive individual rates from the saved settings. If the newer
+  // cgstRate/sgstRate/igstRate fields don't exist yet (e.g. after upgrade),
+  // fall back to defaultGstRate / 2 for CGST/SGST and defaultGstRate for IGST.
+  const defaultGstRate = shopSettings?.defaultGstRate ?? 18;
+  const cgstRate = gstEnabled ? (shopSettings?.cgstRate ?? (defaultGstRate / 2)) : 0;
+  const sgstRate = gstEnabled ? (shopSettings?.sgstRate ?? (defaultGstRate / 2)) : 0;
+  const igstRate = gstEnabled ? (shopSettings?.igstRate ?? defaultGstRate) : 0;
 
   const gstType = isIntraState ? 'intra' : (supplierState ? 'inter' : 'none');
 
@@ -385,8 +559,16 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const totalGst = cgstAmount + sgstAmount + igstAmount;
 
   const grandTotal = taxableAmount + totalGst;
-  const previousDue = selectedSupplierData?.dueAmount || 0;
+  // In view mode this is the frozen snapshot from when the purchase was made
+  // (not today's live supplier due); in create mode it's the live fetched due.
+  const previousDue = isViewMode ? (viewing?.previousDueAmountAtCreation || 0) : (dueSummary?.dueAmount || 0);
+  const totalOutstanding = grandTotal + (includePreviousDue ? previousDue : 0);
+  // Paid Amount and Due Amount to Pay are two independent, explicitly typed
+  // figures — neither is inferred from the other, so what the user sees is
+  // exactly what gets applied. "Current Due" stays scoped to this purchase
+  // only; the previous due's own remainder is shown separately.
   const currentDue = Math.max(0, grandTotal - Number(paidAmount || 0));
+  const remainingPreviousDue = includePreviousDue ? Math.max(0, previousDue - Number(previousDuePaymentAmount || 0)) : previousDue;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -394,12 +576,27 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     if (!header.supplier) newErrors.supplier = t('purchasesPage.supplierRequired');
     if (validRows.length === 0) newErrors.items = t('purchasesPage.itemsRequired');
     if (gstEnabled && !supplierState) {
-      newErrors.supplierState = 'Supplier state is required to calculate GST. Please select a supplier with a valid state.';
+      newErrors.supplierState = t('purchasesPage.gstStateRequiredError');
     }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
+
+    const confirmResult = await Swal.fire({
+      title: t('purchasesPage.confirmSaveTitle'),
+      text: t('purchasesPage.confirmSaveText'),
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#6C63FF',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: t('purchasesPage.yesSavePurchase'),
+      cancelButtonText: t('common.cancel'),
+      background: 'var(--bg-card)',
+      color: 'var(--text-primary)',
+      reverseButtons: true,
+    });
+    if (!confirmResult.isConfirmed) return;
 
     setSaving(true);
     setSubmitError(null);
@@ -433,6 +630,9 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         totalGst,
         totalAmount: grandTotal,
         paidAmount: Number(paidAmount) || 0,
+        includePreviousDue,
+        previousDuePaymentAmount: includePreviousDue ? (Number(previousDuePaymentAmount) || 0) : 0,
+        invoiceImage,
       };
       const { data } = await api.post('/purchases', payload, { _skipLoading: true });
       showToast.success(t('purchasesPage.purchaseCreated', { no: data.purchaseNo }));
@@ -531,21 +731,97 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                 disabled={isViewMode}
               />
             </div>
+
+            <div className="form-group mb-0 purchase-header-notes">
+              <label className="form-label"><BiImage style={{ marginRight: 4 }} />{t('purchasesPage.invoiceImage')}</label>
+              <div className="purchase-invoice-image-field">
+                {invoiceImage ? (
+                  <div className="purchase-invoice-image-preview">
+                    <img src={invoiceImage} alt={t('purchasesPage.invoiceImage')} />
+                    <div className="purchase-invoice-image-preview__actions">
+                      <button
+                        type="button"
+                        className="btn-premium btn-premium-secondary"
+                        onClick={() => invoiceImageInputRef.current?.click()}
+                        disabled={savingInvoiceImage}
+                      >
+                        <BiImage /> {t('purchasesPage.changeInvoiceImage')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-premium btn-premium-secondary"
+                        onClick={handleRemoveInvoiceImage}
+                        disabled={savingInvoiceImage}
+                      >
+                        <BiTrash /> {t('purchasesPage.removeInvoiceImage')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-premium btn-premium-secondary"
+                    onClick={() => invoiceImageInputRef.current?.click()}
+                    disabled={savingInvoiceImage}
+                  >
+                    <BiUpload /> {t('purchasesPage.uploadInvoiceImage')}
+                  </button>
+                )}
+                <input
+                  ref={invoiceImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleInvoiceImageFile}
+                />
+              </div>
+            </div>
           </div>
+
+          {/* ─── Previous Due Card ──────────────────────────────────── */}
+          {!isViewMode && dueSummary && dueSummary.dueAmount > 0 && (
+            <div className="purchase-previous-due-card">
+              <div className="purchase-previous-due-card__header">
+                <span className="purchase-previous-due-card__title">{t('purchasesPage.previousDue')}</span>
+                <span className="purchase-previous-due-card__amount">{money(dueSummary.dueAmount)}</span>
+              </div>
+              <div className="purchase-previous-due-card__meta">
+                {dueSummary.lastPurchaseDate && (
+                  <span className="purchase-previous-due-card__meta-item">
+                    {t('purchasesPage.lastPurchase')}: {new Date(dueSummary.lastPurchaseDate).toLocaleDateString()}
+                  </span>
+                )}
+                <span className="purchase-previous-due-card__meta-item">
+                  {t('purchasesPage.unpaidInvoicesCount', { count: dueSummary.unpaidInvoiceCount })}
+                </span>
+              </div>
+              <label className="purchase-previous-due-card__toggle-row">
+                <span className="mob-inv-switch">
+                  <input
+                    type="checkbox"
+                    checked={includePreviousDue}
+                    onChange={(e) => { setIncludePreviousDue(e.target.checked); if (!e.target.checked) setPreviousDuePaymentAmount(''); }}
+                  />
+                  <span className="mob-inv-switch-slider" />
+                </span>
+                <span className="purchase-previous-due-card__toggle-label">{t('purchasesPage.includePreviousDue')}</span>
+              </label>
+            </div>
+          )}
 
           {/* ─── GST Info Banner ────────────────────────────────────── */}
           {!isViewMode && gstEnabled && selectedSupplierData && (
             <div style={{
               marginTop: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: 'var(--border-radius-sm)',
-              background: isIntraState ? 'rgba(0, 217, 166, 0.08)' : 'rgba(108, 99, 255, 0.08)',
-              color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500,
+              width: '70%', background: 'rgba(23, 162, 184, 0.7)',
+              color: '#ffffff', fontSize: '0.8rem', fontWeight: 600,
             }}>
               {!supplierState ? (
-                <span style={{ color: 'var(--danger)' }}>Supplier state is required to calculate GST.</span>
+                <span style={{ color: 'var(--danger)' }}>{t('purchasesPage.gstBannerStateRequired')}</span>
               ) : isIntraState ? (
-                <span>Intra-state: CGST ({cgstRate}%) + SGST ({sgstRate}%) — supplier is from {supplierState}</span>
+                <span>{t('purchasesPage.gstIntraStateInfo', { cgst: cgstRate, sgst: sgstRate, state: supplierState })}</span>
               ) : (
-                <span>Inter-state: IGST ({igstRate}%) — supplier is from {supplierState}</span>
+                <span>{t('purchasesPage.gstInterStateInfo', { igst: igstRate, state: supplierState })}</span>
               )}
             </div>
           )}
@@ -593,7 +869,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                               onEnter={() => handleRowFieldEnter(row.key, 'product')}
                             />
                             {row.product && (
-                              <div className="purchase-row-hint">
+                              <div className="purchase-row-hint purchase-stock-hint">
                                 {t('purchasesPage.unitStockHint', { unit: row.product.unit, stock: row.product.stock ?? 0 })}
                               </div>
                             )}
@@ -632,6 +908,11 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
                           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRowFieldEnter(row.key, 'quantity'))}
                           disabled={isViewMode}
                         />
+                        {row.returnedQty > 0 && (
+                          <div className="purchase-row-hint purchase-row-hint--returned">
+                            {t('purchasesPage.returnedQtyHint', { qty: row.returnedQty })}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <input
@@ -725,105 +1006,212 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
               ))}
             </div>
           </div>
-        </div>
 
-        {/* ─── Summary ───────────────────────────────────────────────── */}
-        <div className="purchase-summary-card">
-          <div className="purchase-summary-card__body">
-            <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">{t('purchasesPage.totalItems')}</span>
-              <span className="purchase-summary-row__value">{totalItems}</span>
-            </div>
-            <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">Subtotal</span>
-              <span className="purchase-summary-row__value">{money(subtotal)}</span>
-            </div>
-            <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">{t('sale.discount')}</span>
-              <span className="purchase-summary-row__value purchase-summary-row__value--danger">-{money(discountTotal)}</span>
-            </div>
-            {gstType === 'intra' && (
-              <>
-                <div className="purchase-summary-row">
-                  <span className="purchase-summary-row__label">CGST ({cgstRate}%)</span>
-                  <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(cgstAmount)}</span>
-                </div>
-                <div className="purchase-summary-row">
-                  <span className="purchase-summary-row__label">SGST ({sgstRate}%)</span>
-                  <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(sgstAmount)}</span>
-                </div>
-              </>
-            )}
-            {gstType === 'inter' && (
+          {/* ─── Summary ───────────────────────────────────────────────── */}
+          <div className="purchase-summary-card">
+            <div className="purchase-summary-card__body">
               <div className="purchase-summary-row">
-                <span className="purchase-summary-row__label">IGST ({igstRate}%)</span>
-                <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(igstAmount)}</span>
+                <span className="purchase-summary-row__label">{t('purchasesPage.totalItems')}</span>
+                <span className="purchase-summary-row__value">{totalItems}</span>
               </div>
-            )}
-            <div className="purchase-summary-divider" />
-            <div className="purchase-summary-row purchase-summary-row--grand">
-              <span className="purchase-summary-row__label purchase-summary-row__label--grand">{t('purchasesPage.grandTotal')}</span>
-              <span className="purchase-summary-row__value purchase-summary-row__value--grand">{money(grandTotal)}</span>
-            </div>
-            <div className="purchase-summary-divider" />
-            <div className="purchase-summary-row">
-              <span className="purchase-summary-row__label">{t('purchasesPage.previousDue')}</span>
-              <span className="purchase-summary-row__value">{money(previousDue)}</span>
-            </div>
-            <div className="purchase-summary-row purchase-summary-row--paid">
-              <span className="purchase-summary-row__label">{t('sale.paidAmount')}</span>
-              {isViewMode ? (
-                <span className="purchase-summary-row__value purchase-summary-row__value--success">{money(paidAmount)}</span>
-              ) : (
-                <input
-                  type="number"
-                  className="purchase-summary-paid-input"
-                  value={paidAmount}
-                  min="0"
-                  max={grandTotal}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (e.target.value !== '' && val > grandTotal) {
-                      setPaidAmount(String(grandTotal));
-                    } else {
-                      setPaidAmount(e.target.value);
-                    }
-                  }}
-                />
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('sale.subtotal')}</span>
+                <span className="purchase-summary-row__value">{money(subtotal)}</span>
+              </div>
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('sale.discount')}</span>
+                <span className="purchase-summary-row__value purchase-summary-row__value--danger">-{money(discountTotal)}</span>
+              </div>
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('purchasesPage.taxableAmount')}</span>
+                <span className="purchase-summary-row__value">{money(taxableAmount)}</span>
+              </div>
+              {gstType === 'intra' && (
+                <>
+                  <div className="purchase-summary-row">
+                    <span className="purchase-summary-row__label">{t('purchasesPage.cgstLabel', { rate: cgstRate })}</span>
+                    <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(cgstAmount)}</span>
+                  </div>
+                  <div className="purchase-summary-row">
+                    <span className="purchase-summary-row__label">{t('purchasesPage.sgstLabel', { rate: sgstRate })}</span>
+                    <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(sgstAmount)}</span>
+                  </div>
+                </>
+              )}
+              {gstType === 'inter' && (
+                <div className="purchase-summary-row">
+                  <span className="purchase-summary-row__label">{t('purchasesPage.igstLabel', { rate: igstRate })}</span>
+                  <span className="purchase-summary-row__value purchase-summary-row__value--success">+{money(igstAmount)}</span>
+                </div>
+              )}
+              <div className="purchase-summary-divider" />
+              <div className="purchase-summary-row purchase-summary-row--grand">
+                <span className="purchase-summary-row__label purchase-summary-row__label--grand">{t('purchasesPage.grandTotal')}</span>
+                <span className="purchase-summary-row__value purchase-summary-row__value--grand">{money(grandTotal)}</span>
+              </div>
+              <div className="purchase-summary-divider" />
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('purchasesPage.previousDue')}</span>
+                <span className="purchase-summary-row__value">{money(previousDue)}</span>
+              </div>
+              {previousDue > 0 && (
+                <div className="purchase-summary-row">
+                  <span className="purchase-summary-row__label">{t('purchasesPage.totalOutstanding')}</span>
+                  <span className="purchase-summary-row__value">{money(totalOutstanding)}</span>
+                </div>
+              )}
+              {includePreviousDue && previousDue > 0 && (
+                <div className="purchase-summary-row purchase-summary-row--paid">
+                  <span className="purchase-summary-row__label">{t('purchasesPage.dueAmountToPay')}</span>
+                  {isViewMode ? (
+                    <span className="purchase-summary-row__value purchase-summary-row__value--success">{money(previousDuePaymentAmount)}</span>
+                  ) : (
+                    <input
+                      type="number"
+                      className="purchase-summary-paid-input"
+                      value={previousDuePaymentAmount}
+                      min="0"
+                      max={previousDue}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (e.target.value !== '' && val > previousDue) {
+                          setPreviousDuePaymentAmount(String(previousDue));
+                        } else {
+                          setPreviousDuePaymentAmount(e.target.value);
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+              <div className="purchase-summary-row purchase-summary-row--paid">
+                <span className="purchase-summary-row__label">{t('sale.paidAmount')}</span>
+                {isViewMode ? (
+                  <span className="purchase-summary-row__value purchase-summary-row__value--success">{money(paidAmount)}</span>
+                ) : (
+                  <input
+                    type="number"
+                    className="purchase-summary-paid-input"
+                    value={paidAmount}
+                    min="0"
+                    max={grandTotal}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (e.target.value !== '' && val > grandTotal) {
+                        setPaidAmount(String(grandTotal));
+                      } else {
+                        setPaidAmount(e.target.value);
+                      }
+                    }}
+                  />
+                )}
+              </div>
+              {Number(paidAmount || 0) > grandTotal && (
+                <div className="purchase-summary-row" style={{ color: 'var(--danger, #e5484d)', fontSize: '0.8rem' }}>
+                  <span>{t('common.paymentExceedsRemaining')}</span>
+                </div>
+              )}
+              <div className="purchase-summary-divider" />
+              <div className={`purchase-summary-row purchase-summary-row--due ${currentDue > 0 ? 'purchase-summary-row--due-warning' : ''}`}>
+                <span className="purchase-summary-row__label purchase-summary-row__label--due">{t('purchasesPage.currentDue')}</span>
+                <span className={`purchase-summary-row__value purchase-summary-row__value--due ${currentDue > 0 ? 'purchase-summary-row__value--danger' : 'purchase-summary-row__value--success'}`}>
+                  {money(currentDue)}
+                </span>
+              </div>
+              {includePreviousDue && previousDue > 0 && (
+                <div className={`purchase-summary-row purchase-summary-row--due ${remainingPreviousDue > 0 ? 'purchase-summary-row--due-warning' : ''}`}>
+                  <span className="purchase-summary-row__label purchase-summary-row__label--due">{t('purchasesPage.remainingPreviousDue')}</span>
+                  <span className={`purchase-summary-row__value purchase-summary-row__value--due ${remainingPreviousDue > 0 ? 'purchase-summary-row__value--danger' : 'purchase-summary-row__value--success'}`}>
+                    {money(remainingPreviousDue)}
+                  </span>
+                </div>
               )}
             </div>
-            {Number(paidAmount || 0) > grandTotal && (
-              <div className="purchase-summary-row" style={{ color: 'var(--danger, #e5484d)', fontSize: '0.8rem' }}>
-                <span>{t('common.paymentExceedsRemaining')}</span>
-              </div>
-            )}
-            <div className="purchase-summary-divider" />
-            <div className={`purchase-summary-row purchase-summary-row--due ${currentDue > 0 ? 'purchase-summary-row--due-warning' : ''}`}>
-              <span className="purchase-summary-row__label purchase-summary-row__label--due">{t('purchasesPage.currentDue')}</span>
-              <span className={`purchase-summary-row__value purchase-summary-row__value--due ${currentDue > 0 ? 'purchase-summary-row__value--danger' : 'purchase-summary-row__value--success'}`}>
-                {money(currentDue)}
-              </span>
-            </div>
           </div>
-        </div>
 
-        {/* ─── Footer with buttons ──────────────────────────────────── */}
-        <div className="drawer-footer purchase-drawer-footer">
-          {!isViewMode && (
-            <>
+          {/* ─── Payment Summary (Purchase Details / view mode only) ── */}
+          {isViewMode && effectiveViewing && (
+            <div className="purchase-payment-summary-card">
+              <div className="purchase-payment-summary-card__title-row">
+                <div className="purchase-payment-summary-card__title">{t('purchasesPage.paymentSummary')}</div>
+                {rows.some((r) => r.product && Number(r.quantity || 0) - Number(r.returnedQty || 0) > 0) && (
+                  <button type="button" className="btn-premium btn-premium-secondary" onClick={openReturnModal}>
+                    <BiUndo /> {t('purchasesPage.processReturn')}
+                  </button>
+                )}
+              </div>
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('common.total')}</span>
+                <span className="purchase-summary-row__value">{money(effectiveViewing.totalAmount)}</span>
+              </div>
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('purchasesPage.previousDueIncludedLabel')}</span>
+                <span className="purchase-summary-row__value">{effectiveViewing.previousDueIncluded ? t('common.yes') : t('common.no')}</span>
+              </div>
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('purchasesPage.previousDue')}</span>
+                <span className="purchase-summary-row__value">{money(effectiveViewing.previousDueAmountAtCreation)}</span>
+              </div>
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('purchasesPage.paymentReceived')}</span>
+                <span className="purchase-summary-row__value purchase-summary-row__value--success">{money(effectiveViewing.paidAmount)}</span>
+              </div>
+              <div className="purchase-summary-row">
+                <span className="purchase-summary-row__label">{t('purchasesPage.currentDue')}</span>
+                <span className="purchase-summary-row__value" style={{ color: effectiveViewing.dueAmount > 0 ? 'var(--danger)' : undefined }}>
+                  {money(effectiveViewing.dueAmount)}
+                </span>
+              </div>
+              {effectiveViewing.previousDueIncluded && effectiveViewing.previousDueAllocations?.length > 0 && (
+                <div className="purchase-payment-summary-card__allocations">
+                  <div className="purchase-payment-summary-card__allocations-title">{t('purchasesPage.allocationBreakdown')}</div>
+                  {effectiveViewing.previousDueAllocations.map((a, i) => (
+                    <div key={i} className="purchase-payment-summary-card__allocation-row">
+                      <span>{a.purchaseNo}</span>
+                      <span>{money(a.amountApplied)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {effectiveViewing.returns?.length > 0 && (
+                <div className="purchase-payment-summary-card__allocations">
+                  <div className="purchase-payment-summary-card__allocations-title">{t('purchasesPage.returnHistory')}</div>
+                  {effectiveViewing.returns.map((ret, i) => (
+                    <div key={i} className="purchase-return-history-entry">
+                      <div className="purchase-payment-summary-card__allocation-row">
+                        <span>{new Date(ret.returnDate).toLocaleDateString()}</span>
+                        <span className="purchase-summary-row__value--danger">-{money(ret.totalReturnValue)}</span>
+                      </div>
+                      {ret.items.map((it, j) => (
+                        <div key={j} className="purchase-return-history-entry__item">
+                          {it.productName} × {it.quantity}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Footer with buttons ──────────────────────────────────── */}
+          <div className="drawer-footer purchase-drawer-footer">
+            {!isViewMode && (
+              <>
+                <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="btn-premium btn-premium-primary" onClick={handleSubmit} disabled={saving}>
+                  {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('purchasesPage.savePurchase')}</>}
+                </button>
+              </>
+            )}
+            {isViewMode && (
               <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
-                {t('common.cancel')}
+                {t('common.close')}
               </button>
-              <button type="button" className="btn-premium btn-premium-primary" onClick={handleSubmit} disabled={saving}>
-                {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiCheck /> {t('purchasesPage.savePurchase')}</>}
-              </button>
-            </>
-          )}
-          {isViewMode && (
-            <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}>
-              {t('common.close')}
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -837,6 +1225,68 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         t={t}
         initialName={productDrawer.initialName}
       />
+
+      {/* ─── Process Return Modal (view mode only) ────────────────── */}
+      {returnModalOpen && (
+        <div className="modal-premium" onClick={() => setReturnModalOpen(false)}>
+          <div className="modal-premium-content" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-premium-header">
+              <h5><BiUndo className="me-2" />{t('purchasesPage.processReturn')}</h5>
+              <button className="btn-close-premium" onClick={() => setReturnModalOpen(false)}><BiX /></button>
+            </div>
+            <div className="modal-premium-body">
+              <div className="purchase-return-item-list">
+                {rows.filter((r) => r.product).map((row) => {
+                  const maxReturnable = Number(row.quantity || 0) - Number(row.returnedQty || 0);
+                  return (
+                    <div key={row.key} className="purchase-return-item-row">
+                      <div className="purchase-return-item-row__info">
+                        <span className="purchase-return-item-row__name">{row.product?.name || t('purchasesPage.unknownProduct')}</span>
+                        <span className="purchase-return-item-row__hint">
+                          {t('purchasesPage.returnMaxHint', { max: maxReturnable, unit: row.product?.unit || '' })}
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxReturnable}
+                        className="purchase-return-item-row__input"
+                        placeholder="0"
+                        value={returnQuantities[row.product._id] || ''}
+                        disabled={maxReturnable <= 0}
+                        onChange={(e) => handleReturnQtyChange(row.product._id, e.target.value, maxReturnable)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="form-group mt-3 mb-0">
+                <label className="form-label">{t('purchasesPage.returnReason')}</label>
+                <textarea
+                  className="form-control"
+                  rows={2}
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  placeholder={t('purchasesPage.returnReasonPlaceholder')}
+                />
+              </div>
+            </div>
+            <div className="modal-premium-footer">
+              <button type="button" className="btn-premium btn-premium-secondary" onClick={() => setReturnModalOpen(false)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn-premium btn-premium-primary"
+                onClick={handleSubmitReturn}
+                disabled={submittingReturn || !Object.values(returnQuantities).some((v) => Number(v) > 0)}
+              >
+                {submittingReturn ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiUndo /> {t('purchasesPage.submitReturn')}</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -1119,8 +1119,8 @@ const Suppliers = () => {
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
-                <th>{t('auth.email')}</th>
                 <th>State</th>
+                <th>{t('sale.paidAmount')}</th>
                 <th>{t('common.due')}</th>
                 <th style={{ width: '120px' }}>{t('common.actions')}</th>
               </tr>
@@ -1157,8 +1157,8 @@ const Suppliers = () => {
                     {supplier.nameBn && <small style={{ color: 'var(--text-muted)' }}>{supplier.nameBn}</small>}
                   </td>
                   <td>{supplier.phone}</td>
-                  <td>{supplier.email || '-'}</td>
                   <td>{supplier.state || 'West Bengal'}</td>
+                  <td><span style={supplier.totalPaid > 0 ? { color: 'var(--secondary)', fontWeight: 600 } : {}}>₹{supplier.totalPaid || 0}</span></td>
                   <td>
                     <span style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : {}}>
                       ₹{supplier.dueAmount || 0}

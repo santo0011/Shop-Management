@@ -8726,6 +8726,37 @@ select:-webkit-autofill {
   grid-column: span 3;
 }
 
+.purchase-invoice-image-field {
+  display: flex;
+}
+
+.purchase-invoice-image-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.purchase-invoice-image-preview img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+  cursor: zoom-in;
+}
+
+.purchase-invoice-image-preview__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.purchase-invoice-image-preview__actions .btn-premium {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+}
+
 /* Compact header form fields inside the purchase drawer */
 .purchase-header-grid .form-label {
   font-size: 0.8rem;
@@ -8773,8 +8804,6 @@ select:-webkit-autofill {
 }
 
 .purchase-items-scroll {
-  max-height: 46vh;
-  overflow: auto;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
 }
@@ -8887,14 +8916,10 @@ select:-webkit-autofill {
 
 /* ─── Modern Summary Card ─────────────────────────────────────── */
 .purchase-summary-card {
-  flex-shrink: 0;
-  position: sticky;
-  bottom: 60px;
-  z-index: 5;
   background: var(--bg-card);
-  border-top: 1px solid var(--border-color);
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
+  border-top: 2px solid var(--border-color);
   padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
 }
 
 .purchase-summary-card__body {
@@ -8913,15 +8938,15 @@ select:-webkit-autofill {
 }
 
 .purchase-summary-row__label {
-  font-size: 0.72rem;
+  font-size: 0.86rem;
   font-weight: 500;
   color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .purchase-summary-row__value {
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text-primary);
   text-align: right;
   white-space: nowrap;
@@ -8937,9 +8962,9 @@ select:-webkit-autofill {
 }
 
 .purchase-summary-divider {
-  height: 1px;
-  background: var(--border-light);
-  margin: 0.1rem 0;
+  height: 2px;
+  background: var(--border-color);
+  margin: 0.25rem 0;
 }
 
 /* Grand Total row */
@@ -8948,13 +8973,13 @@ select:-webkit-autofill {
 }
 
 .purchase-summary-row__label--grand {
-  font-size: 0.78rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .purchase-summary-row__value--grand {
-  font-size: 0.92rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--primary);
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -8970,13 +8995,13 @@ select:-webkit-autofill {
 
 .purchase-summary-paid-input {
   width: 100px;
-  height: 28px;
+  height: 30px;
   padding: 0 6px;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 700;
   font-family: var(--font-mono);
   text-align: right;
-  border: 1.5px solid var(--border-color);
+  border: 2px solid var(--text-secondary);
   border-radius: var(--border-radius-sm);
   background: var(--bg-input);
   color: var(--text-primary);
@@ -9003,14 +9028,223 @@ select:-webkit-autofill {
 }
 
 .purchase-summary-row__label--due {
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .purchase-summary-row__value--due {
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 800;
+}
+
+/* ─── Previous Due Card (Add Purchase) ────────────────────────── */
+.purchase-previous-due-card {
+  margin-top: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--border-radius-md);
+  background: var(--glow-danger);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  animation: purchaseCardIn 0.25s ease-out;
+}
+
+.purchase-previous-due-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.purchase-previous-due-card__title {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.purchase-previous-due-card__amount {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--danger);
+  font-family: var(--font-mono);
+}
+
+.purchase-previous-due-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.6rem;
+  margin-top: 0.1rem;
+}
+
+.purchase-previous-due-card__meta-item {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.purchase-previous-due-card__toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px dashed rgba(255, 107, 107, 0.25);
+  cursor: pointer;
+  user-select: none;
+}
+
+.purchase-previous-due-card__toggle-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+@keyframes purchaseCardIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Payment Summary Card (Purchase Details / view mode) ──────── */
+.purchase-payment-summary-card {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  animation: purchaseCardIn 0.25s ease-out;
+}
+
+.purchase-payment-summary-card__title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.purchase-payment-summary-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.purchase-payment-summary-card__title-row .purchase-payment-summary-card__title {
+  margin-bottom: 0;
+}
+
+.purchase-payment-summary-card__title-row .btn-premium {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.purchase-payment-summary-card__allocations {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-color);
+}
+
+.purchase-payment-summary-card__allocations-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+}
+
+.purchase-payment-summary-card__allocation-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 0.15rem 0;
+  font-family: var(--font-mono);
+}
+
+.purchase-return-history-entry {
+  padding: 0.3rem 0;
+}
+
+.purchase-return-history-entry__item {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding-left: 0.5rem;
+}
+
+.purchase-row-hint--returned {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.purchase-row-hint.purchase-stock-hint,
+.purchase-mobile-product-card__hint.purchase-stock-hint {
+  color: var(--secondary);
+  font-weight: 600;
+}
+
+/* ─── Process Return Modal ───────────────────────────────────────── */
+.purchase-return-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.purchase-return-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+}
+
+.purchase-return-item-row__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.purchase-return-item-row__name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.purchase-return-item-row__hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.purchase-return-item-row__input {
+  width: 70px;
+  height: 34px;
+  padding: 0 8px;
+  text-align: center;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.purchase-return-item-row__input:disabled {
+  opacity: 0.4;
+}
+
+/* ─── Ledger FIFO chip (Supplier Ledger) ────────────────────────── */
+.ledger-fifo-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--primary);
 }
 
 /* Hide "Purchase" text on mobile button, keep just "Add" */
@@ -9122,7 +9356,6 @@ select:-webkit-autofill {
   /* Modern summary card mobile — even more compact */
   .purchase-summary-card {
     padding: 0.35rem 0.6rem;
-    bottom: 50px;
   }
 
   .purchase-summary-row {
@@ -9130,11 +9363,11 @@ select:-webkit-autofill {
   }
 
   .purchase-summary-row__label {
-    font-size: 0.68rem;
+    font-size: 0.8rem;
   }
 
   .purchase-summary-row__value {
-    font-size: 0.72rem;
+    font-size: 0.95rem;
   }
 
   .purchase-summary-row--grand {
@@ -9142,21 +9375,21 @@ select:-webkit-autofill {
   }
 
   .purchase-summary-row__label--grand {
-    font-size: 0.72rem;
-  }
-
-  .purchase-summary-row__value--grand {
     font-size: 0.85rem;
   }
 
+  .purchase-summary-row__value--grand {
+    font-size: 1rem;
+  }
+
   .purchase-summary-divider {
-    margin: 0.05rem 0;
+    margin: 0.15rem 0;
   }
 
   .purchase-summary-paid-input {
     width: 80px;
-    height: 26px;
-    font-size: 0.72rem;
+    height: 28px;
+    font-size: 0.85rem;
     padding: 0 4px;
   }
 
@@ -9170,11 +9403,11 @@ select:-webkit-autofill {
   }
 
   .purchase-summary-row__label--due {
-    font-size: 0.72rem;
+    font-size: 0.85rem;
   }
 
   .purchase-summary-row__value--due {
-    font-size: 0.8rem;
+    font-size: 0.92rem;
   }
 
   /* Product search field inside mobile cards: compact */
@@ -9464,12 +9697,40 @@ select:-webkit-autofill {
   cursor: not-allowed;
 }
 
-/* Sticky footer on mobile drawer */
+/* Mobile: stack layout vertically, summary at bottom */
+@media (max-width: 991.98px) {
+  .purchase-drawer-layout {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .purchase-drawer-left {
+    overflow-y: visible;
+    padding: 0.75rem;
+  }
+
+  .purchase-drawer-right {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    align-self: auto;
+    max-height: none;
+    overflow-y: visible;
+    flex-shrink: 0;
+  }
+
+  .purchase-drawer-right .purchase-summary-card {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .purchase-summary-footer {
+    padding-top: 0.5rem;
+  }
+}
+
+/* Footer sits inline in the drawer's single scroll flow on mobile too. */
 @media (max-width: 575.98px) {
   .purchase-drawer-footer {
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
     background: var(--bg-card);
     border-top: 1px solid var(--border-color);
     padding: 0.5rem 0.75rem;
@@ -14623,5 +14884,286 @@ select:-webkit-autofill {
   .suppliers-header-actions .btn-premium {
     flex: 1;
     justify-content: center;
+  }
+}
+
+/* ==========================================
+   SUPPLIER LEDGER — Purchase List accordion
+   ("View" row expands details in place, no
+   modal/drawer; only one row open at a time)
+   ========================================== */
+
+.btn-action.is-active {
+  background: rgba(var(--primary-rgb), 0.15);
+  color: var(--primary);
+}
+
+/* ─── Grid-based purchase list ──────────────────────────────────
+   Deliberately a CSS Grid, not an HTML <table>: a real table's auto-layout
+   sizes columns from the widest content anywhere in the table, including a
+   nested accordion row — one wide nested element and the whole table (and
+   the page under it) gets a horizontal scrollbar. Grid cells have
+   `min-width: 0` below, so long content ellipsizes instead of forcing the
+   track wider — this cannot produce a horizontal scrollbar by construction.
+   The accordion panel is a plain sibling <div>, so expand/collapse is just
+   normal block layout — no table row/cell model to fight, no visual glitches
+   on open/close. */
+.ledger-grid-table {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.ledger-grid-header,
+.ledger-grid-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr 56px;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+}
+
+.ledger-grid-header {
+  background: var(--bg-input);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.ledger-grid-row {
+  border-bottom: 1px solid var(--border-light);
+  transition: background 0.15s ease;
+}
+
+.ledger-grid-row:last-child {
+  border-bottom: none;
+}
+
+.ledger-grid-row:hover {
+  background: var(--bg-input);
+}
+
+.ledger-row--expanded {
+  background: rgba(var(--primary-rgb), 0.06);
+}
+
+.ledger-grid-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.ledger-grid-cell--actions {
+  display: flex;
+  justify-content: flex-end;
+  overflow: visible;
+}
+
+.ledger-expand-wrap {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.ledger-expand-wrap:last-child {
+  border-bottom: none;
+}
+
+.ledger-expand-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.ledger-expand-panel {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 1.25rem;
+  background: var(--bg-input);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--primary);
+  animation: ledgerExpandIn 0.22s ease-out;
+}
+
+@keyframes ledgerExpandIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ledger-expand-section {
+  margin-bottom: 1.25rem;
+}
+
+.ledger-expand-section:last-child {
+  margin-bottom: 0;
+}
+
+.ledger-expand-section__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Section 1 — info grid */
+.ledger-expand-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.ledger-expand-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+}
+
+.ledger-expand-info-item__label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ledger-expand-info-item__value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Section 2 — responsive product table */
+.ledger-expand-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-card);
+}
+
+.ledger-expand-table-scroll .purchase-items-table {
+  min-width: 640px;
+}
+
+/* Sections 3 & 4 — colored mini summary cards, blue project theme */
+.ledger-mini-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.ledger-mini-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--border-radius-md);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ledger-mini-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.ledger-mini-card__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  opacity: 0.85;
+}
+
+.ledger-mini-card__value {
+  font-size: 0.98rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.ledger-mini-card--primary {
+  background: rgba(var(--primary-rgb), 0.1);
+  border-color: rgba(var(--primary-rgb), 0.2);
+  color: var(--primary);
+}
+
+.ledger-mini-card--info {
+  background: rgba(23, 162, 184, 0.1);
+  border-color: rgba(23, 162, 184, 0.2);
+  color: var(--info);
+}
+
+.ledger-mini-card--success {
+  background: rgba(0, 217, 166, 0.1);
+  border-color: rgba(0, 217, 166, 0.2);
+  color: var(--secondary);
+}
+
+.ledger-mini-card--warning {
+  background: rgba(255, 181, 69, 0.1);
+  border-color: rgba(255, 181, 69, 0.2);
+  color: #F39C12;
+}
+
+.ledger-mini-card--danger {
+  background: rgba(255, 107, 107, 0.1);
+  border-color: rgba(255, 107, 107, 0.2);
+  color: var(--danger);
+}
+
+.ledger-mini-card--primary .ledger-mini-card__value,
+.ledger-mini-card--info .ledger-mini-card__value,
+.ledger-mini-card--success .ledger-mini-card__value,
+.ledger-mini-card--warning .ledger-mini-card__value,
+.ledger-mini-card--danger .ledger-mini-card__value {
+  color: var(--text-primary);
+}
+
+/* Mobile "View Full Details" trigger inside the ExpandableCard */
+.ledger-mobile-view-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.ledger-mobile-view-btn.is-active {
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--primary);
+  border-color: rgba(var(--primary-rgb), 0.25);
+}
+
+@media (max-width: 575.98px) {
+  .ledger-expand-panel {
+    padding: 0.85rem;
+  }
+
+  .ledger-expand-info-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ledger-mini-card-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }

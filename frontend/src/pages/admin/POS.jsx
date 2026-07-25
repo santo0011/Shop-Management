@@ -661,7 +661,7 @@ const POS = () => {
               </div>
             </div>
             <div className="pos-round-off-row"><span>{t('posPage.totals.roundOff')}</span><span>{roundOff < 0 ? '-' : ''}₹{Math.abs(roundOff).toFixed(2)}</span></div>
-            <div className="pos-grand-total"><span>{t('posPage.totals.payable')}</span><span className="pos-grand-total-amount">₹{payableAmount.toFixed(2)}</span></div>
+            <div className="pos-grand-total"><span>{includePreviousDue && hasPreviousDue ? t('posPage.previousDue.totalPayable') : t('posPage.totals.payable')}</span><span className="pos-grand-total-amount">₹{(includePreviousDue && hasPreviousDue ? totalPayable : payableAmount).toFixed(2)}</span></div>
           </div>
 
           <div className="pos-action-buttons">

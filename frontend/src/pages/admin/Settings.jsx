@@ -798,17 +798,32 @@ const Settings = () => {
                   <div className="mb-3">
                     <label className="form-label">Default GST Rate (%)</label>
                     <div className="d-flex gap-2 align-items-center flex-wrap">
-                      <input type="number" className="form-control" style={{ maxWidth: '120px' }} value={gstForm.defaultGstRate} onChange={e => setGstForm({ ...gstForm, defaultGstRate: Math.max(0, Math.min(100, Number(e.target.value))) })} min="0" max="100" step="0.5" />
+                      <input type="number" className="form-control" style={{ maxWidth: '120px' }} value={gstForm.defaultGstRate} onChange={e => {
+                        const val = Math.max(0, Math.min(100, Number(e.target.value)));
+                        setGstForm({ ...gstForm, defaultGstRate: val, cgstRate: val / 2, sgstRate: val / 2, igstRate: val });
+                      }} min="0" max="100" step="0.5" />
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>%</span>
                       <div className="d-flex gap-1 ms-2 flex-wrap">
                         {[0, 5, 12, 18, 28].map(val => (
-                          <button key={val} type="button" className={`btn-premium btn-premium-sm ${gstForm.defaultGstRate === val ? 'btn-premium-primary' : 'btn-premium-secondary'}`} onClick={() => setGstForm({ ...gstForm, defaultGstRate: val })}>
+                          <button key={val} type="button" className={`btn-premium btn-premium-sm ${gstForm.defaultGstRate === val ? 'btn-premium-primary' : 'btn-premium-secondary'}`} onClick={() => setGstForm({ ...gstForm, defaultGstRate: val, cgstRate: val / 2, sgstRate: val / 2, igstRate: val })}>
                             {val === 0 ? 'Nil' : `${val}%`}
                           </button>
                         ))}
                       </div>
                     </div>
                     <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: 4, display: 'block' }}>Choose from standard GST rates: 0% (Nil), 5%, 12%, 18%, 28%</small>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">CGST Rate (%)</label>
+                    <input type="number" className="form-control" style={{ maxWidth: '120px' }} value={gstForm.cgstRate} onChange={e => setGstForm({ ...gstForm, cgstRate: Math.max(0, Math.min(100, Number(e.target.value))) })} min="0" max="100" step="0.5" />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">SGST Rate (%)</label>
+                    <input type="number" className="form-control" style={{ maxWidth: '120px' }} value={gstForm.sgstRate} onChange={e => setGstForm({ ...gstForm, sgstRate: Math.max(0, Math.min(100, Number(e.target.value))) })} min="0" max="100" step="0.5" />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">IGST Rate (%)</label>
+                    <input type="number" className="form-control" style={{ maxWidth: '120px' }} value={gstForm.igstRate} onChange={e => setGstForm({ ...gstForm, igstRate: Math.max(0, Math.min(100, Number(e.target.value))) })} min="0" max="100" step="0.5" />
                   </div>
                   <div className="mb-3">
                     <label className="printer-settings-checkbox">
