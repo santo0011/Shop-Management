@@ -1244,9 +1244,9 @@ const Products = () => {
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
-      <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
-        <div className="table-responsive">
-          <table className="table-custom mb-0">
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
+        <div className="sales-table-scroll">
+          <table className="sales-table">
             <thead>
               <tr>
                 <th style={{ width: '44px' }}>
@@ -1266,27 +1266,18 @@ const Products = () => {
                 <th>{t('product.sellingPrice')}</th>
                 <th>{t('product.stock')}</th>
                 <th>{t('common.status')}</th>
-                <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                <th style={{ width: '110px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {refreshing ? (
                 <TableSkeletonRows />
               ) : searching ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                  </td>
-                </tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
-                    {t('empty.noProducts')}
-                  </td>
-                </tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><span className="sales-empty-icon">📦</span><p>{t('empty.noProducts')}</p></div></td></tr>
               ) : products.map((product, idx) => (
-                <tr key={product._id} className={isSelected(product._id) ? 'bulk-select-row--selected' : ''}>
+                <tr key={product._id} className={`${idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'} ${isSelected(product._id) ? 'bulk-select-row--selected' : ''}`}>
                   <td>
                     <label className="bulk-select-checkbox" title={t('productsPage.selectProduct')}>
                       <input type="checkbox" checked={isSelected(product._id)} onChange={() => toggleSelect(product._id)} />
@@ -1297,13 +1288,16 @@ const Products = () => {
                     {(page - 1) * PRODUCTS_PER_PAGE + idx + 1}
                   </td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{product.name}</div>
-                    {product.nameBn && <small style={{ color: 'var(--text-muted)' }}>{product.nameBn}</small>}
+                    <div className="sales-customer-badge">
+                      <BiPackage size={14} />
+                      <span>{product.name}</span>
+                    </div>
+                    {product.nameBn && <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: 2, fontSize: '0.7rem' }}>{product.nameBn}</small>}
                   </td>
-                  <td>{product.category?.name || '-'}</td>
-                  <td>₹{product.sellingPrice}</td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{product.category?.name || '-'}</td>
+                  <td><span className="sales-amount">₹{Number(product.sellingPrice || 0).toFixed(2)}</span></td>
                   <td>
-                    <span style={product.stock <= product.minStock ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>
+                    <span className="sales-amount" style={product.stock <= product.minStock ? { color: 'var(--danger)', fontWeight: 700 } : { color: 'var(--text-secondary)' }}>
                       {product.stock} {product.unit}
                     </span>
                   </td>
@@ -1317,18 +1311,16 @@ const Products = () => {
                       {product.isActive !== false ? t('common.active') : t('common.inactive')}
                     </button>
                   </td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => { setViewProductId(product._id); setViewDrawerOpen(true); }}>
-                        <BiShow />
-                      </button>
-                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(product)}>
-                        <BiEdit />
-                      </button>
-                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(product._id)}>
-                        <BiTrash />
-                      </button>
-                    </div>
+                  <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                    <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')} onClick={() => { setViewProductId(product._id); setViewDrawerOpen(true); }}>
+                      <BiShow />
+                    </button>
+                    <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} title={t('common.edit')} onClick={() => handleEdit(product)}>
+                      <BiEdit />
+                    </button>
+                    <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} title={t('common.delete')} onClick={() => setDeleteConfirm(product._id)}>
+                      <BiTrash />
+                    </button>
                   </td>
                 </tr>
               ))}

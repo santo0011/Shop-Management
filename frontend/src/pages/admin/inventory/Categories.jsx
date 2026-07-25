@@ -1026,9 +1026,9 @@ const Categories = () => {
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
-      <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
-        <div className="table-responsive">
-          <table className="table-custom mb-0">
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
+        <div className="sales-table-scroll">
+          <table className="sales-table">
             <thead>
               <tr>
                 <th style={{ width: '44px' }}>
@@ -1045,27 +1045,18 @@ const Categories = () => {
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('product.productName')} (EN)</th>
                 <th>{t('product.productName')} (BN)</th>
-                <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                <th style={{ width: '110px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {refreshing ? (
                 <TableSkeletonRows />
               ) : searching ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                  </td>
-                </tr>
+                <tr><td colSpan={5}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : categories.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
-                    {t('categoriesPage.noCategoriesFound')}
-                  </td>
-                </tr>
+                <tr><td colSpan={5}><div className="sales-empty-state"><span className="sales-empty-icon">📂</span><p>{t('categoriesPage.noCategoriesFound')}</p></div></td></tr>
               ) : categories.map((category, idx) => (
-                <tr key={category._id} className={isSelected(category._id) ? 'bulk-select-row--selected' : ''}>
+                <tr key={category._id} className={`${idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'} ${isSelected(category._id) ? 'bulk-select-row--selected' : ''}`}>
                   <td>
                     <label className="bulk-select-checkbox" title={t('categoriesPage.selectCategory')}>
                       <input type="checkbox" checked={isSelected(category._id)} onChange={() => toggleSelect(category._id)} />
@@ -1076,21 +1067,22 @@ const Categories = () => {
                     {(page - 1) * CATEGORIES_PER_PAGE + idx + 1}
                   </td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{category.name}</div>
-                  </td>
-                  <td>{category.nameBn || '-'}</td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => { setViewCategoryId(category._id); setViewDrawerOpen(true); }}>
-                        <BiShow />
-                      </button>
-                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(category)}>
-                        <BiEdit />
-                      </button>
-                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(category._id)}>
-                        <BiTrash />
-                      </button>
+                    <div className="sales-customer-badge">
+                      <BiCategory size={14} />
+                      <span>{category.name}</span>
                     </div>
+                  </td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{category.nameBn || '-'}</td>
+                  <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                    <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')} onClick={() => { setViewCategoryId(category._id); setViewDrawerOpen(true); }}>
+                      <BiShow />
+                    </button>
+                    <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} title={t('common.edit')} onClick={() => handleEdit(category)}>
+                      <BiEdit />
+                    </button>
+                    <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} title={t('common.delete')} onClick={() => setDeleteConfirm(category._id)}>
+                      <BiTrash />
+                    </button>
                   </td>
                 </tr>
               ))}

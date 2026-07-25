@@ -5,12 +5,13 @@ import ProductDrawer from '../../../components/common/ProductDrawer';
 import ProductSearchField from '../../../components/common/ProductSearchField';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import Pagination from '../../../components/common/Pagination';
+import StatCard from '../../../components/common/StatCard';
 import { showToast } from '../../../utils/toast';
 import {
   BiSearch, BiPlus, BiTrash, BiX, BiCheck, BiShow, BiCalendar, BiNote,
   BiCreditCard, BiHash, BiUser, BiChevronDown, BiChevronUp,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable, BiError, BiRefresh, BiInfoCircle,
-  BiImage, BiUndo, BiZoomIn,
+  BiImage, BiUndo, BiZoomIn, BiDollar, BiWallet, BiTrendingUp, BiCart,
 } from 'react-icons/bi';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
@@ -221,6 +222,116 @@ const ProductCard = ({ row, index, isViewMode, isOpen, onToggle, setFieldRef, up
       </div>
     </div>
   );
+};
+
+// ─── Full-screen Invoice Image Viewer ──────────────────────────────────
+const InvoiceImageViewer = ({ src, alt, onClose }) => {
+  const [scale, setScale] = useState(1);
+  const imgRef = useRef(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const zoomIn = () => setScale((s) => Math.min(s + 0.25, 3));
+  const zoomOut = () => setScale((s) => Math.max(s - 0.25, 0.25));
+  const resetZoom = () => setScale(1);
+
+  const handleDownload = () => {
+    const a = document.createElement('a');
+    a.href = src;
+    a.download = 'invoice-image.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <div
+      className="purchase-invoice-zoom-overlay"
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+        background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex',
+        alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out',
+        animation: 'fadeIn 0.2s ease',
+      }}
+    >
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
+      {/* Close button - always visible */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        style={{
+          position: 'fixed', top: 16, right: 16, zIndex: 10001,
+          width: 40, height: 40, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.15)', border: 'none',
+          color: '#fff', fontSize: 24, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)', transition: 'background 0.15s',
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+      >
+        <BiX />
+      </button>
+
+      {/* Image */}
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '92vw', maxHeight: '85vh', objectFit: 'contain',
+          transform: `scale(${scale})`, transition: 'transform 0.2s ease',
+          borderRadius: 8, cursor: 'default', userSelect: 'none',
+        }}
+      />
+
+      {/* Toolbar */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', gap: 8, padding: '8px 16px',
+          background: 'rgba(255,255,255,0.12)', borderRadius: 12,
+          backdropFilter: 'blur(8px)', zIndex: 10001,
+        }}
+      >
+        <button type="button" onClick={zoomOut} title="Zoom Out"
+          style={toolbarBtnStyle}>
+          <BiZoomIn size={16} style={{ transform: 'scaleX(-1)' }} />
+        </button>
+        <button type="button" onClick={resetZoom} title="Reset Zoom"
+          style={{ ...toolbarBtnStyle, fontSize: 12, fontFamily: 'var(--font-family)' }}>
+          {Math.round(scale * 100)}%
+        </button>
+        <button type="button" onClick={zoomIn} title="Zoom In"
+          style={toolbarBtnStyle}>
+          <BiZoomIn size={16} />
+        </button>
+        <div style={{ width: 1, background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+        <button type="button" onClick={handleDownload} title="Download"
+          style={toolbarBtnStyle}>
+          <BiDownload size={16} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const toolbarBtnStyle = {
+  width: 36, height: 36, borderRadius: 8, border: 'none',
+  background: 'rgba(255,255,255,0.08)', color: '#fff',
+  cursor: 'pointer', display: 'flex', alignItems: 'center',
+  justifyContent: 'center', transition: 'background 0.15s',
 };
 
 // ─── Purchase Entry Drawer (create) / Detail Drawer (view) ────────────────
@@ -875,16 +986,11 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
 
           {/* ─── Invoice Image Zoom Lightbox (view mode) ───────────────── */}
           {zoomImage && (
-            <div className="purchase-invoice-zoom-overlay" onClick={() => setZoomImage(null)}>
-              <button
-                type="button"
-                className="btn-close-premium purchase-invoice-zoom-overlay__close"
-                onClick={() => setZoomImage(null)}
-              >
-                <BiX />
-              </button>
-              <img src={zoomImage} alt={t('purchasesPage.invoiceImage')} onClick={(e) => e.stopPropagation()} />
-            </div>
+            <InvoiceImageViewer
+              src={zoomImage}
+              alt={t('purchasesPage.invoiceImage')}
+              onClose={() => setZoomImage(null)}
+            />
           )}
 
           {/* ─── Previous Due Card ──────────────────────────────────── */}
@@ -2265,6 +2371,29 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
   );
 };
 
+// ─── Date helpers ─────────────────────────────────────────────
+const toDateInputValue = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const DATE_PRESETS = [
+  { key: 'today', labelKey: 'common.today' },
+  { key: '7d', labelKey: 'common.last7Days' },
+  { key: '30d', labelKey: 'common.last30Days' },
+  { key: 'month', labelKey: 'common.thisMonth' },
+  { key: 'custom', labelKey: 'common.customRange' },
+];
+
+const PAYMENT_STATUS_OPTIONS = (t) => [
+  { key: '', label: t('common.all') },
+  { key: 'paid', label: t('common.paid') },
+  { key: 'partial', label: t('common.partial') },
+  { key: 'unpaid', label: t('purchasesPage.unpaid') },
+];
+
 // ─── Main Purchases Page ───────────────────────────────────────────────────
 // Fixed page size for the Purchases list — server-side pagination via ?page=&limit=.
 const PURCHASES_PER_PAGE = 10;
@@ -2285,6 +2414,13 @@ const Purchases = () => {
   const [viewing, setViewing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [payingSupplier, setPayingSupplier] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [datePreset, setDatePreset] = useState('today');
+  const [startDate, setStartDate] = useState(() => toDateInputValue(new Date()));
+  const [endDate, setEndDate] = useState(() => toDateInputValue(new Date()));
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -2292,10 +2428,33 @@ const Purchases = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // A new search term invalidates the current page — always land back on page 1.
+  // Any filter change invalidates the current page — always land back on page 1.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, supplierFilter, paymentStatusFilter, startDate, endDate]);
+
+  useEffect(() => {
+    api.get('/suppliers?limit=10000', { _skipLoading: true }).then(({ data }) => {
+      setSuppliers(Array.isArray(data) ? data : data.suppliers || []);
+    }).catch(() => {});
+  }, []);
+
+  const applyDatePreset = (key) => {
+    setDatePreset(key);
+    if (key === 'custom') return;
+    const now = new Date();
+    let start = new Date(now);
+    const end = new Date(now);
+    if (key === '7d') {
+      start.setDate(start.getDate() - 6);
+    } else if (key === '30d') {
+      start.setDate(start.getDate() - 29);
+    } else if (key === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    setStartDate(toDateInputValue(start));
+    setEndDate(toDateInputValue(end));
+  };
 
   const fetchPurchases = useCallback(async () => {
     if (isFirstLoad.current) {
@@ -2303,13 +2462,19 @@ const Purchases = () => {
     } else {
       setRefreshing(true);
     }
+    setSearching(true);
     try {
-      const { data } = await api.get(
-        `/purchases?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${PURCHASES_PER_PAGE}`,
-        { _skipLoading: true }
-      );
+      const params = new URLSearchParams({
+        page, limit: PURCHASES_PER_PAGE,
+        startDate, endDate,
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+        ...(supplierFilter ? { supplier: supplierFilter } : {}),
+        ...(paymentStatusFilter ? { status: paymentStatusFilter } : {}),
+      });
+      const { data } = await api.get(`/purchases?${params.toString()}`, { _skipLoading: true });
       setPurchases(data.purchases || []);
       setTotalCount(data.total || 0);
+      setStats(data.stats || null);
       const pages = Math.max(1, data.pages || 1);
       setTotalPages(pages);
       // Self-correct if the current page no longer exists — e.g. the last
@@ -2325,7 +2490,7 @@ const Purchases = () => {
       setSearching(false);
       if (isFirstLoad.current) isFirstLoad.current = false;
     }
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, startDate, endDate, supplierFilter, paymentStatusFilter]);
 
   useEffect(() => {
     fetchPurchases();
@@ -2418,25 +2583,82 @@ const Purchases = () => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="list-filters-card">
-        <div className="list-filter-field list-search-field">
-          <div className="search-box">
+      {/* ─── Stat Cards ──────────────────────────────────────────────── */}
+      <div className="row g-3 mb-4">
+        <div className="col-6 col-md-3">
+          <StatCard icon={BiDollar} label={t('purchasesPage.totalPurchases')} value={stats?.totalPurchases || 0} color="primary" rawValue={stats?.totalPurchases || 0} isCurrency={false} />
+        </div>
+        <div className="col-6 col-md-3">
+          <StatCard icon={BiWallet} label={t('common.total')} value={stats?.totalAmount || 0} color="success" rawValue={stats?.totalAmount || 0} isCurrency={true} />
+        </div>
+        <div className="col-6 col-md-3">
+          <StatCard icon={BiTrendingUp} label={t('common.paid')} value={stats?.totalPaid || 0} color="warning" rawValue={stats?.totalPaid || 0} isCurrency={true} />
+        </div>
+        <div className="col-6 col-md-3">
+          <StatCard icon={BiCart} label={t('common.due')} value={stats?.totalDue || 0} color="danger" rawValue={stats?.totalDue || 0} isCurrency={true} />
+        </div>
+      </div>
+
+      {/* ─── Filters ─────────────────────────────────────────────────── */}
+      <div className="sales-filters-wrapper">
+        <div className="sales-filters">
+          <div className="sales-filter search-box">
             <BiSearch className="search-icon" />
-            <input
-              className="form-control list-filter-input"
-              placeholder={t('purchasesPage.searchPlaceholder')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <input className="form-control sales-filter-input" placeholder={t('purchasesPage.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+
+          <div className="sales-date-filters-scroll">
+            <div className="sales-date-segmented" role="tablist" aria-label="Date filter">
+              {DATE_PRESETS.map((p, idx) => (
+                <React.Fragment key={p.key}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={datePreset === p.key}
+                    className={`sales-date-pill ${datePreset === p.key ? 'active' : ''}`}
+                    onClick={() => applyDatePreset(p.key)}
+                  >
+                    <BiCalendar />
+                    <span>{t(p.labelKey)}</span>
+                  </button>
+                  {idx === 2 && <span className="sales-date-break" aria-hidden="true" />}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          {datePreset === 'custom' && (
+            <>
+              <div className="sales-filter">
+                <BiCalendar size={14} className="sales-filter-icon-abs" />
+                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div className="sales-filter">
+                <BiCalendar size={14} className="sales-filter-icon-abs" />
+                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+            </>
+          )}
+
+          <div className="sales-filter">
+            <select className="form-control sales-filter-input" value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
+              <option value="">{t('purchasesPage.selectSupplier')}</option>
+              {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          <div className="sales-filter">
+            <select className="form-control sales-filter-input" value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)}>
+              {PAYMENT_STATUS_OPTIONS(t).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
           </div>
         </div>
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
-      <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
-        <div className="table-responsive">
-          <table className="table-custom purchases-list-table mb-0">
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
+        <div className="sales-table-scroll">
+          <table className="sales-table">
             <thead>
               <tr>
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
@@ -2447,57 +2669,46 @@ const Purchases = () => {
                 <th>{t('common.paid')}</th>
                 <th>{t('common.due')}</th>
                 <th>{t('common.status')}</th>
-                <th style={{ width: '100px' }}>{t('common.actions')}</th>
+                <th style={{ width: '110px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {refreshing ? (
                 <TableSkeletonRows />
               ) : searching ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                  </td>
-                </tr>
+                <tr><td colSpan={9}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : purchases.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
-                    {t('purchasesPage.noPurchasesFound')}
-                  </td>
-                </tr>
+                <tr><td colSpan={9}><div className="sales-empty-state"><span className="sales-empty-icon">📄</span><p>{t('purchasesPage.noPurchasesFound')}</p></div></td></tr>
               ) : purchases.map((purchase, idx) => (
-                <tr key={purchase._id}>
+                <tr key={purchase._id} className={idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'}>
                   <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                     {(page - 1) * PURCHASES_PER_PAGE + idx + 1}
                   </td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{purchase.purchaseNo}</div>
-                  </td>
+                  <td><span className="sales-invoice-badge"><BiHash size={12} />{purchase.purchaseNo}</span></td>
                   <td>{purchase.supplierInvoiceNo || '-'}</td>
-                  <td>{purchase.supplier?.name || '-'}</td>
-                  <td>₹{purchase.totalAmount}</td>
-                  <td>₹{purchase.paidAmount}</td>
                   <td>
-                    <span style={purchase.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>
-                      ₹{purchase.dueAmount}
+                    <div className="sales-customer-badge">
+                      <BiUser size={14} />
+                      <span>{purchase.supplier?.name || '-'}</span>
+                    </div>
+                  </td>
+                  <td><span className="sales-amount">₹{Number(purchase.totalAmount || 0).toFixed(2)}</span></td>
+                  <td><span className="sales-amount" style={{ color: 'var(--text-secondary)' }}>₹{Number(purchase.paidAmount || 0).toFixed(2)}</span></td>
+                  <td>
+                    <span className="sales-amount" style={purchase.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : { color: 'var(--text-secondary)' }}>
+                      ₹{Number(purchase.dueAmount || 0).toFixed(2)}
                     </span>
                   </td>
                   <td>{getStatusBadge(purchase.paymentStatus)}</td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(purchase)}>
-                        <BiShow />
+                  <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                    <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')} onClick={() => handleView(purchase)}>
+                      <BiShow />
+                    </button>
+                    {purchase.supplier?.dueAmount > 0 && (
+                      <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} title={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase.supplier)}>
+                        <BiCreditCard />
                       </button>
-                      {purchase.supplier?.dueAmount > 0 && (
-                        <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase.supplier)}>
-                          <BiCreditCard />
-                        </button>
-                      )}
-                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(purchase)}>
-                        <BiTrash />
-                      </button>
-                    </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -2549,7 +2760,7 @@ const Purchases = () => {
           </div>
         ) : purchases.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.35 }}>📄</div>
             <h5 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t('purchasesPage.noPurchasesFound')}</h5>
           </div>
         ) : purchases.map((purchase) => (
@@ -2558,13 +2769,13 @@ const Purchases = () => {
             compact={
               <>
                 <div className="expandable-card__compact-row">
-                  <span className="expandable-card__name">{purchase.supplier?.name || t('common.unknown')}</span>
+                  <span className="expandable-card__name"><BiHash size={12} style={{ marginRight: 2 }} /> {purchase.purchaseNo}</span>
                   <span className="expandable-card__price">{money(purchase.totalAmount)}</span>
                 </div>
                 <div className="expandable-card__meta">
                   <span className="expandable-card__meta-item">
-                    <BiHash />
-                    <span>{purchase.purchaseNo}</span>
+                    <BiUser />
+                    <span>{purchase.supplier?.name || t('common.unknown')}</span>
                   </span>
                   <span className="expandable-card__meta-item">
                     <BiCalendar />
@@ -2631,9 +2842,6 @@ const Purchases = () => {
                     <BiCreditCard />
                   </button>
                 )}
-                <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(purchase)}>
-                  <BiTrash />
-                </button>
               </>
             }
           />

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Product = require('../models/Product');
 const Supplier = require('../models/Supplier');
@@ -15,7 +16,7 @@ const getPurchases = async (req, res) => {
     if (startDate && endDate) {
       query.purchaseDate = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
-    if (supplier) query.supplier = supplier;
+    if (supplier) query.supplier = new mongoose.Types.ObjectId(supplier);
     if (status) query.paymentStatus = status;
     if (search) {
       const matchingSuppliers = await Supplier.find({
@@ -30,15 +31,38 @@ const getPurchases = async (req, res) => {
       ];
     }
 
-    const purchases = await Purchase.find(query)
-      .populate('supplier', 'name phone state dueAmount')
-      .populate('items.product', 'name nameBn')
-      .sort({ purchaseDate: -1 })
-      .skip(skip)
-      .limit(limit);
+    const [purchases, total, statsAgg] = await Promise.all([
+      Purchase.find(query)
+        .populate('supplier', 'name phone state dueAmount')
+        .populate('items.product', 'name nameBn')
+        .sort({ purchaseDate: -1 })
+        .skip(skip)
+        .limit(limit),
+      Purchase.countDocuments(query),
+      Purchase.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: '$totalAmount' },
+            totalPaid: { $sum: '$paidAmount' },
+            totalDue: { $sum: '$dueAmount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
 
-    const total = await Purchase.countDocuments(query);
-    res.json({ purchases, page, pages: Math.ceil(total / limit), total });
+    const stats = statsAgg[0]
+      ? {
+          totalPurchases: statsAgg[0].count,
+          totalAmount: statsAgg[0].totalAmount,
+          totalPaid: statsAgg[0].totalPaid,
+          totalDue: statsAgg[0].totalDue,
+        }
+      : { totalPurchases: 0, totalAmount: 0, totalPaid: 0, totalDue: 0 };
+
+    res.json({ purchases, page, pages: Math.ceil(total / limit), total, stats });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

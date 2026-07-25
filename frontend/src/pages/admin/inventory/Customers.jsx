@@ -1833,9 +1833,9 @@ const Customers = () => {
           </div>
 
           {/* Table */}
-          <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
-            <div className="table-responsive">
-              <table className="table-custom mb-0">
+          <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
+            <div className="sales-table-scroll">
+              <table className="sales-table">
                 <thead>
                   <tr>
                     <th style={{ width: '56px' }}>{t('common.sl')}</th>
@@ -1844,55 +1844,51 @@ const Customers = () => {
                     <th>{t('customersPage.totalPurchase')}</th>
                     <th>{t('common.due')}</th>
                     <th>{t('customersPage.loyalty')}</th>
-                    <th style={{ width: '140px' }}>{t('common.actions')}</th>
+                    <th style={{ width: '110px' }}>{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {refreshing ? (
                     <TableSkeletonRows />
                   ) : searching ? (
-                    <tr><td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                      <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                    </td></tr>
+                    <tr><td colSpan={7}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
                   ) : customers.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>👥</div>
-                      {t('customersPage.noCustomersFound')}
-                    </td></tr>
+                    <tr><td colSpan={7}><div className="sales-empty-state"><span className="sales-empty-icon">👥</span><p>{t('customersPage.noCustomersFound')}</p></div></td></tr>
                   ) : customers.map((customer, idx) => (
-                    <tr key={customer._id}>
+                    <tr key={customer._id} className={idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'}>
                       <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                         {(page - 1) * CUSTOMERS_PER_PAGE + idx + 1}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{customer.name}</div>
-                        {customer.nameBn && <small style={{ color: 'var(--text-muted)' }}>{customer.nameBn}</small>}
+                        <div className="sales-customer-badge">
+                          <BiUser size={14} />
+                          <span>{customer.name}</span>
+                        </div>
+                        {customer.nameBn && <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: 2, fontSize: '0.7rem' }}>{customer.nameBn}</small>}
                       </td>
-                      <td>{customer.phone}</td>
-                      <td>{formatCurrency(customer.totalPurchases)}</td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{customer.phone}</td>
+                      <td><span className="sales-amount">{formatCurrency(customer.totalPurchases)}</span></td>
                       <td>
-                        <span style={customer.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>
+                        <span className="sales-amount" style={customer.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : {}}>
                           {formatCurrency(customer.dueAmount)}
                         </span>
                       </td>
                       <td>
                         <span className="badge badge-primary" style={{
                           background: 'rgba(108, 99, 255, 0.12)', color: 'var(--primary)',
-                          padding: '0.3rem 0.75rem', borderRadius: 'var(--border-radius-pill)',
-                          fontSize: '0.8rem', fontWeight: 600,
+                          padding: '0.2rem 0.6rem', borderRadius: 'var(--border-radius-pill)',
+                          fontSize: '0.72rem', fontWeight: 600,
                         }}>
                           {customer.loyaltyPoints || 0} {t('customersPage.pts')}
                         </span>
                       </td>
-                      <td>
-                        <div className="d-flex gap-1">
-                          <button className="btn-action btn-action-view" data-tooltip={t('common.view')}
-                            onClick={() => handleView(customer)}><BiShow /></button>
-                          <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')}
-                            onClick={() => handleEdit(customer)}><BiEdit /></button>
-                          <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')}
-                            onClick={() => confirmDelete(customer)}><BiTrash /></button>
-                        </div>
+                      <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                        <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')}
+                          onClick={() => handleView(customer)}><BiShow /></button>
+                        <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} title={t('common.edit')}
+                          onClick={() => handleEdit(customer)}><BiEdit /></button>
+                        <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} title={t('common.delete')}
+                          onClick={() => confirmDelete(customer)}><BiTrash /></button>
                       </td>
                     </tr>
                   ))}

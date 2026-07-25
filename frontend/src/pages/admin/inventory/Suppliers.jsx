@@ -1100,9 +1100,9 @@ const Suppliers = () => {
       </div>
 
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
-      <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
-        <div className="table-responsive">
-          <table className="table-custom mb-0">
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
+        <div className="sales-table-scroll">
+          <table className="sales-table">
             <thead>
               <tr>
                 <th style={{ width: '44px' }}>
@@ -1122,27 +1122,18 @@ const Suppliers = () => {
                 <th>State</th>
                 <th>{t('sale.paidAmount')}</th>
                 <th>{t('common.due')}</th>
-                <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                <th style={{ width: '110px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {refreshing ? (
                 <TableSkeletonRows />
               ) : searching ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                  </td>
-                </tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : suppliers.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
-                    {t('empty.noSuppliers')}
-                  </td>
-                </tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><span className="sales-empty-icon">🤝</span><p>{t('empty.noSuppliers')}</p></div></td></tr>
               ) : suppliers.map((supplier, idx) => (
-                <tr key={supplier._id} className={isSelected(supplier._id) ? 'bulk-select-row--selected' : ''}>
+                <tr key={supplier._id} className={`${idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'} ${isSelected(supplier._id) ? 'bulk-select-row--selected' : ''}`}>
                   <td>
                     <label className="bulk-select-checkbox" title={t('suppliersPage.selectSupplier')}>
                       <input type="checkbox" checked={isSelected(supplier._id)} onChange={() => toggleSelect(supplier._id)} />
@@ -1153,29 +1144,30 @@ const Suppliers = () => {
                     {(page - 1) * SUPPLIERS_PER_PAGE + idx + 1}
                   </td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{supplier.name}</div>
-                    {supplier.nameBn && <small style={{ color: 'var(--text-muted)' }}>{supplier.nameBn}</small>}
+                    <div className="sales-customer-badge">
+                      <BiBuilding size={14} />
+                      <span>{supplier.name}</span>
+                    </div>
+                    {supplier.nameBn && <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: 2, fontSize: '0.7rem' }}>{supplier.nameBn}</small>}
                   </td>
-                  <td>{supplier.phone}</td>
-                  <td>{supplier.state || 'West Bengal'}</td>
-                  <td><span style={supplier.totalPaid > 0 ? { color: 'var(--secondary)', fontWeight: 600 } : {}}>₹{supplier.totalPaid || 0}</span></td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{supplier.phone}</td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{supplier.state || 'West Bengal'}</td>
+                  <td><span className="sales-amount" style={{ color: 'var(--text-secondary)' }}>₹{Number(supplier.totalPaid || 0).toFixed(2)}</span></td>
                   <td>
-                    <span style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : {}}>
-                      ₹{supplier.dueAmount || 0}
+                    <span className="sales-amount" style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : { color: 'var(--text-secondary)' }}>
+                      ₹{Number(supplier.dueAmount || 0).toFixed(2)}
                     </span>
                   </td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => setViewDetailsId(supplier._id)}>
-                        <BiShow />
-                      </button>
-                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(supplier)}>
-                        <BiEdit />
-                      </button>
-                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(supplier._id)}>
-                        <BiTrash />
-                      </button>
-                    </div>
+                  <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                    <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')} onClick={() => setViewDetailsId(supplier._id)}>
+                      <BiShow />
+                    </button>
+                    <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} title={t('common.edit')} onClick={() => handleEdit(supplier)}>
+                      <BiEdit />
+                    </button>
+                    <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} title={t('common.delete')} onClick={() => setDeleteConfirm(supplier._id)}>
+                      <BiTrash />
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -499,10 +499,17 @@ const GstReport = () => {
         </span>
       </div>
 
-      {/* ─── Dashboard Cards ──────────────────────────────────────── */}
+      {/* ─── Dashboard Cards (2 rows × 3 columns) ──────────────────── */}
       <div className="row g-3 mb-3">
-        {dashboardCards.map((card, idx) => (
-          <div key={idx} className="col-6 col-md-4 col-lg-2">
+        {dashboardCards.slice(0, 3).map((card, idx) => (
+          <div key={idx} className="col-6 col-md-4">
+            <StatCard icon={card.icon} label={card.label} value={card.value} color={card.color} rawValue={card.rawValue} isCurrency={card.isCurrency} />
+          </div>
+        ))}
+      </div>
+      <div className="row g-3 mb-3">
+        {dashboardCards.slice(3, 6).map((card, idx) => (
+          <div key={idx + 3} className="col-6 col-md-4">
             <StatCard icon={card.icon} label={card.label} value={card.value} color={card.color} rawValue={card.rawValue} isCurrency={card.isCurrency} />
           </div>
         ))}
