@@ -2471,8 +2471,8 @@ const Purchases = () => {
         ...(supplierFilter ? { supplier: supplierFilter } : {}),
         ...(paymentStatusFilter ? { status: paymentStatusFilter } : {}),
       });
-      const { data } = await api.get(`/purchases?${params.toString()}`, { _skipLoading: true });
-      setPurchases(data.purchases || []);
+        const { data } = await api.get(`/purchases?${params.toString()}`, { _skipLoading: true });
+        setPurchases((data.purchases || []).reverse());
       setTotalCount(data.total || 0);
       setStats(data.stats || null);
       const pages = Math.max(1, data.pages || 1);

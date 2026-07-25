@@ -1152,7 +1152,7 @@ const Suppliers = () => {
                   </td>
                   <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{supplier.phone}</td>
                   <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{supplier.state || 'West Bengal'}</td>
-                  <td><span className="sales-amount" style={{ color: 'var(--text-secondary)' }}>₹{Number(supplier.totalPaid || 0).toFixed(2)}</span></td>
+                  <td><span className="sales-amount" style={{ color: 'var(--secondary)', fontWeight: 600 }}>₹{Number(supplier.totalPaid || 0).toFixed(2)}</span></td>
                   <td>
                     <span className="sales-amount" style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : { color: 'var(--text-secondary)' }}>
                       ₹{Number(supplier.dueAmount || 0).toFixed(2)}

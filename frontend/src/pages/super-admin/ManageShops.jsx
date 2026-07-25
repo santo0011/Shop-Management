@@ -315,6 +315,133 @@ const TableSkeletonRows = ({ columns = 5 }) => (
   </>
 );
 
+// ─── Shop Details Drawer Skeleton ────────────────────────────
+const shimmerStyle = (height, width = '100%', mb = 0) => ({
+  height,
+  width,
+  marginBottom: mb,
+  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+  backgroundSize: '200% 100%',
+  borderRadius: 6,
+  animation: 'shimmer 1.5s infinite',
+});
+
+const shimmerCircle = (size) => ({
+  width: size,
+  height: size,
+  borderRadius: '50%',
+  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+  backgroundSize: '200% 100%',
+  animation: 'shimmer 1.5s infinite',
+});
+
+const shimmerBadge = (width) => ({
+  height: 20,
+  width,
+  borderRadius: 20,
+  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+  backgroundSize: '200% 100%',
+  animation: 'shimmer 1.5s infinite',
+});
+
+const shimmerRow = (hasIcon = true) => (
+  <div key={Math.random()} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+    {hasIcon && <div style={shimmerCircle(34)} />}
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={shimmerStyle(8, '40%', 6)} />
+      <div style={shimmerStyle(12, '70%')} />
+    </div>
+  </div>
+);
+
+const SectionSkeleton = ({ icon = true, rows = 3 }) => (
+  <div className="premium-card" style={{ border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}>
+    <div style={{
+      padding: '0.75rem 1.25rem',
+      borderBottom: '1px solid var(--border-color)',
+      display: 'flex', alignItems: 'center', gap: '8px',
+    }}>
+      {icon && <div style={shimmerCircle(14)} />}
+      <div style={shimmerStyle(10, '50%')} />
+    </div>
+    <div style={{ padding: '1rem 1.25rem' }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: i < rows - 1 ? '12px' : 0 }}>
+          <div style={shimmerCircle(34)} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={shimmerStyle(8, '35%', 5)} />
+            <div style={shimmerStyle(12, '65%')} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const ShopDetailsSkeleton = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    {/* Hero banner skeleton */}
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.06), rgba(0, 217, 166, 0.04))',
+      borderRadius: 'var(--border-radius-lg)',
+      padding: '1.5rem',
+      textAlign: 'center',
+      border: '1px solid var(--border-color)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+        <div style={shimmerCircle(72)} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+        <div style={shimmerStyle(20, '160px')} />
+      </div>
+      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+        <div style={shimmerBadge('80px')} />
+        <div style={shimmerBadge('100px')} />
+      </div>
+    </div>
+
+    {/* Info section skeletons */}
+    <SectionSkeleton rows={4} />
+    <SectionSkeleton rows={2} />
+    <SectionSkeleton rows={1} />
+    <SectionSkeleton rows={2} />
+
+    {/* Subscription history skeleton */}
+    <div className="premium-card" style={{ border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-card)' }}>
+      <div style={{
+        padding: '0.75rem 1.25rem',
+        borderBottom: '1px solid var(--border-color)',
+        display: 'flex', alignItems: 'center', gap: '8px',
+      }}>
+        <div style={shimmerCircle(14)} />
+        <div style={shimmerStyle(10, '45%')} />
+      </div>
+      <div style={{ padding: '1rem 1.25rem' }}>
+        {[1, 2, 3].map((r) => (
+          <div key={r} style={{
+            display: 'flex', alignItems: 'flex-start', gap: '12px',
+            padding: '0.75rem',
+            borderRadius: 'var(--border-radius-md)',
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-light)',
+            marginBottom: r < 3 ? '0.75rem' : 0,
+          }}>
+            <div style={shimmerCircle(8)} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <div style={shimmerStyle(12, '50%')} />
+                <div style={shimmerBadge('60px')} />
+              </div>
+              <div style={shimmerStyle(8, '80%', 4)} />
+              <div style={shimmerStyle(8, '60%')} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 const ManageShops = () => {
   const { t } = useTranslation();
   const location = useLocation();
@@ -531,10 +658,7 @@ const ManageShops = () => {
         </div>
         <div className="drawer-body">
           {viewShopLoading ? (
-            <div className="d-flex flex-column align-items-center justify-content-center py-5">
-              <div className="spinner-border mb-3" style={{ color: 'var(--primary)', width: '2.5rem', height: '2.5rem' }} role="status" />
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>{t('manageShopsPage.loadingShopDetails')}</p>
-            </div>
+            <ShopDetailsSkeleton />
           ) : viewShopError ? (
             <div style={{
               padding: '1rem',

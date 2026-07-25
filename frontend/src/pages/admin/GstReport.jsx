@@ -646,18 +646,21 @@ const GstReport = () => {
                 </tr>
               ) : rows.map((r) => {
                 const type = rowGstType(r);
+                const cgstAmount = Number(r.cgst || 0);
+                const sgstAmount = Number(r.sgst || 0);
+                const igstAmount = Number(r.igst || 0);
                 return (
                   <tr key={r._id}>
                     <td><span className="sales-invoice-badge">{r.no || '-'}</span></td>
                     <td>{formatDate(r.date)}</td>
                     <td>{r.partyName || '-'}</td>
-                    <td>{r.partyState || '-'}</td>
+                    <td style={{ color: '#475569', fontWeight: 500 }}>{r.partyState || '-'}</td>
                     <td><span className={`gst-type-badge gst-type-badge--${type}`}>{gstTypeBadgeLabel(type, t)}</span></td>
                     <td className="gst-cell-amount">{money(r.taxableAmount)}</td>
-                    <td className="gst-cell-amount">{money(r.cgst)}</td>
-                    <td className="gst-cell-amount">{money(r.sgst)}</td>
-                    <td className="gst-cell-amount">{money(r.igst)}</td>
-                    <td className="gst-cell-amount" style={{ fontWeight: 700 }}>{money(r.totalAmount)}</td>
+                    <td className="gst-cell-amount" style={{ color: cgstAmount > 0 ? '#2563EB' : '#94A3B8', fontWeight: cgstAmount > 0 ? 600 : 500 }}>{money(r.cgst)}</td>
+                    <td className="gst-cell-amount" style={{ color: sgstAmount > 0 ? '#2563EB' : '#94A3B8', fontWeight: sgstAmount > 0 ? 600 : 500 }}>{money(r.sgst)}</td>
+                    <td className="gst-cell-amount" style={{ color: igstAmount > 0 ? '#EA580C' : '#94A3B8', fontWeight: igstAmount > 0 ? 600 : 500 }}>{money(r.igst)}</td>
+                    <td className="gst-cell-amount" style={{ color: '#059669', fontWeight: 700 }}>{money(r.totalAmount)}</td>
                   </tr>
                 );
               })}
@@ -679,6 +682,9 @@ const GstReport = () => {
           </div>
         ) : rows.map((r) => {
           const type = rowGstType(r);
+          const cgstAmount = Number(r.cgst || 0);
+          const sgstAmount = Number(r.sgst || 0);
+          const igstAmount = Number(r.igst || 0);
           return (
             <ExpandableCard
               key={r._id}
@@ -686,7 +692,7 @@ const GstReport = () => {
                 <>
                   <div className="expandable-card__compact-row">
                     <span className="expandable-card__name">{r.no || '-'}</span>
-                    <span className="expandable-card__price">{money(r.totalAmount)}</span>
+                    <span className="expandable-card__price" style={{ color: '#059669', fontWeight: 700 }}>{money(r.totalAmount)}</span>
                   </div>
                   <div className="expandable-card__meta">
                     <span className="expandable-card__meta-item"><BiCalendar /><span>{formatDate(r.date)}</span></span>
@@ -697,12 +703,12 @@ const GstReport = () => {
               expanded={
                 <div className="expandable-card__rows">
                   <div className="expandable-card__row"><span className="expandable-card__row-label">{isSalesTab ? t('gstReportPage.customer') : t('gstReportPage.supplier')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{r.partyName || '-'}</span></div>
-                  <div className="expandable-card__row"><span className="expandable-card__row-label">{t('gstReportPage.state')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{r.partyState || '-'}</span></div>
+                  <div className="expandable-card__row"><span className="expandable-card__row-label">{t('gstReportPage.state')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value" style={{ color: '#475569', fontWeight: 500 }}>{r.partyState || '-'}</span></div>
                   <div className="expandable-card__row"><span className="expandable-card__row-label">{t('gstReportPage.taxableAmount')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{money(r.taxableAmount)}</span></div>
-                  <div className="expandable-card__row"><span className="expandable-card__row-label">CGST</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{money(r.cgst)}</span></div>
-                  <div className="expandable-card__row"><span className="expandable-card__row-label">SGST</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{money(r.sgst)}</span></div>
-                  <div className="expandable-card__row"><span className="expandable-card__row-label">IGST</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{money(r.igst)}</span></div>
-                  <div className="expandable-card__row"><span className="expandable-card__row-label">{t('gstReportPage.grandTotal')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{money(r.totalAmount)}</span></div>
+                  <div className="expandable-card__row"><span className="expandable-card__row-label">CGST</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value" style={{ color: cgstAmount > 0 ? '#2563EB' : '#94A3B8', fontWeight: cgstAmount > 0 ? 600 : 500 }}>{money(r.cgst)}</span></div>
+                  <div className="expandable-card__row"><span className="expandable-card__row-label">SGST</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value" style={{ color: sgstAmount > 0 ? '#2563EB' : '#94A3B8', fontWeight: sgstAmount > 0 ? 600 : 500 }}>{money(r.sgst)}</span></div>
+                  <div className="expandable-card__row"><span className="expandable-card__row-label">IGST</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value" style={{ color: igstAmount > 0 ? '#EA580C' : '#94A3B8', fontWeight: igstAmount > 0 ? 600 : 500 }}>{money(r.igst)}</span></div>
+                  <div className="expandable-card__row"><span className="expandable-card__row-label">{t('gstReportPage.grandTotal')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value" style={{ color: '#059669', fontWeight: 700 }}>{money(r.totalAmount)}</span></div>
                 </div>
               }
             />
