@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import {
   BiGridAlt, BiCart, BiPackage, BiCategory, BiCar, BiGroup,
-  BiReceipt, BiDollar, BiLineChart, BiCog,
+  BiReceipt, BiDollar, BiLineChart, BiCog, BiCalculator,
   BiCreditCard, BiStore, BiX
 } from 'react-icons/bi';
 
@@ -28,6 +28,7 @@ const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
   const financeMenu = [
     { path: '/sales', icon: BiDollar, label: t('nav.sales') },
     { path: '/reports', icon: BiLineChart, label: t('nav.reports') },
+    { path: '/gst-report', icon: BiCalculator, label: t('nav.gstReport') },
   ];
 
   // Kept out of the scrollable nav list and pinned in the footer so they're

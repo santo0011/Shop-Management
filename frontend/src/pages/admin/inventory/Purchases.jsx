@@ -8,9 +8,9 @@ import Pagination from '../../../components/common/Pagination';
 import { showToast } from '../../../utils/toast';
 import {
   BiSearch, BiPlus, BiTrash, BiX, BiCheck, BiShow, BiCalendar, BiNote,
-  BiCreditCard, BiHash, BiUser, BiChevronDown,
+  BiCreditCard, BiHash, BiUser, BiChevronDown, BiChevronUp,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable, BiError, BiRefresh, BiInfoCircle,
-  BiImage, BiUndo,
+  BiImage, BiUndo, BiZoomIn,
 } from 'react-icons/bi';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
@@ -241,8 +241,9 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   const [includePreviousDue, setIncludePreviousDue] = useState(false);
   const [invoiceImage, setInvoiceImage] = useState('');
   const [savingInvoiceImage, setSavingInvoiceImage] = useState(false);
+  const [zoomImage, setZoomImage] = useState(null);
   const [viewingOverride, setViewingOverride] = useState(null);
-  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnPanelOpen, setReturnPanelOpen] = useState(false);
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnReason, setReturnReason] = useState('');
   const [submittingReturn, setSubmittingReturn] = useState(false);
@@ -282,6 +283,9 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         sellingPrice: i.sellingPrice,
         discount: i.discount || 0,
         returnedQty: i.returnedQty || 0,
+        // Carried through only for the Return Panel's live refund preview —
+        // already net of any prior returns, matching what the backend uses.
+        total: i.total,
       })));
       setPaidAmount(viewing.paidAmount || 0);
       setInvoiceImage(viewing.invoiceImage || '');
@@ -297,9 +301,10 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     setIncludePreviousDue(false);
     setPreviousDuePaymentAmount('');
     setViewingOverride(null);
-    setReturnModalOpen(false);
+    setReturnPanelOpen(false);
     setReturnQuantities({});
     setReturnReason('');
+    setZoomImage(null);
   }, [open, viewing]);
 
   // The purchase doc as currently known — either the prop from the parent,
@@ -425,10 +430,11 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   };
 
   // ─── Purchase Return (view mode only) ────────────────────────────────
-  const openReturnModal = () => {
+  // Inline panel inside this same drawer — no separate confirmation modal.
+  const toggleReturnPanel = () => {
     setReturnQuantities({});
     setReturnReason('');
-    setReturnModalOpen(true);
+    setReturnPanelOpen((prev) => !prev);
   };
 
   const handleReturnQtyChange = (productId, value, maxReturnable) => {
@@ -440,9 +446,27 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     }
   };
 
+  // Client-side preview only — mirrors the backend's own proration
+  // (purchaseController.processPurchaseReturn) so the panel shows an
+  // accurate refund estimate, but the server always recomputes and is the
+  // source of truth for what actually gets saved.
+  const previewReturnAmount = (row, qty) => {
+    const maxReturnable = Number(row.quantity || 0) - Number(row.returnedQty || 0);
+    if (!qty || qty <= 0 || maxReturnable <= 0) return 0;
+    const unitTotal = Number(row.total || 0) / maxReturnable;
+    return Math.round(unitTotal * qty * 100) / 100;
+  };
+
+  const returnableRows = rows.filter((r) => r.product && (Number(r.quantity || 0) - Number(r.returnedQty || 0)) > 0);
+  const totalReturnPreview = Object.entries(returnQuantities).reduce((sum, [productId, qty]) => {
+    const row = rows.find((r) => r.product?._id === productId);
+    return row ? sum + previewReturnAmount(row, Number(qty) || 0) : sum;
+  }, 0);
+  const hasValidReturnQty = Object.values(returnQuantities).some((v) => Number.isFinite(Number(v)) && Number(v) > 0);
+
   const handleSubmitReturn = async () => {
     const items = Object.entries(returnQuantities)
-      .filter(([, qty]) => Number(qty) > 0)
+      .filter(([, qty]) => Number.isFinite(Number(qty)) && Number(qty) > 0)
       .map(([productId, qty]) => {
         const row = rows.find((r) => r.product?._id === productId);
         return { productId, productName: row?.product?.name || '', quantity: Number(qty) };
@@ -454,11 +478,13 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
       const { data } = await api.post(`/purchases/${effectiveViewing._id}/return`, { items, reason: returnReason }, { _skipLoading: true });
       setRows((prev) => prev.map((r) => {
         const updated = (data.items || []).find((i) => (i.product?._id || i.product) === r.product?._id);
-        return updated ? { ...r, returnedQty: updated.returnedQty || 0 } : r;
+        return updated ? { ...r, returnedQty: updated.returnedQty || 0, total: updated.total } : r;
       }));
       setViewingOverride(data);
       showToast.success(t('purchasesPage.returnProcessed'));
-      setReturnModalOpen(false);
+      setReturnPanelOpen(false);
+      setReturnQuantities({});
+      setReturnReason('');
       onSuccess();
     } catch (err) {
       showToast.error(err.response?.data?.message || t('purchasesPage.returnFailed'));
@@ -471,6 +497,13 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
     () => suppliers.find((s) => s._id === header.supplier) || (viewing?.supplier && typeof viewing.supplier === 'object' ? viewing.supplier : null),
     [suppliers, header.supplier, viewing]
   );
+
+  // The schema only ever stores one invoice image today (a single base64
+  // string), but normalizing to an array here means this display never needs
+  // to change if that's extended later — it already renders "all of them".
+  const invoiceImages = Array.isArray(invoiceImage)
+    ? invoiceImage.filter(Boolean)
+    : (invoiceImage ? [invoiceImage] : []);
 
   // ─── GST Logic ──────────────────────────────────────────────────────
   // All GST percentages come from Settings → Tax & GST. Never hardcoded.
@@ -732,51 +765,127 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
               />
             </div>
 
-            <div className="form-group mb-0 purchase-header-notes">
-              <label className="form-label"><BiImage style={{ marginRight: 4 }} />{t('purchasesPage.invoiceImage')}</label>
-              <div className="purchase-invoice-image-field">
-                {invoiceImage ? (
-                  <div className="purchase-invoice-image-preview">
-                    <img src={invoiceImage} alt={t('purchasesPage.invoiceImage')} />
-                    <div className="purchase-invoice-image-preview__actions">
+            {isViewMode ? (
+              <div className="form-group mb-0 purchase-header-notes">
+                <label className="form-label"><BiImage style={{ marginRight: 4 }} />{t('purchasesPage.invoiceImage')}</label>
+                <div className="purchase-invoice-section">
+                  {invoiceImages.length > 0 ? (
+                    <>
+                      <div className="purchase-invoice-gallery">
+                        {invoiceImages.map((src, idx) => (
+                          <button
+                            type="button"
+                            key={idx}
+                            className="purchase-invoice-gallery__thumb"
+                            onClick={() => setZoomImage(src)}
+                          >
+                            <img src={src} alt={t('purchasesPage.invoiceImage')} />
+                            <span className="purchase-invoice-gallery__zoom-hint"><BiZoomIn /></span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="purchase-invoice-section__actions">
+                        <button
+                          type="button"
+                          className="btn-premium btn-premium-secondary"
+                          onClick={() => invoiceImageInputRef.current?.click()}
+                          disabled={savingInvoiceImage}
+                        >
+                          <BiImage /> {t('purchasesPage.changeInvoiceImage')}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-premium btn-premium-secondary"
+                          onClick={handleRemoveInvoiceImage}
+                          disabled={savingInvoiceImage}
+                        >
+                          <BiTrash /> {t('purchasesPage.removeInvoiceImage')}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="purchase-invoice-section__empty">
+                      <span>{t('purchasesPage.noInvoiceUploaded')}</span>
                       <button
                         type="button"
                         className="btn-premium btn-premium-secondary"
                         onClick={() => invoiceImageInputRef.current?.click()}
                         disabled={savingInvoiceImage}
                       >
-                        <BiImage /> {t('purchasesPage.changeInvoiceImage')}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-premium btn-premium-secondary"
-                        onClick={handleRemoveInvoiceImage}
-                        disabled={savingInvoiceImage}
-                      >
-                        <BiTrash /> {t('purchasesPage.removeInvoiceImage')}
+                        <BiUpload /> {t('purchasesPage.uploadInvoiceImage')}
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn-premium btn-premium-secondary"
-                    onClick={() => invoiceImageInputRef.current?.click()}
-                    disabled={savingInvoiceImage}
-                  >
-                    <BiUpload /> {t('purchasesPage.uploadInvoiceImage')}
-                  </button>
-                )}
-                <input
-                  ref={invoiceImageInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleInvoiceImageFile}
-                />
+                  )}
+                  <input
+                    ref={invoiceImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleInvoiceImageFile}
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="form-group mb-0 purchase-header-notes">
+                <label className="form-label"><BiImage style={{ marginRight: 4 }} />{t('purchasesPage.invoiceImage')}</label>
+                <div className="purchase-invoice-image-field">
+                  {invoiceImage ? (
+                    <div className="purchase-invoice-image-preview">
+                      <img src={invoiceImage} alt={t('purchasesPage.invoiceImage')} />
+                      <div className="purchase-invoice-image-preview__actions">
+                        <button
+                          type="button"
+                          className="btn-premium btn-premium-secondary"
+                          onClick={() => invoiceImageInputRef.current?.click()}
+                          disabled={savingInvoiceImage}
+                        >
+                          <BiImage /> {t('purchasesPage.changeInvoiceImage')}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-premium btn-premium-secondary"
+                          onClick={handleRemoveInvoiceImage}
+                          disabled={savingInvoiceImage}
+                        >
+                          <BiTrash /> {t('purchasesPage.removeInvoiceImage')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-premium btn-premium-secondary"
+                      onClick={() => invoiceImageInputRef.current?.click()}
+                      disabled={savingInvoiceImage}
+                    >
+                      <BiUpload /> {t('purchasesPage.uploadInvoiceImage')}
+                    </button>
+                  )}
+                  <input
+                    ref={invoiceImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleInvoiceImageFile}
+                  />
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* ─── Invoice Image Zoom Lightbox (view mode) ───────────────── */}
+          {zoomImage && (
+            <div className="purchase-invoice-zoom-overlay" onClick={() => setZoomImage(null)}>
+              <button
+                type="button"
+                className="btn-close-premium purchase-invoice-zoom-overlay__close"
+                onClick={() => setZoomImage(null)}
+              >
+                <BiX />
+              </button>
+              <img src={zoomImage} alt={t('purchasesPage.invoiceImage')} onClick={(e) => e.stopPropagation()} />
+            </div>
+          )}
 
           {/* ─── Previous Due Card ──────────────────────────────────── */}
           {!isViewMode && dueSummary && dueSummary.dueAmount > 0 && (
@@ -1134,12 +1243,117 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
             <div className="purchase-payment-summary-card">
               <div className="purchase-payment-summary-card__title-row">
                 <div className="purchase-payment-summary-card__title">{t('purchasesPage.paymentSummary')}</div>
-                {rows.some((r) => r.product && Number(r.quantity || 0) - Number(r.returnedQty || 0) > 0) && (
-                  <button type="button" className="btn-premium btn-premium-secondary" onClick={openReturnModal}>
-                    <BiUndo /> {t('purchasesPage.processReturn')}
+                {returnableRows.length > 0 && (
+                  <button type="button" className="btn-premium btn-premium-secondary" onClick={toggleReturnPanel}>
+                    {returnPanelOpen ? <><BiChevronUp /> {t('common.close')}</> : <><BiUndo /> {t('purchasesPage.processReturn')}</>}
                   </button>
                 )}
               </div>
+
+              {/* ─── Inline Return Panel — no separate confirmation modal ── */}
+              <div className={`purchase-return-panel-wrap ${returnPanelOpen ? 'is-expanded' : ''}`}>
+                <div className="purchase-return-panel-wrap__inner">
+                  <div className="purchase-return-panel">
+                    <div className="purchase-return-panel__rows">
+                      {rows.filter((r) => r.product).map((row) => {
+                        const purchasedQty = Number(row.quantity || 0);
+                        const alreadyReturnedQty = Number(row.returnedQty || 0);
+                        const availableQty = purchasedQty - alreadyReturnedQty;
+                        const qtyValue = returnQuantities[row.product._id] || '';
+                        const returnAmount = previewReturnAmount(row, Number(qtyValue) || 0);
+                        return (
+                          <div
+                            key={row.key}
+                            className={`purchase-return-panel__row ${availableQty <= 0 ? 'purchase-return-panel__row--done' : ''}`}
+                          >
+                            <div className="purchase-return-panel__row-name">
+                              {row.product?.name || t('purchasesPage.unknownProduct')}
+                              {availableQty <= 0 && (
+                                <span className="purchase-return-panel__badge">{t('purchasesPage.fullyReturned')}</span>
+                              )}
+                            </div>
+                            <div className="purchase-return-panel__row-stats">
+                              <div className="purchase-return-panel__stat">
+                                <span className="purchase-return-panel__stat-label">{t('purchasesPage.purchasedQty')}</span>
+                                <span className="purchase-return-panel__stat-value">{purchasedQty}</span>
+                              </div>
+                              <div className="purchase-return-panel__stat">
+                                <span className="purchase-return-panel__stat-label">{t('purchasesPage.alreadyReturnedQty')}</span>
+                                <span className="purchase-return-panel__stat-value">{alreadyReturnedQty}</span>
+                              </div>
+                              <div className="purchase-return-panel__stat">
+                                <span className="purchase-return-panel__stat-label">{t('purchasesPage.availableToReturn')}</span>
+                                <span className="purchase-return-panel__stat-value">{availableQty}</span>
+                              </div>
+                              <div className="purchase-return-panel__stat">
+                                <span className="purchase-return-panel__stat-label">{t('purchasesPage.returnQty')}</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={availableQty}
+                                  className="purchase-return-panel__qty-input"
+                                  placeholder="0"
+                                  value={qtyValue}
+                                  disabled={availableQty <= 0 || submittingReturn}
+                                  onChange={(e) => handleReturnQtyChange(row.product._id, e.target.value, availableQty)}
+                                />
+                              </div>
+                              <div className="purchase-return-panel__stat">
+                                <span className="purchase-return-panel__stat-label">{t('purchasesPage.returnAmount')}</span>
+                                <span className="purchase-return-panel__stat-value purchase-return-panel__stat-value--danger">
+                                  {returnAmount > 0 ? `-${money(returnAmount)}` : money(0)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="form-group mt-3 mb-0">
+                      <label className="form-label">{t('purchasesPage.returnReason')}</label>
+                      <textarea
+                        className="form-control"
+                        rows={2}
+                        value={returnReason}
+                        onChange={(e) => setReturnReason(e.target.value)}
+                        placeholder={t('purchasesPage.returnReasonPlaceholder')}
+                        disabled={submittingReturn}
+                      />
+                    </div>
+
+                    <div className="purchase-return-panel__footer">
+                      <div className="purchase-return-panel__total">
+                        <span>{t('purchasesPage.totalRefund')}</span>
+                        <span className="purchase-return-panel__total-value">{money(totalReturnPreview)}</span>
+                      </div>
+                      <div className="purchase-return-panel__actions">
+                        <button
+                          type="button"
+                          className="btn-premium btn-premium-secondary"
+                          onClick={toggleReturnPanel}
+                          disabled={submittingReturn}
+                        >
+                          {t('common.cancel')}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-premium btn-premium-primary"
+                          onClick={handleSubmitReturn}
+                          disabled={submittingReturn || !hasValidReturnQty}
+                        >
+                          {submittingReturn ? (
+                            <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</>
+                          ) : (
+                            <><BiUndo /> {t('purchasesPage.submitReturn')}</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="purchase-summary-row">
                 <span className="purchase-summary-row__label">{t('common.total')}</span>
                 <span className="purchase-summary-row__value">{money(effectiveViewing.totalAmount)}</span>
@@ -1226,67 +1440,6 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
         initialName={productDrawer.initialName}
       />
 
-      {/* ─── Process Return Modal (view mode only) ────────────────── */}
-      {returnModalOpen && (
-        <div className="modal-premium" onClick={() => setReturnModalOpen(false)}>
-          <div className="modal-premium-content" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-premium-header">
-              <h5><BiUndo className="me-2" />{t('purchasesPage.processReturn')}</h5>
-              <button className="btn-close-premium" onClick={() => setReturnModalOpen(false)}><BiX /></button>
-            </div>
-            <div className="modal-premium-body">
-              <div className="purchase-return-item-list">
-                {rows.filter((r) => r.product).map((row) => {
-                  const maxReturnable = Number(row.quantity || 0) - Number(row.returnedQty || 0);
-                  return (
-                    <div key={row.key} className="purchase-return-item-row">
-                      <div className="purchase-return-item-row__info">
-                        <span className="purchase-return-item-row__name">{row.product?.name || t('purchasesPage.unknownProduct')}</span>
-                        <span className="purchase-return-item-row__hint">
-                          {t('purchasesPage.returnMaxHint', { max: maxReturnable, unit: row.product?.unit || '' })}
-                        </span>
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        max={maxReturnable}
-                        className="purchase-return-item-row__input"
-                        placeholder="0"
-                        value={returnQuantities[row.product._id] || ''}
-                        disabled={maxReturnable <= 0}
-                        onChange={(e) => handleReturnQtyChange(row.product._id, e.target.value, maxReturnable)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="form-group mt-3 mb-0">
-                <label className="form-label">{t('purchasesPage.returnReason')}</label>
-                <textarea
-                  className="form-control"
-                  rows={2}
-                  value={returnReason}
-                  onChange={(e) => setReturnReason(e.target.value)}
-                  placeholder={t('purchasesPage.returnReasonPlaceholder')}
-                />
-              </div>
-            </div>
-            <div className="modal-premium-footer">
-              <button type="button" className="btn-premium btn-premium-secondary" onClick={() => setReturnModalOpen(false)}>
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                className="btn-premium btn-premium-primary"
-                onClick={handleSubmitReturn}
-                disabled={submittingReturn || !Object.values(returnQuantities).some((v) => Number(v) > 0)}
-              >
-                {submittingReturn ? <><span className="spinner-border spinner-border-sm" /> {t('common.saving')}</> : <><BiUndo /> {t('purchasesPage.submitReturn')}</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
@@ -1923,6 +2076,195 @@ const TableSkeletonRows = () => (
   </>
 );
 
+// ─── Payment method config (icons & colors matching POS / Customer payment) ─
+const supplierPaymentMethodConfig = (t) => [
+  { key: 'cash', icon: '💵', label: t('sale.cash'), color: '#2ecc71' },
+  { key: 'card', icon: '💳', label: t('sale.card'), color: '#6C63FF' },
+  { key: 'upi', icon: '📱', label: t('sale.upi'), color: '#00D9A6' },
+  { key: 'mobile_banking', icon: '🏦', label: t('sale.mobileBanking'), color: '#FF6B9D' },
+];
+
+// ─── Supplier Payment Drawer ────────────────────────────────────────────
+// Mirrors Customers.jsx's "Receive Payment" drawer exactly (same layout,
+// same Exact-amount button, same card-style payment method picker) but pays
+// DOWN a supplier's due via POST /suppliers/:id/payment, which FIFO-
+// allocates the amount across their oldest unpaid purchases server-side.
+const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState('cash');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const dueAmount = supplier?.dueAmount || 0;
+  const methods = supplierPaymentMethodConfig(t);
+
+  useEffect(() => {
+    if (open) {
+      setAmount('');
+      setMethod('cash');
+      setNote('');
+      setError('');
+    }
+  }, [open]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const val = parseFloat(amount);
+    if (!val || val <= 0) { setError(t('suppliersPage.invalidAmount')); return; }
+    if (val > dueAmount) { setError(t('suppliersPage.amountExceedsDue')); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await api.post(`/suppliers/${supplier._id}/payment`, { amount: val, paymentMethod: method, notes: note });
+      showToast.success(t('suppliersPage.paymentSuccess'));
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || t('common.error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+      <div className={`drawer ${open ? 'open' : ''}`}>
+        <div className="drawer-header">
+          <h5 style={{ fontSize: '1rem', margin: 0 }}>{t('suppliersPage.makePayment')}</h5>
+          <button className="btn-close-premium" onClick={onClose}><BiX /></button>
+        </div>
+        <div className="drawer-body" style={{ padding: '1rem' }}>
+          {supplier && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              borderRadius: 'var(--border-radius-md)',
+              background: 'rgba(108,99,255,0.06)',
+              border: '1px solid rgba(108,99,255,0.12)',
+              marginBottom: '1rem',
+            }}>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{supplier.name}</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{supplier.phone}</div>
+              <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t('suppliersPage.currentDue')}:</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)' }}>{money(dueAmount)}</span>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div style={{
+              padding: '0.5rem 0.75rem', borderRadius: 'var(--border-radius-sm)',
+              background: 'var(--glow-danger)', color: 'var(--danger)',
+              fontWeight: 500, marginBottom: '0.6rem', fontSize: '0.78rem',
+            }}>{error}</div>
+          )}
+          <form id="supplier-payment-form" onSubmit={handleSubmit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Payment Amount with Exact button */}
+              <div>
+                <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+                  {t('suppliersPage.paymentAmount')} <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
+                  <input
+                    type="number" step="0.01" className="form-control"
+                    value={amount} onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px', flex: 1 }}
+                  />
+                  {dueAmount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setAmount(String(dueAmount))}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 600,
+                        borderRadius: 'var(--border-radius-md)',
+                        border: '1.5px solid var(--primary)',
+                        background: 'transparent',
+                        color: 'var(--primary)',
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease',
+                        fontFamily: 'var(--font-family)',
+                        minHeight: '40px',
+                      }}
+                      onMouseEnter={(e) => { e.target.style.background = 'rgba(108,99,255,0.08)'; }}
+                      onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
+                    >
+                      <BiCheck style={{ fontSize: '1rem' }} /> {t('posPage.payment.exact')}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Card-style Payment Method selector (matching POS / Customer payment) */}
+              <div>
+                <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.4rem' }}>
+                  {t('sale.paymentMethod')}
+                </label>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                  gap: '0.5rem',
+                }}>
+                  {methods.map((pm) => (
+                    <button
+                      key={pm.key}
+                      type="button"
+                      onClick={() => setMethod(pm.key)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                        padding: '0.6rem 0.4rem',
+                        borderRadius: 'var(--border-radius-md)',
+                        border: `1.5px solid ${method === pm.key ? pm.color : 'var(--border-color)'}`,
+                        background: method === pm.key ? `${pm.color}10` : 'var(--bg-card)',
+                        color: method === pm.key ? pm.color : 'var(--text-secondary)',
+                        cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600,
+                        transition: 'all 0.15s ease',
+                        fontFamily: 'var(--font-family)',
+                        minHeight: '60px',
+                        boxShadow: method === pm.key ? `0 2px 8px ${pm.color}30` : 'none',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{pm.icon}</span>
+                      <span>{pm.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+                  {t('common.notes')} ({t('common.optional')})
+                </label>
+                <textarea
+                  className="form-control"
+                  value={note} onChange={(e) => setNote(e.target.value)}
+                  rows={2}
+                  placeholder={t('suppliersPage.paymentNotePlaceholder')}
+                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', resize: 'vertical' }}
+                />
+              </div>
+            </div>
+          </form>
+        </div>
+        <div className="drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
+          <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}
+            style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
+            {t('common.cancel')}
+          </button>
+          <button type="submit" form="supplier-payment-form" onClick={handleSubmit}
+            className="btn-premium btn-premium-primary" disabled={saving}
+            style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
+            {saving ? <span className="spinner-border spinner-border-sm" /> : <BiCheck />} {t('suppliersPage.pay')}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
+
 // ─── Main Purchases Page ───────────────────────────────────────────────────
 // Fixed page size for the Purchases list — server-side pagination via ?page=&limit=.
 const PURCHASES_PER_PAGE = 10;
@@ -1942,6 +2284,7 @@ const Purchases = () => {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [payingSupplier, setPayingSupplier] = useState(null);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -2011,11 +2354,12 @@ const Purchases = () => {
       }
     } catch (err) {
       console.error(err);
+      throw err;
     }
   };
 
-  const confirmDelete = (purchase) => {
-    Swal.fire({
+  const confirmDelete = async (purchase) => {
+    const result = await Swal.fire({
       title: t('purchasesPage.deletePurchaseTitle'),
       text: t('purchasesPage.deletePurchaseConfirm', { no: purchase.purchaseNo }),
       icon: 'warning',
@@ -2027,20 +2371,22 @@ const Purchases = () => {
       background: 'var(--bg-card)',
       color: 'var(--text-primary)',
       reverseButtons: true,
-    }).then((result) => {
-      if (result.isConfirmed) {
-        handleDelete(purchase._id);
-        Swal.fire({
-          title: t('purchasesPage.deletedTitle'),
-          text: t('purchasesPage.purchaseDeletedText'),
-          icon: 'success',
-          timer: 1500,
-          showConfirmButton: false,
-          background: 'var(--bg-card)',
-          color: 'var(--text-primary)',
-        });
-      }
     });
+    if (!result.isConfirmed) return;
+    try {
+      await handleDelete(purchase._id);
+      Swal.fire({
+        title: t('purchasesPage.deletedTitle'),
+        text: t('purchasesPage.purchaseDeletedText'),
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false,
+        background: 'var(--bg-card)',
+        color: 'var(--text-primary)',
+      });
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('purchasesPage.deleteFailed'));
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -2090,7 +2436,7 @@ const Purchases = () => {
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
       <div className={`table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`}>
         <div className="table-responsive">
-          <table className="table-custom mb-0">
+          <table className="table-custom purchases-list-table mb-0">
             <thead>
               <tr>
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
@@ -2143,6 +2489,11 @@ const Purchases = () => {
                       <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(purchase)}>
                         <BiShow />
                       </button>
+                      {purchase.supplier?.dueAmount > 0 && (
+                        <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase.supplier)}>
+                          <BiCreditCard />
+                        </button>
+                      )}
                       <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(purchase)}>
                         <BiTrash />
                       </button>
@@ -2275,6 +2626,11 @@ const Purchases = () => {
                 <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(purchase)}>
                   <BiShow />
                 </button>
+                {purchase.supplier?.dueAmount > 0 && (
+                  <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase.supplier)}>
+                    <BiCreditCard />
+                  </button>
+                )}
                 <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => confirmDelete(purchase)}>
                   <BiTrash />
                 </button>
@@ -2306,6 +2662,15 @@ const Purchases = () => {
       <BulkImportDrawer
         open={bulkImportOpen}
         onClose={() => setBulkImportOpen(false)}
+        onSuccess={fetchPurchases}
+        t={t}
+      />
+
+      {/* Supplier Payment Drawer */}
+      <SupplierPaymentDrawer
+        open={!!payingSupplier}
+        supplier={payingSupplier}
+        onClose={() => setPayingSupplier(null)}
         onSuccess={fetchPurchases}
         t={t}
       />

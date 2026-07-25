@@ -20,20 +20,23 @@ const statusMeta = {
   unpaid: { bg: 'rgba(255, 107, 107, 0.12)', color: '#FF6B6B', label: 'Unpaid' },
 };
 
-// GST type isn't a stored enum on Purchase — derived purely for display from
-// whichever tax amounts are actually present (no calculation, just a label).
-const gstTypeLabel = (data, t) => {
-  if ((data.cgst || 0) > 0 || (data.sgst || 0) > 0) return t('suppliersPage.gstTypeIntra');
-  if ((data.igst || 0) > 0) return t('suppliersPage.gstTypeInter');
-  return t('suppliersPage.gstTypeNone');
+// GST type follows the project's Indian GST (West Bengal) rules: same state
+// as the company ⇒ CGST + SGST (intra-state), different state ⇒ IGST
+// (inter-state). This mirrors backend/utils/gstCalculation.js#splitGst and
+// the Add Purchase drawer (Purchases.jsx) — never a generic "Tax" field.
+const resolveGstType = (companyState, supplierState) => {
+  const a = (companyState || '').toLowerCase().trim();
+  const b = (supplierState || '').toLowerCase().trim();
+  if (!b) return 'none';
+  return a && a === b ? 'intra' : 'inter';
 };
 
-// ─── Expandable Purchase Details (Sections 1–5) ──────────────────
+// ─── Expandable Purchase Details (Sections 2–3, 5) ──────────────────
 // Renders from the full purchase doc (GET /purchases/:id) — every figure
 // here is either a direct field or a simple derived display value, exactly
 // mirroring the same math already used in the Add Purchase drawer. No
 // backend calculation is touched.
-const PurchaseExpandDetails = ({ data, loading, t, previousDueUsed, runningBalance }) => {
+const PurchaseExpandDetails = ({ data, loading, t, shopSettings }) => {
   if (loading) {
     return (
       <div className="ledger-expand-loading">
@@ -43,46 +46,33 @@ const PurchaseExpandDetails = ({ data, loading, t, previousDueUsed, runningBalan
   }
   if (!data) return null;
 
-  const st = statusMeta[data.paymentStatus] || statusMeta.unpaid;
+  // Company state comes from Settings → Tax & GST (never hardcoded); supplier
+  // state comes from the populated purchase document.
+  const companyState = shopSettings?.businessState || 'West Bengal';
+  const supplierState = data.supplier?.state || '';
+  const gstType = resolveGstType(companyState, supplierState);
+
+  // Rates for the column headers come from Settings → Tax & GST, same
+  // fallback chain as the Add Purchase drawer (Purchases.jsx) — never hardcoded.
+  const defaultGstRate = shopSettings?.defaultGstRate ?? 18;
+  const cgstRate = shopSettings?.cgstRate ?? (defaultGstRate / 2);
+  const sgstRate = shopSettings?.sgstRate ?? (defaultGstRate / 2);
+  const igstRate = shopSettings?.igstRate ?? defaultGstRate;
 
   return (
     <div className="ledger-expand-panel">
-      {/* Section 1 — Purchase Information */}
+      {/* Section 3 — Payment Summary (kept short: just paid & due) */}
       <div className="ledger-expand-section">
-        <div className="ledger-expand-section__title">{t('suppliersPage.purchaseInfo')}</div>
-        <div className="ledger-expand-info-grid">
-          <div className="ledger-expand-info-item">
-            <span className="ledger-expand-info-item__label">{t('purchasesPage.supplierInvoiceNo')}</span>
-            <span className="ledger-expand-info-item__value">{data.supplierInvoiceNo || '-'}</span>
+        <div className="ledger-expand-section__title">{t('purchasesPage.paymentSummary')}</div>
+        <div className="ledger-mini-card-grid">
+          <div className="ledger-mini-card ledger-mini-card--success">
+            <span className="ledger-mini-card__label">{t('sale.paidAmount')}</span>
+            <span className="ledger-mini-card__value">{formatCurrency(data.paidAmount)}</span>
           </div>
-          <div className="ledger-expand-info-item">
-            <span className="ledger-expand-info-item__label">{t('purchasesPage.purchaseDate')}</span>
-            <span className="ledger-expand-info-item__value">{formatDate(data.purchaseDate)}</span>
+          <div className="ledger-mini-card ledger-mini-card--danger">
+            <span className="ledger-mini-card__label">{t('purchasesPage.dueAmount')}</span>
+            <span className="ledger-mini-card__value">{formatCurrency(data.dueAmount)}</span>
           </div>
-          <div className="ledger-expand-info-item">
-            <span className="ledger-expand-info-item__label">{t('purchase.supplier')}</span>
-            <span className="ledger-expand-info-item__value">{data.supplier?.name || '-'}</span>
-          </div>
-          <div className="ledger-expand-info-item">
-            <span className="ledger-expand-info-item__label">{t('suppliersPage.gstType')}</span>
-            <span className="ledger-expand-info-item__value">{gstTypeLabel(data, t)}</span>
-          </div>
-          <div className="ledger-expand-info-item">
-            <span className="ledger-expand-info-item__label">{t('common.status')}</span>
-            <span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>{st.label}</span>
-          </div>
-          {previousDueUsed > 0 && (
-            <div className="ledger-expand-info-item">
-              <span className="ledger-expand-info-item__label">{t('suppliersPage.previousDueUsed')}</span>
-              <span className="ledger-expand-info-item__value">{formatCurrency(previousDueUsed)}</span>
-            </div>
-          )}
-          {runningBalance !== undefined && (
-            <div className="ledger-expand-info-item">
-              <span className="ledger-expand-info-item__label">{t('suppliersPage.runningBalance')}</span>
-              <span className="ledger-expand-info-item__value">{formatCurrency(runningBalance)}</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -99,7 +89,15 @@ const PurchaseExpandDetails = ({ data, loading, t, previousDueUsed, runningBalan
                 <th>{t('product.unit')}</th>
                 <th>{t('product.purchasePrice')}</th>
                 <th>{t('sale.discount')}</th>
-                <th>{t('sale.tax')}</th>
+                {gstType === 'intra' && (
+                  <>
+                    <th>{t('purchasesPage.cgstLabel', { rate: cgstRate })}</th>
+                    <th>{t('purchasesPage.sgstLabel', { rate: sgstRate })}</th>
+                  </>
+                )}
+                {gstType === 'inter' && (
+                  <th>{t('purchasesPage.igstLabel', { rate: igstRate })}</th>
+                )}
                 <th>{t('purchasesPage.lineTotal')}</th>
               </tr>
             </thead>
@@ -112,60 +110,20 @@ const PurchaseExpandDetails = ({ data, loading, t, previousDueUsed, runningBalan
                   <td>{item.unit}</td>
                   <td>{formatCurrency(item.purchasePrice)}</td>
                   <td>{item.discount ? `${item.discount}%` : '-'}</td>
-                  <td>{formatCurrency(item.gstAmount)}</td>
+                  {gstType === 'intra' && (
+                    <>
+                      <td>{formatCurrency(item.cgst)}</td>
+                      <td>{formatCurrency(item.sgst)}</td>
+                    </>
+                  )}
+                  {gstType === 'inter' && (
+                    <td>{formatCurrency(item.igst)}</td>
+                  )}
                   <td style={{ fontWeight: 700 }}>{formatCurrency(item.total)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Section 3 — Payment Summary (kept short: just paid & due) */}
-      <div className="ledger-expand-section">
-        <div className="ledger-expand-section__title">{t('purchasesPage.paymentSummary')}</div>
-        <div className="ledger-mini-card-grid">
-          <div className="ledger-mini-card ledger-mini-card--success">
-            <span className="ledger-mini-card__label">{t('sale.paidAmount')}</span>
-            <span className="ledger-mini-card__value">{formatCurrency(data.paidAmount)}</span>
-          </div>
-          <div className="ledger-mini-card ledger-mini-card--danger">
-            <span className="ledger-mini-card__label">{t('purchasesPage.dueAmount')}</span>
-            <span className="ledger-mini-card__value">{formatCurrency(data.dueAmount)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 4 — GST Summary */}
-      <div className="ledger-expand-section">
-        <div className="ledger-expand-section__title">{t('suppliersPage.gstSummary')}</div>
-        <div className="ledger-mini-card-grid">
-          <div className="ledger-mini-card ledger-mini-card--info">
-            <span className="ledger-mini-card__label">{t('purchasesPage.taxableAmount')}</span>
-            <span className="ledger-mini-card__value">{formatCurrency(data.taxableAmount)}</span>
-          </div>
-          {(data.cgst > 0 || data.sgst > 0) && (
-            <>
-              <div className="ledger-mini-card ledger-mini-card--primary">
-                <span className="ledger-mini-card__label">CGST</span>
-                <span className="ledger-mini-card__value">{formatCurrency(data.cgst)}</span>
-              </div>
-              <div className="ledger-mini-card ledger-mini-card--primary">
-                <span className="ledger-mini-card__label">SGST</span>
-                <span className="ledger-mini-card__value">{formatCurrency(data.sgst)}</span>
-              </div>
-            </>
-          )}
-          {data.igst > 0 && (
-            <div className="ledger-mini-card ledger-mini-card--primary">
-              <span className="ledger-mini-card__label">IGST</span>
-              <span className="ledger-mini-card__value">{formatCurrency(data.igst)}</span>
-            </div>
-          )}
-          <div className="ledger-mini-card ledger-mini-card--success">
-            <span className="ledger-mini-card__label">{t('purchasesPage.grandTotal')}</span>
-            <span className="ledger-mini-card__value">{formatCurrency(data.totalAmount)}</span>
-          </div>
         </div>
       </div>
 
@@ -365,6 +323,7 @@ const SupplierLedgerPage = () => {
   const [supplier, setSupplier] = useState(null);
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerSummary, setLedgerSummary] = useState(null);
+  const [shopSettings, setShopSettings] = useState(null);
   const isFirstLoad = useRef(true);
 
   // Accordion state for the "View" details row — only one purchase expanded
@@ -380,7 +339,10 @@ const SupplierLedgerPage = () => {
       return;
     }
     setExpandedPurchaseId(purchaseId);
-    if (expandedPurchaseCache[purchaseId]) return;
+    // Always refetch on expand rather than serving a same-session cache —
+    // purchase figures (GST, payments) can change after the row was first
+    // viewed, and a stale in-memory copy would keep showing outdated data
+    // until a full page reload.
     setLoadingExpandedId(purchaseId);
     try {
       const { data } = await api.get(`/purchases/${purchaseId}`, { _skipLoading: true });
@@ -400,15 +362,18 @@ const SupplierLedgerPage = () => {
       setRefreshing(true);
     }
     try {
-      const [supplierRes, ledgerRes] = await Promise.all([
+      const [supplierRes, ledgerRes, shopRes] = await Promise.all([
         api.get(`/suppliers/${supplierId}`, { _skipLoading: true }),
         api.get(`/suppliers/${supplierId}/ledger`, { _skipLoading: true }),
+        api.get('/shops/my', { _skipLoading: true }),
       ]);
       setSupplier(supplierRes.data);
       // Ledger endpoint returns entries oldest-first (for correct running-balance
       // math) — reverse for the newest-first display this page already used.
       setLedgerEntries([...(ledgerRes.data.entries || [])].reverse());
       setLedgerSummary(ledgerRes.data.summary || null);
+      const shop = shopRes.data.shop || shopRes.data;
+      setShopSettings(shop.settings || {});
     } catch (err) {
       console.error(err);
     } finally {
@@ -593,17 +558,16 @@ const SupplierLedgerPage = () => {
                         </button>
                       </div>
                     </div>
-                    {isExpanded && (
-                      <div className="ledger-expand-wrap">
+                    <div className={`ledger-expand-wrap ${isExpanded ? 'is-expanded' : ''}`}>
+                      <div className="ledger-expand-wrap__inner">
                         <PurchaseExpandDetails
                           data={expandedPurchaseCache[e.purchaseId]}
                           loading={loadingExpandedId === e.purchaseId}
                           t={t}
-                          previousDueUsed={e.previousDueUsed}
-                          runningBalance={e.runningBalance}
+                          shopSettings={shopSettings}
                         />
                       </div>
-                    )}
+                    </div>
                   </React.Fragment>
                 );
               })
@@ -685,15 +649,16 @@ const SupplierLedgerPage = () => {
                         >
                           {isExpanded ? <><BiChevronUp /> {t('common.close')}</> : <><BiShow /> {t('common.view')}</>}
                         </button>
-                        {isExpanded && (
-                          <PurchaseExpandDetails
-                            data={expandedPurchaseCache[e.purchaseId]}
-                            loading={loadingExpandedId === e.purchaseId}
-                            t={t}
-                            previousDueUsed={e.previousDueUsed}
-                            runningBalance={e.runningBalance}
-                          />
-                        )}
+                        <div className={`ledger-expand-wrap ${isExpanded ? 'is-expanded' : ''}`}>
+                          <div className="ledger-expand-wrap__inner">
+                            <PurchaseExpandDetails
+                              data={expandedPurchaseCache[e.purchaseId]}
+                              loading={loadingExpandedId === e.purchaseId}
+                              t={t}
+                              shopSettings={shopSettings}
+                            />
+                          </div>
+                        </div>
                       </div>
                     }
                   />

@@ -202,19 +202,38 @@ const getSupplierDueReport = async (req, res) => {
   }
 };
 
+// GST type reflects what was actually charged on each transaction — its own
+// stored cgst/sgst/igst (set by splitGst at creation time), not a
+// retroactive recompute against today's Settings. A GST report has to
+// reflect what each historical invoice actually says.
+const gstTypeMatch = (gstType) => {
+  if (gstType === 'intra') return { $or: [{ cgst: { $gt: 0 } }, { sgst: { $gt: 0 } }] };
+  if (gstType === 'inter') return { igst: { $gt: 0 } };
+  return {};
+};
+
+// @desc    GST summary (sales + purchase totals, output/input/net, monthly
+//          breakdown) for the GST Reports page. Transaction-level detail is
+//          served separately (paginated) by getGstReportDetails below.
+// @route   GET /api/reports/gst
 const getGstReport = async (req, res) => {
   try {
     const shopId = req.user.shop;
-    const { startDate, endDate, type, gstRate, state, customer, supplier } = req.query;
+    const { startDate, endDate, gstType, gstRate, state, customer, supplier } = req.query;
 
-    let dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter = { $gte: new Date(startDate), $lte: new Date(endDate) };
-    }
+    // Default to the last 30 days when no range is given, matching
+    // getReportsAnalytics — previously this endpoint silently returned
+    // all-time data with no date filter at all.
+    const end = endDate ? new Date(endDate) : new Date();
+    if (!endDate) end.setHours(23, 59, 59, 999);
+    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
+    if (!startDate) start.setHours(0, 0, 0, 0);
+    const dateFilter = { $gte: start, $lte: end };
+
+    const typeFilter = gstTypeMatch(gstType);
 
     // ─── Sales GST ────────────────────────────────────────────────
-    const salesMatch = { shop: shopId };
-    if (startDate && endDate) salesMatch.saleDate = dateFilter;
+    const salesMatch = { shop: shopId, saleDate: dateFilter, ...typeFilter };
     if (gstRate) salesMatch.gstRate = Number(gstRate);
     if (customer) salesMatch.customer = customer;
 
@@ -244,42 +263,8 @@ const getGstReport = async (req, res) => {
       },
     ]);
 
-    const salesGstDetail = await Sale.aggregate([
-      { $match: salesMatch },
-      {
-        $lookup: {
-          from: 'customers',
-          localField: 'customer',
-          foreignField: '_id',
-          as: 'customerData',
-        },
-      },
-      { $unwind: { path: '$customerData', preserveNullAndEmptyArrays: true } },
-      { $match: state ? { 'customerData.state': state } : {} },
-      { $sort: { saleDate: -1 } },
-      { $limit: 500 },
-      {
-        $project: {
-          _id: 1,
-          invoiceNo: 1,
-          saleDate: 1,
-          customerName: { $ifNull: ['$customerData.name', 'Walk-in'] },
-          customerState: { $ifNull: ['$customerData.state', ''] },
-          taxableAmount: 1,
-          gstRate: 1,
-          cgst: 1,
-          sgst: 1,
-          igst: 1,
-          gstAmount: 1,
-          totalAmount: 1,
-          paymentStatus: 1,
-        },
-      },
-    ]);
-
     // ─── Purchase GST ──────────────────────────────────────────────
-    const purchaseMatch = { shop: shopId };
-    if (startDate && endDate) purchaseMatch.purchaseDate = dateFilter;
+    const purchaseMatch = { shop: shopId, purchaseDate: dateFilter, ...typeFilter };
     if (gstRate) purchaseMatch.gstRate = Number(gstRate);
     if (supplier) purchaseMatch.supplier = supplier;
 
@@ -305,38 +290,6 @@ const getGstReport = async (req, res) => {
           totalGst: { $sum: '$gstAmount' },
           totalPurchases: { $sum: '$totalAmount' },
           count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const purchaseGstDetail = await Purchase.aggregate([
-      { $match: purchaseMatch },
-      {
-        $lookup: {
-          from: 'suppliers',
-          localField: 'supplier',
-          foreignField: '_id',
-          as: 'supplierData',
-        },
-      },
-      { $unwind: { path: '$supplierData', preserveNullAndEmptyArrays: true } },
-      { $match: state ? { 'supplierData.state': state } : {} },
-      { $sort: { purchaseDate: -1 } },
-      { $limit: 500 },
-      {
-        $project: {
-          _id: 1,
-          purchaseNo: 1,
-          purchaseDate: 1,
-          supplierName: { $ifNull: ['$supplierData.name', ''] },
-          supplierState: { $ifNull: ['$supplierData.state', ''] },
-          taxableAmount: 1,
-          gstRate: 1,
-          cgst: 1,
-          sgst: 1,
-          igst: 1,
-          gstAmount: 1,
-          totalAmount: 1,
         },
       },
     ]);
@@ -388,14 +341,9 @@ const getGstReport = async (req, res) => {
     ]);
 
     res.json({
-      sales: {
-        summary: salesSummary,
-        details: salesGstDetail,
-      },
-      purchases: {
-        summary: purchaseSummary,
-        details: purchaseGstDetail,
-      },
+      range: { startDate: start.toISOString(), endDate: end.toISOString() },
+      sales: { summary: salesSummary },
+      purchases: { summary: purchaseSummary },
       summary,
       monthly: {
         sales: monthlySalesGst,
@@ -407,4 +355,109 @@ const getGstReport = async (req, res) => {
   }
 };
 
-module.exports = { getReportsAnalytics, getStockReport, getCustomerDueReport, getSupplierDueReport, getGstReport };
+// @desc    Paginated, searchable transaction-level GST detail table for
+//          the GST Reports page — served separately from getGstReport so
+//          switching pages/searching doesn't re-run the (heavier) summary
+//          aggregation, and so the response includes a real total count
+//          instead of a raw capped dump.
+// @route   GET /api/reports/gst/details
+const getGstReportDetails = async (req, res) => {
+  try {
+    const shopId = req.user.shop;
+    const { reportType, startDate, endDate, gstType, search, page, limit } = req.query;
+
+    if (reportType !== 'sales' && reportType !== 'purchases') {
+      return res.status(400).json({ message: 'reportType must be "sales" or "purchases"' });
+    }
+
+    const end = endDate ? new Date(endDate) : new Date();
+    if (!endDate) end.setHours(23, 59, 59, 999);
+    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
+    if (!startDate) start.setHours(0, 0, 0, 0);
+    const dateFilter = { $gte: start, $lte: end };
+
+    const typeFilter = gstTypeMatch(gstType);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = Math.min(5000, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * pageSize;
+    const searchRegex = search ? new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+
+    const isSales = reportType === 'sales';
+    const Model = isSales ? Sale : Purchase;
+    const dateField = isSales ? 'saleDate' : 'purchaseDate';
+    const joinCollection = isSales ? 'customers' : 'suppliers';
+    const joinField = isSales ? 'customer' : 'supplier';
+    const joinAlias = isSales ? 'partyData' : 'partyData';
+    const noField = isSales ? 'invoiceNo' : 'purchaseNo';
+
+    const match = { shop: shopId, [dateField]: dateFilter, ...typeFilter };
+
+    const pipeline = [
+      { $match: match },
+      {
+        $lookup: {
+          from: joinCollection,
+          localField: joinField,
+          foreignField: '_id',
+          as: joinAlias,
+        },
+      },
+      { $unwind: { path: `$${joinAlias}`, preserveNullAndEmptyArrays: true } },
+    ];
+
+    if (searchRegex) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { [noField]: searchRegex },
+            { [`${joinAlias}.name`]: searchRegex },
+          ],
+        },
+      });
+    }
+
+    pipeline.push(
+      { $sort: { [dateField]: -1 } },
+      {
+        $facet: {
+          rows: [
+            { $skip: skip },
+            { $limit: pageSize },
+            {
+              $project: {
+                _id: 1,
+                no: `$${noField}`,
+                date: `$${dateField}`,
+                partyName: { $ifNull: [`$${joinAlias}.name`, isSales ? 'Walk-in' : ''] },
+                partyState: { $ifNull: [`$${joinAlias}.state`, ''] },
+                gstRate: 1,
+                taxableAmount: 1,
+                cgst: 1,
+                sgst: 1,
+                igst: 1,
+                gstAmount: 1,
+                totalAmount: 1,
+              },
+            },
+          ],
+          totalCount: [{ $count: 'count' }],
+        },
+      }
+    );
+
+    const [result] = await Model.aggregate(pipeline);
+    const rows = result?.rows || [];
+    const totalCount = result?.totalCount?.[0]?.count || 0;
+
+    res.json({
+      rows,
+      totalCount,
+      page: pageNum,
+      pages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getReportsAnalytics, getStockReport, getCustomerDueReport, getSupplierDueReport, getGstReport, getGstReportDetails };

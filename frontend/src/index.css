@@ -836,6 +836,18 @@ body {
   transform: translateY(-1px);
 }
 
+.btn-action-payment {
+  background: rgba(46, 204, 113, 0.12);
+  color: #2ecc71;
+}
+
+.btn-action-payment:hover {
+  background: #2ecc71;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+  transform: translateY(-1px);
+}
+
 .btn-action-toggle {
   background: rgba(0, 217, 166, 0.12);
   color: #00D9A6;
@@ -891,6 +903,16 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
+}
+
+/* Purchases list page only — bumped up from the shared .table-custom
+   default, which reads too small for this table's numeric columns. */
+.purchases-list-table {
+  font-size: 0.8rem;
+}
+
+.purchases-list-table thead th {
+  font-size: 0.7rem;
 }
 
 .table-custom thead th {
@@ -1213,7 +1235,9 @@ select:-webkit-autofill {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1060;
+  /* Above .drawer-overlay (1080) / .drawer (1090) — a modal opened while a
+     drawer is open (e.g. delete-confirm) must never render behind it. */
+  z-index: 1150;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1230,6 +1254,15 @@ select:-webkit-autofill {
   max-height: 90vh;
   overflow-y: auto;
   animation: modalFadeIn 0.2s ease;
+}
+
+/* SweetAlert2 (confirm dialogs via Swal.fire, and the showToast utility in
+   utils/toast.js) has no z-index override anywhere else in this codebase, so
+   it falls back to the library default of 1060 — below .drawer (1090) and
+   every other overlay tier in the app. Every confirm/alert/toast must always
+   render above any drawer or modal, so this is pinned above all of them. */
+.swal2-container {
+  z-index: 10000 !important;
 }
 
 @keyframes modalFadeIn {
@@ -8757,6 +8790,119 @@ select:-webkit-autofill {
   font-size: 0.75rem;
 }
 
+/* ─── Invoice Image Section (View Drawer) ────────────────────────── */
+.purchase-invoice-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+}
+
+.purchase-invoice-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.purchase-invoice-gallery__thumb {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--bg-card);
+}
+
+.purchase-invoice-gallery__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.purchase-invoice-gallery__zoom-hint {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.95rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.purchase-invoice-gallery__thumb:hover .purchase-invoice-gallery__zoom-hint,
+.purchase-invoice-gallery__thumb:focus-visible .purchase-invoice-gallery__zoom-hint {
+  opacity: 1;
+}
+
+.purchase-invoice-section__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.purchase-invoice-section__actions .btn-premium {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+.purchase-invoice-section__empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.purchase-invoice-section__empty .btn-premium {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+/* Full-screen zoom preview for an invoice image, above everything else in
+   the app (drawers, modals, SweetAlert2) — see the global z-index tiers
+   further down for why 10000 is the safe "always on top" value. */
+.purchase-invoice-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  padding: 2rem;
+  cursor: zoom-out;
+}
+
+.purchase-invoice-zoom-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-xl);
+  cursor: default;
+}
+
+.purchase-invoice-zoom-overlay__close {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 1;
+}
+
 /* Compact header form fields inside the purchase drawer */
 .purchase-header-grid .form-label {
   font-size: 0.8rem;
@@ -9181,8 +9327,34 @@ select:-webkit-autofill {
   font-weight: 600;
 }
 
-/* ─── Process Return Modal ───────────────────────────────────────── */
-.purchase-return-item-list {
+/* ─── Inline Return Panel (Purchase Details drawer) ─────────────────
+   Same grid-template-rows 0fr→1fr smooth-expand technique used for the
+   Supplier Ledger's collapsible purchase details — no JS height
+   measurement needed, transitions to the panel's natural content height. */
+.purchase-return-panel-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.purchase-return-panel-wrap.is-expanded {
+  grid-template-rows: 1fr;
+}
+
+.purchase-return-panel-wrap__inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.purchase-return-panel {
+  margin: 0.75rem 0;
+  padding: 0.85rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+}
+
+.purchase-return-panel__rows {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -9190,48 +9362,118 @@ select:-webkit-autofill {
   overflow-y: auto;
 }
 
-.purchase-return-item-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.5rem 0.6rem;
+.purchase-return-panel__row {
+  padding: 0.6rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
+  background: var(--bg-card);
 }
 
-.purchase-return-item-row__info {
+.purchase-return-panel__row--done {
+  opacity: 0.65;
+}
+
+.purchase-return-panel__row-name {
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.purchase-return-item-row__name {
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
+  margin-bottom: 0.5rem;
 }
 
-.purchase-return-item-row__hint {
-  font-size: 0.72rem;
+.purchase-return-panel__badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--border-radius-sm);
+}
+
+.purchase-return-panel__row-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.6rem;
+}
+
+.purchase-return-panel__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.purchase-return-panel__stat-label {
+  font-size: 0.68rem;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
-.purchase-return-item-row__input {
-  width: 70px;
-  height: 34px;
+.purchase-return-panel__stat-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.purchase-return-panel__stat-value--danger {
+  color: var(--danger);
+}
+
+.purchase-return-panel__qty-input {
+  width: 100%;
+  height: 32px;
   padding: 0 8px;
   text-align: center;
   border: 1.5px solid var(--border-color);
   border-radius: var(--border-radius-sm);
   background: var(--bg-input);
   color: var(--text-primary);
-  flex-shrink: 0;
 }
 
-.purchase-return-item-row__input:disabled {
+.purchase-return-panel__qty-input:disabled {
   opacity: 0.4;
+}
+
+.purchase-return-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.purchase-return-panel__total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.purchase-return-panel__total-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--danger);
+  font-family: var(--font-mono);
+}
+
+.purchase-return-panel__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 575.98px) {
+  .purchase-return-panel__row-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 /* ─── Ledger FIFO chip (Supplier Ledger) ────────────────────────── */
@@ -14968,10 +15210,25 @@ select:-webkit-autofill {
 }
 
 .ledger-expand-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ledger-expand-wrap.is-expanded {
+  grid-template-rows: 1fr;
+}
+
+.ledger-expand-wrap__inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.ledger-expand-wrap.is-expanded .ledger-expand-wrap__inner {
   border-bottom: 1px solid var(--border-light);
 }
 
-.ledger-expand-wrap:last-child {
+.ledger-expand-wrap:last-child .ledger-expand-wrap__inner {
   border-bottom: none;
 }
 
@@ -14993,12 +15250,12 @@ select:-webkit-autofill {
   background: var(--bg-input);
   border-top: 1px solid var(--border-color);
   border-bottom: 2px solid var(--primary);
-  animation: ledgerExpandIn 0.22s ease-out;
+  opacity: 0;
+  transition: opacity 0.25s ease 0.1s;
 }
 
-@keyframes ledgerExpandIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+.ledger-expand-wrap.is-expanded .ledger-expand-panel {
+  opacity: 1;
 }
 
 .ledger-expand-section {
@@ -15166,4 +15423,200 @@ select:-webkit-autofill {
   .ledger-mini-card-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GST Reports Page
+   Reuses .sales-date-segmented/.sales-date-pill/.sales-filter*
+   (filters), .stat-card-modern (dashboard cards), .sales-table/
+   .table-container/.desktop-table/.mobile-cards/.expandable-card*
+   (table + mobile), .sales-empty-state (empty state) wholesale —
+   only the Output/Input/Net GST summary and a couple of report-
+   specific badges are genuinely new here.
+   ═══════════════════════════════════════════════════════════════ */
+
+.gst-report-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.gst-report-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--border-radius-md);
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.gst-report-tab:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.gst-company-info-bar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: var(--border-radius-md);
+  border: 1px dashed var(--border-color);
+  background: var(--bg-input);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.gst-company-info-bar__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gst-company-info-bar__item strong {
+  color: var(--text-primary);
+}
+
+.gst-report-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.gst-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gst-type-badge--intra {
+  background: rgba(42, 120, 214, 0.12);
+  color: var(--primary);
+}
+
+.gst-type-badge--inter {
+  background: rgba(124, 92, 214, 0.12);
+  color: #7c5cd6;
+}
+
+.gst-type-badge--none {
+  background: var(--bg-input);
+  color: var(--text-muted);
+}
+
+/* ─── Output / Input / Net GST Summary ──────────────────────────── */
+.gst-summary-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.gst-summary-group {
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.gst-summary-group::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--gst-accent, var(--primary));
+}
+
+.gst-summary-group--output { --gst-accent: var(--secondary); }
+.gst-summary-group--input { --gst-accent: var(--warning); }
+.gst-summary-group--net-payable { --gst-accent: var(--danger); }
+.gst-summary-group--net-credit { --gst-accent: var(--secondary); }
+
+.gst-summary-group__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.85rem;
+}
+
+.gst-summary-group__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  font-size: 0.85rem;
+}
+
+.gst-summary-group__row + .gst-summary-group__row {
+  border-top: 1px dashed var(--border-light);
+}
+
+.gst-summary-group__row-label {
+  color: var(--text-muted);
+}
+
+.gst-summary-group__row-value {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.gst-summary-group__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.gst-summary-group__total-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--gst-accent, var(--primary));
+}
+
+.gst-net-formula {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: -0.5rem 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+  .gst-summary-section {
+    grid-template-columns: 1fr;
+  }
+  .gst-net-formula {
+    display: none;
+  }
+}
+
+/* ─── Report Table money-column alignment ───────────────────────── */
+.gst-report-table td.gst-cell-amount,
+.gst-report-table th.gst-cell-amount {
+  text-align: right;
+  font-family: var(--font-mono);
 }

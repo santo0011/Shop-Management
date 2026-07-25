@@ -28,6 +28,7 @@ import Sales from './pages/admin/Sales';
 import CustomerLedgerPage from './pages/admin/CustomerLedgerPage';
 import POS from './pages/admin/POS';
 import Reports from './pages/admin/Reports';
+import GstReport from './pages/admin/GstReport';
 import Subscription from './pages/admin/Subscription';
 import Settings from './pages/admin/Settings';
 
@@ -190,6 +191,7 @@ function App() {
           <Route path="purchases" element={<Purchases />} />
           <Route path="sales" element={<Sales />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="gst-report" element={<GstReport />} />
           <Route path="subscription" element={<Subscription />} />
           <Route path="settings" element={<Settings />} />
         </Route>

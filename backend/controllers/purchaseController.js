@@ -31,7 +31,7 @@ const getPurchases = async (req, res) => {
     }
 
     const purchases = await Purchase.find(query)
-      .populate('supplier', 'name phone state')
+      .populate('supplier', 'name phone state dueAmount')
       .populate('items.product', 'name nameBn')
       .sort({ purchaseDate: -1 })
       .skip(skip)
@@ -142,11 +142,17 @@ const createPurchase = async (req, res) => {
     const supplierData = await Supplier.findById(supplier);
     const supplierState = supplierData?.state || '';
 
+    // The Add Purchase drawer applies GST once at invoice level (from
+    // Settings) and never sends a per-item gstRate/tax — so that must be
+    // the fallback here, not 0, or every purchase is stored with zero GST.
+    const gstEnabled = shop?.settings?.gstEnabled !== false;
+    const defaultGstRate = gstEnabled ? (shop?.settings?.defaultGstRate ?? 18) : 0;
+
     const purchaseNo = await generatePurchaseNo(req.user.shop);
 
     // Calculate GST for each line item and the invoice
     const calculatedItems = (items || []).map(item => {
-      const gstRate = Number(item.gstRate) || Number(item.tax) || 0;
+      const gstRate = Number(item.gstRate) || Number(item.tax) || defaultGstRate;
       const lineGst = calculateItemTotals(
         item.quantity,
         item.purchasePrice,
@@ -312,7 +318,10 @@ const processPurchaseReturn = async (req, res) => {
       return res.status(400).json({ message: 'At least one item is required for return' });
     }
 
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
     let totalReturnValue = 0;
+    let sumTaxable = 0, sumCgst = 0, sumSgst = 0, sumIgst = 0, sumGst = 0;
     const returnItems = [];
 
     for (const ret of items) {
@@ -324,21 +333,49 @@ const processPurchaseReturn = async (req, res) => {
       const alreadyReturned = purchaseItem.returnedQty || 0;
       const maxReturnable = purchaseItem.quantity - alreadyReturned;
 
-      if (!ret.quantity || ret.quantity <= 0 || ret.quantity > maxReturnable) {
+      if (!Number.isFinite(ret.quantity) || ret.quantity <= 0 || ret.quantity > maxReturnable) {
         return res.status(400).json({
           message: `Cannot return ${ret.quantity} of "${ret.productName || ret.productId}". Max returnable: ${maxReturnable}`,
         });
       }
 
+      // Prorate from what's still remaining on this line (already net of any
+      // earlier partial returns), so sequential returns stay accurate and the
+      // refund reflects the item's actual discount+GST-inclusive value —
+      // not just its raw purchasePrice. This is exactly the per-unit value
+      // calculateItemTotals (utils/gstCalculation.js) produced at creation.
+      const unitTaxable = maxReturnable > 0 ? (purchaseItem.taxableAmount || 0) / maxReturnable : 0;
+      const unitCgst = maxReturnable > 0 ? (purchaseItem.cgst || 0) / maxReturnable : 0;
+      const unitSgst = maxReturnable > 0 ? (purchaseItem.sgst || 0) / maxReturnable : 0;
+      const unitIgst = maxReturnable > 0 ? (purchaseItem.igst || 0) / maxReturnable : 0;
+      const unitGst = maxReturnable > 0 ? (purchaseItem.gstAmount || 0) / maxReturnable : 0;
+      const unitTotal = maxReturnable > 0 ? (purchaseItem.total || 0) / maxReturnable : 0;
+
+      const returnTaxable = round2(unitTaxable * ret.quantity);
+      const returnCgst = round2(unitCgst * ret.quantity);
+      const returnSgst = round2(unitSgst * ret.quantity);
+      const returnIgst = round2(unitIgst * ret.quantity);
+      const returnGst = round2(unitGst * ret.quantity);
+      const returnVal = round2(unitTotal * ret.quantity);
+
       purchaseItem.returnedQty = alreadyReturned + ret.quantity;
+      purchaseItem.taxableAmount = Math.max(0, round2((purchaseItem.taxableAmount || 0) - returnTaxable));
+      purchaseItem.cgst = Math.max(0, round2((purchaseItem.cgst || 0) - returnCgst));
+      purchaseItem.sgst = Math.max(0, round2((purchaseItem.sgst || 0) - returnSgst));
+      purchaseItem.igst = Math.max(0, round2((purchaseItem.igst || 0) - returnIgst));
+      purchaseItem.gstAmount = Math.max(0, round2((purchaseItem.gstAmount || 0) - returnGst));
+      purchaseItem.total = Math.max(0, round2((purchaseItem.total || 0) - returnVal));
 
       // Goods physically leave stock on a purchase return — opposite of a
       // sale return, where returned goods re-enter stock.
       await Product.findByIdAndUpdate(ret.productId, { $inc: { stock: -ret.quantity } });
 
-      const unitValue = purchaseItem.purchasePrice || 0;
-      const returnVal = Math.round((ret.returnValue || unitValue * ret.quantity) * 100) / 100;
       totalReturnValue += returnVal;
+      sumTaxable += returnTaxable;
+      sumCgst += returnCgst;
+      sumSgst += returnSgst;
+      sumIgst += returnIgst;
+      sumGst += returnGst;
 
       returnItems.push({
         product: ret.productId,
@@ -353,9 +390,14 @@ const processPurchaseReturn = async (req, res) => {
     const prevPaidAmount = purchase.paidAmount || 0;
     const prevDueAmount = purchase.dueAmount || 0;
 
-    purchase.totalAmount = Math.max(0, Math.round(((purchase.totalAmount || 0) - totalReturnValue) * 100) / 100);
-    purchase.paidAmount = Math.max(0, Math.round(((purchase.paidAmount || 0) - totalReturnValue) * 100) / 100);
-    purchase.dueAmount = Math.max(0, Math.round((purchase.totalAmount - purchase.paidAmount) * 100) / 100);
+    purchase.taxableAmount = Math.max(0, round2((purchase.taxableAmount || 0) - sumTaxable));
+    purchase.cgst = Math.max(0, round2((purchase.cgst || 0) - sumCgst));
+    purchase.sgst = Math.max(0, round2((purchase.sgst || 0) - sumSgst));
+    purchase.igst = Math.max(0, round2((purchase.igst || 0) - sumIgst));
+    purchase.gstAmount = Math.max(0, round2((purchase.gstAmount || 0) - sumGst));
+    purchase.totalAmount = Math.max(0, round2((purchase.totalAmount || 0) - totalReturnValue));
+    purchase.paidAmount = Math.max(0, round2((purchase.paidAmount || 0) - totalReturnValue));
+    purchase.dueAmount = Math.max(0, round2(purchase.totalAmount - purchase.paidAmount));
 
     if (purchase.dueAmount === 0 && purchase.paidAmount > 0) {
       purchase.paymentStatus = 'paid';
@@ -394,4 +436,4 @@ const processPurchaseReturn = async (req, res) => {
   }
 };
 
-module.exports = { getPurchases, getPurchase, createPurchase, updatePurchasePayment, updatePurchaseInvoiceImage, processPurchaseReturn };
+module.exports = { getPurchases, getPurchase, createPurchase, updatePurchasePayment, updatePurchaseInvoiceImage, processPurchaseReturn, allocatePreviousDue };

@@ -1,5 +1,7 @@
 const Supplier = require('../models/Supplier');
 const Purchase = require('../models/Purchase');
+const SupplierPayment = require('../models/SupplierPayment');
+const { allocatePreviousDue } = require('./purchaseController');
 
 // ─── Get Supplier Details (view-only) ─────────────────────────────
 // Returns full supplier profile + summary stats + purchase history + payment history.
@@ -150,4 +152,51 @@ const getSupplierLedger = async (req, res) => {
   }
 };
 
-module.exports = { getSupplierDetails, getSupplierDueSummary, getSupplierLedger };
+// ─── Pay Supplier (standalone due payment) ─────────────────────────────
+// Applies the payment via the exact same FIFO allocatePreviousDue helper
+// used when a new purchase's "previous due" payment is applied — every
+// rupee still lands on a real Purchase.paidAmount/dueAmount, so the
+// supplier ledger (built purely by re-reading Purchase docs) automatically
+// stays correct with no changes needed there. A SupplierPayment record is
+// created purely as an audit trail (payment method/notes/which invoices it
+// covered), mirroring CustomerPayment's role for customer due collection.
+const payToSupplier = async (req, res) => {
+  try {
+    const shopId = req.user.shop;
+    const supplierId = req.params.id;
+    const { amount, paymentMethod, notes } = req.body;
+
+    const supplier = await Supplier.findOne({ _id: supplierId, shop: shopId });
+    if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
+
+    const amt = Number(amount);
+    if (!amt || amt <= 0) {
+      return res.status(400).json({ message: 'Invalid payment amount' });
+    }
+    if (amt > (supplier.dueAmount || 0)) {
+      return res.status(400).json({ message: 'Payment amount exceeds due amount' });
+    }
+
+    const allocation = await allocatePreviousDue(shopId, supplierId, amt, true);
+
+    supplier.dueAmount = Math.max(0, Math.round((supplier.dueAmount - allocation.appliedToPreviousDue) * 100) / 100);
+    supplier.totalPaid = Math.round(((supplier.totalPaid || 0) + allocation.appliedToPreviousDue) * 100) / 100;
+    await supplier.save();
+
+    const payment = await SupplierPayment.create({
+      supplier: supplier._id,
+      shop: shopId,
+      amount: allocation.appliedToPreviousDue,
+      paymentMethod: paymentMethod || 'cash',
+      notes: notes || '',
+      paidBy: req.user._id,
+      allocations: allocation.previousDueAllocations,
+    });
+
+    res.json({ payment, supplier });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getSupplierDetails, getSupplierDueSummary, getSupplierLedger, payToSupplier };
