@@ -580,9 +580,15 @@
     "validation": {
       "customerRequiredForDue": "Customer name and phone number are required for due sales."
     },
+    "roundOff": {
+      "title": "Round Off Discount",
+      "exact": "Exact",
+      "roundOff": "Round Off"
+    },
     "totals": {
       "grandTotal": "Grand Total",
       "roundOff": "Round Off",
+      "roundOffDiscount": "Round Off Discount",
       "payable": "Final Payable",
       "noPreviousInvoice": "No previous invoice to reprint",
       "dueAmount": "Due Amount:",

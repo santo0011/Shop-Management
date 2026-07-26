@@ -3637,6 +3637,118 @@ select:-webkit-autofill {
   color: var(--primary);
 }
 
+/* ─── Round-Off Discount Section ──────────────────────────── */
+.pos-roundoff-section {
+  margin-bottom: 6px;
+}
+
+.pos-roundoff-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.pos-roundoff-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px 5px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  gap: 1px;
+  min-height: 52px;
+  overflow: hidden;
+}
+
+.pos-roundoff-card:hover {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.04);
+}
+
+.pos-roundoff-card.active {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.08);
+  box-shadow: 0 0 0 1px rgba(var(--primary-rgb), 0.15);
+}
+
+.pos-roundoff-card-check {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all var(--transition-fast);
+}
+
+.pos-roundoff-card.active .pos-roundoff-card-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pos-roundoff-card-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.pos-roundoff-card.active .pos-roundoff-card-title {
+  color: var(--primary);
+}
+
+.pos-roundoff-card-discount {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #FF6B6B;
+  font-family: var(--font-mono);
+  line-height: 1.2;
+}
+
+.pos-roundoff-card-payable {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  line-height: 1.2;
+}
+
+.pos-roundoff-card.active .pos-roundoff-card-payable {
+  color: var(--primary);
+}
+
+@media (max-width: 575.98px) {
+  .pos-roundoff-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .pos-roundoff-card {
+    padding: 6px 3px 5px;
+    min-height: 54px;
+  }
+  .pos-roundoff-card-title {
+    font-size: 0.72rem;
+  }
+  .pos-roundoff-card-discount {
+    font-size: 0.75rem;
+  }
+  .pos-roundoff-card-payable {
+    font-size: 0.85rem;
+  }
+}
+
 /* ─── Action Buttons Row ────────────────────────────────── */
 .pos-action-buttons {
   display: flex;

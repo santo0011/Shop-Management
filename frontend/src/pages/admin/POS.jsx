@@ -139,10 +139,12 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
               <span style={{fontSize:'0.75rem',fontWeight:600,color:'var(--text-secondary)'}}>{t('posPage.totals.grandTotal')}</span>
               <span style={{fontSize:'0.85rem',fontWeight:800,color:'#6C63FF'}}>₹{Number(data.grandTotal||0).toFixed(2)}</span>
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 8px'}}>
-              <span style={{fontSize:'0.68rem',color:'var(--text-muted)'}}>{t('posPage.totals.roundOff')}</span>
-              <span style={{fontSize:'0.68rem',color:'var(--text-muted)'}}>{Number(data.roundOff||0)<0?'-':''}₹{Math.abs(Number(data.roundOff||0)).toFixed(2)}</span>
-            </div>
+            {data.roundOffDiscount > 0 && (
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 8px'}}>
+                <span style={{fontSize:'0.68rem',color:'var(--text-muted)'}}>{t('posPage.totals.roundOffDiscount')}</span>
+                <span style={{fontSize:'0.68rem',fontWeight:600,color:'#FF6B6B'}}>-₹{Number(data.roundOffDiscount||0).toFixed(2)}</span>
+              </div>
+            )}
           </div>
           {data.dueAmount > 0 && (
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 10px',borderRadius:'8px',background:'rgba(255,107,107,0.08)',border:'1px solid rgba(255,107,107,0.2)',marginBottom:'8px'}}>
@@ -232,6 +234,34 @@ const POSSkeletonLoader = () => (
   </div>
 );
 
+// ─── Round-Off Discount Options ─────────────────────────────
+const getRoundOffOptions = (grandTotal) => {
+  const integer = Math.floor(grandTotal);
+  const fractional = grandTotal - integer;
+
+  // Always generate 4 round-off options (no "Exact" card)
+  const intPayable = integer;
+  let nearest5 = Math.floor(integer / 5) * 5;
+  let nearest10 = Math.floor(integer / 10) * 10;
+  let nearest100 = Math.floor(integer / 100) * 100;
+
+  // Ensure strictly decreasing unique values
+  if (nearest10 >= nearest5) nearest10 = nearest5 - 5;
+  if (nearest100 >= nearest10) nearest100 = nearest10 - 5;
+
+  // Build 4 options with labels
+  const options = [
+    { key: 'int', label: 'Round 1', payable: intPayable, discount: fractional },
+    { key: '5', label: 'Round 2', payable: nearest5, discount: grandTotal - nearest5 },
+    { key: '10', label: 'Round 3', payable: nearest10, discount: grandTotal - nearest10 },
+    { key: '100', label: 'Round 4', payable: nearest100, discount: grandTotal - nearest100 },
+  ];
+
+  // Filter out options with zero or negative discount, but ensure we always have at least 1
+  const valid = options.filter(o => o.discount > 0);
+  return valid.length > 0 ? valid : [options[0]];
+};
+
 const POS = () => {
   const { t, i18n } = useTranslation();
   const isBn = i18n.language === 'bn';
@@ -280,6 +310,8 @@ const POS = () => {
   const [isFadingOut, setIsFadingOut] = useState(false);
   const progressTimerRef = useRef(null);
   const fadeTimerRef = useRef(null);
+  // ─── Round-Off Discount State ──────────────────────────────
+  const [selectedRoundOff, setSelectedRoundOff] = useState(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -401,7 +433,7 @@ const POS = () => {
     setCustomQtyModal(null);
   }, [customQtyModal]);
 
-  const resetCartFieldsForNextSale = () => { setCart([]); setPaidAmount(''); setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setDiscountValue(''); setDiscountMode('percent'); setCustomerNote(''); setPaymentMethod(getLastPayment()); };
+  const resetCartFieldsForNextSale = () => { setCart([]); setPaidAmount(''); setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setDiscountValue(''); setDiscountMode('percent'); setCustomerNote(''); setPaymentMethod(getLastPayment()); setSelectedRoundOff(null); };
   const clearCart = () => { resetCartFieldsForNextSale(); setLastSale(null); };
 
   // ─── GST Calculation ─────────────────────────────────────────
@@ -413,15 +445,27 @@ const POS = () => {
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const itemDiscount = cart.reduce((sum, item) => sum + ((item.price * item.discount / 100) * item.quantity), 0);
   const extraDiscount = discountMode === 'percent' ? (subtotal - itemDiscount) * ((discountValue || 0) / 100) : (discountValue || 0);
-  const totalDiscount = itemDiscount + extraDiscount;
-  const taxableAmount = subtotal - totalDiscount;
+  const manualDiscount = itemDiscount + extraDiscount;
+  const taxableAmount = subtotal - manualDiscount;
   const gstAmount = taxableAmount > 0 ? Math.round(taxableAmount * (gstRate / 100) * 100) / 100 : 0;
   const cgst = isIntrastate ? gstAmount / 2 : 0;
   const sgst = isIntrastate ? gstAmount / 2 : 0;
   const igst = !isIntrastate ? gstAmount : 0;
-  const grandTotal = subtotal + gstAmount - totalDiscount;
-  const payableAmount = Math.floor(grandTotal);
-  const roundOff = payableAmount - grandTotal;
+  const preRoundOffTotal = subtotal + gstAmount - manualDiscount;
+
+  // ─── Round-Off Discount ──────────────────────────────────────
+  const roundOffOptions = getRoundOffOptions(preRoundOffTotal);
+  // Only apply round-off discount when user explicitly selects a card
+  const selectedRoundOffOption = selectedRoundOff !== null
+    ? roundOffOptions.find(o => o.key === selectedRoundOff)
+    : null;
+  const roundOffDiscount = selectedRoundOffOption ? selectedRoundOffOption.discount : 0;
+  const payableAmount = selectedRoundOffOption ? selectedRoundOffOption.payable : preRoundOffTotal;
+
+  // ─── Combined Discount (Manual + Round-Off) ──────────────────
+  const totalDiscount = manualDiscount + roundOffDiscount;
+  const grandTotal = preRoundOffTotal - roundOffDiscount;
+
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const hasPreviousDue = !!(previousDue && previousDue.dueAmount > 0);
@@ -448,7 +492,7 @@ const POS = () => {
     if (cart.length === 0) return;
     if (isPaidOverTotal) return;
     if (customerRequiredForDue) { showToast.error(t('posPage.validation.customerRequiredForDue')); return; }
-    setConfirmData({ totalItems, subtotal, discount: totalDiscount, grandTotal, roundOff, payableAmount, paidAmount, dueAmount, paymentMethod, gstAmount, cgst, sgst, igst, gstRate, isIntrastate, extraDiscount, customerNote, includePreviousDue, previousDueAmount, totalPayable });
+    setConfirmData({ totalItems, subtotal, discount: totalDiscount, grandTotal, roundOffDiscount, payableAmount, paidAmount, dueAmount, paymentMethod, gstAmount, cgst, sgst, igst, gstRate, isIntrastate, extraDiscount, customerNote, includePreviousDue, previousDueAmount, totalPayable });
     setShowConfirmModal(true);
   };
 
@@ -473,12 +517,13 @@ const POS = () => {
         subtotal, discount: totalDiscount, gstRate, gstAmount, cgst, sgst, igst, taxableAmount,
         totalAmount: payableAmount, paidAmount: confirmedPaidAmount, dueAmount: Math.max(0, payableAmount - confirmedPaidAmount),
         paymentMethod: selectedPayment, posType: 'pos', notes: customerNote,
+        roundOffDiscount,
       };
       const { data } = await api.post('/sales', payload, { _skipLoading: true });
       advanceProgressToStep2();
       const saleDetail = await api.get(`/sales/${data._id || data.sale}`);
       const saleData = saleDetail.data.sale || saleDetail.data;
-      setLastSale({ ...saleData, invoiceNo: data.invoiceNo || saleData.invoiceNo, totalAmount: data.totalAmount || saleData.totalAmount || payableAmount, roundOff: data.roundOff ?? saleData.roundOff ?? roundOff, paidAmount: data.paidAmount || saleData.paidAmount || paidAmount, dueAmount: data.dueAmount || saleData.dueAmount || dueAmount, paymentMethod: selectedPayment, notes: customerNote });
+      setLastSale({ ...saleData, invoiceNo: data.invoiceNo || saleData.invoiceNo, totalAmount: data.totalAmount || saleData.totalAmount || payableAmount, roundOff: data.roundOff ?? saleData.roundOff ?? roundOffDiscount, paidAmount: data.paidAmount || saleData.paidAmount || paidAmount, dueAmount: data.dueAmount || saleData.dueAmount || dueAmount, paymentMethod: selectedPayment, notes: customerNote });
       if (confirmedPrevDuePayment > 0 && targetCustomerId) {
         try { await api.post(`/customers/${targetCustomerId}/payment`, { amount: confirmedPrevDuePayment, paymentMethod: selectedPayment, notes: `Previous due settled during POS checkout (Invoice ${data.invoiceNo || ''})` }); } catch (payErr) { showToast.warning(t('posPage.previousDue.paymentRecordFailed')); }
       }
@@ -620,6 +665,31 @@ const POS = () => {
             </div>
           </div>
 
+          {/* ─── Round-Off Discount Cards ─────────────────────────── */}
+          {cart.length > 0 && roundOffOptions.length > 0 && (
+            <div className="pos-roundoff-section">
+              <label className="pos-payment-label">{t('posPage.roundOff.title')}</label>
+              <div className="pos-roundoff-cards">
+                {roundOffOptions.map((opt) => {
+                  const isSelected = selectedRoundOff === opt.key;
+                  return (
+                    <div
+                      key={opt.key}
+                      className={`pos-roundoff-card ${isSelected ? 'active' : ''}`}
+                      onClick={() => setSelectedRoundOff(opt.key)}
+                    >
+                      <div className="pos-roundoff-card-check">
+                        <BiCheck size={10} />
+                      </div>
+                      <div className="pos-roundoff-card-discount">-₹{opt.discount.toFixed(2)}</div>
+                      <div className="pos-roundoff-card-payable">₹{opt.payable.toFixed(2)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="pos-paid-section">
             <label className="pos-payment-label">{t('sale.paidAmount')}</label>
             <div className="pos-paid-row">
@@ -660,7 +730,6 @@ const POS = () => {
                 <span style={{fontSize:'0.72rem',fontWeight:700,color:totalDiscount > 0 ? '#FF6B6B' : 'var(--text-muted)'}}>{totalDiscount > 0 ? `-₹${totalDiscount.toFixed(2)}` : '₹0.00'}</span>
               </div>
             </div>
-            <div className="pos-round-off-row"><span>{t('posPage.totals.roundOff')}</span><span>{roundOff < 0 ? '-' : ''}₹{Math.abs(roundOff).toFixed(2)}</span></div>
             <div className="pos-grand-total"><span>{includePreviousDue && hasPreviousDue ? t('posPage.previousDue.totalPayable') : t('posPage.totals.payable')}</span><span className="pos-grand-total-amount">₹{(includePreviousDue && hasPreviousDue ? totalPayable : payableAmount).toFixed(2)}</span></div>
           </div>
 

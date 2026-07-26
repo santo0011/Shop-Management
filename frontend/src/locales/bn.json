@@ -576,9 +576,15 @@
     "validation": {
       "customerRequiredForDue": "বাকি বিক্রয়ের জন্য ক্রেতার নাম ও ফোন নম্বর আবশ্যক।"
     },
+    "roundOff": {
+      "title": "রাউন্ড অফ ডিসকাউন্ট",
+      "exact": "সঠিক",
+      "roundOff": "রাউন্ড অফ"
+    },
     "totals": {
       "grandTotal": "সর্বমোট",
       "roundOff": "রাউন্ড অফ",
+      "roundOffDiscount": "রাউন্ড অফ ডিসকাউন্ট",
       "payable": "প্রদেয় পরিমাণ",
       "noPreviousInvoice": "পুনরায় প্রিন্ট করার মতো আগের কোন চালান নেই",
       "dueAmount": "বকেয়া:",
