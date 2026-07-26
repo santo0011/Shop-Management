@@ -19,21 +19,23 @@ import * as XLSX from 'xlsx';
 // ─── Constants ────────────────────────────────────────────────────────────
 const getPaymentMethods = (t) => [
   { value: 'cash', label: t('sale.cash') },
-  { value: 'card', label: t('sale.card') },
   { value: 'bank_transfer', label: t('purchasesPage.bankTransfer') },
+  { value: 'upi', label: t('sale.upi') },
   { value: 'mobile_banking', label: t('sale.mobileBanking') },
-  { value: 'due', label: t('common.due') },
+  { value: 'card', label: t('sale.card') }
 ];
 
 const paymentMethodLabel = (method, t) => {
   const map = {
     cash: t('sale.cash'),
-    card: t('sale.card'),
     bank_transfer: t('purchasesPage.bankTransfer'),
+    upi: t('sale.upi'),
     mobile_banking: t('sale.mobileBanking'),
-    due: t('common.due'),
+    card: t('sale.card'),
+    cheque: t('sale.cheque'),
+    other: t('sale.other'),
   };
-  return map[method] || '-';
+  return map[method] || method || '-';
 };
 
 const ROW_FIELDS = ['batchNumber', 'expiryDate', 'quantity', 'purchasePrice', 'sellingPrice', 'discount'];
@@ -1550,7 +1552,7 @@ const PurchaseDrawer = ({ open, onClose, onSuccess, viewing, t }) => {
   );
 };
 
-const PAYMENT_METHOD_VALUES = ['cash', 'card', 'bank_transfer', 'mobile_banking', 'due'];
+const PAYMENT_METHOD_VALUES = ['cash', 'bank_transfer', 'upi', 'mobile_banking', 'card', 'cheque', 'other'];
 
 // ─── Bulk Import Drawer ─────────────────────────────────────────────────────
 // Each imported row creates one purchase with a single line item — the same
@@ -2190,20 +2192,31 @@ const supplierPaymentMethodConfig = (t) => [
   { key: 'mobile_banking', icon: '🏦', label: t('sale.mobileBanking'), color: '#FF6B9D' },
 ];
 
-// ─── Supplier Payment Drawer ────────────────────────────────────────────
-// Mirrors Customers.jsx's "Receive Payment" drawer exactly (same layout,
-// same Exact-amount button, same card-style payment method picker) but pays
-// DOWN a supplier's due via POST /suppliers/:id/payment, which FIFO-
-// allocates the amount across their oldest unpaid purchases server-side.
-const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
+// ─── Invoice Payment Drawer ─────────────────────────────────────────────
+// Invoice-wise payment for a single purchase. Shows the purchase's own
+// invoice info and calls PUT /purchases/:id/payment to update only that
+// purchase's paid/due amounts. The supplier's total due is recalculated in
+// the background by the backend's Supplier.findByIdAndUpdate $inc.
+// Payment method config (icons & colors matching POS / Customer payment)
+const paymentMethodConfig = (t) => [
+  { key: 'cash', icon: '💵', label: t('sale.cash'), color: '#2ecc71' },
+  { key: 'card', icon: '💳', label: t('sale.card'), color: '#6C63FF' },
+  { key: 'upi', icon: '📱', label: t('sale.upi'), color: '#00D9A6' },
+  { key: 'mobile_banking', icon: '🏦', label: t('sale.mobileBanking'), color: '#FF6B9D' },
+];
+
+const InvoicePaymentDrawer = ({ open, onClose, purchase, onSuccess, t }) => {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('cash');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const dueAmount = supplier?.dueAmount || 0;
-  const methods = supplierPaymentMethodConfig(t);
+  // Use the purchase's own dueAmount — this is the invoice-level due, NOT the supplier's total
+  const dueAmount = purchase?.dueAmount || 0;
+  const totalAmount = purchase?.totalAmount || 0;
+  const paidAmount = purchase?.paidAmount || 0;
+  const methods = paymentMethodConfig(t);
 
   useEffect(() => {
     if (open) {
@@ -2222,7 +2235,12 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
     setSaving(true);
     setError('');
     try {
-      await api.post(`/suppliers/${supplier._id}/payment`, { amount: val, paymentMethod: method, notes: note });
+      // Use the purchase-specific payment endpoint — only affects this invoice
+      // _skipLoading: true prevents the Global Loader from showing
+      await api.put(`/purchases/${purchase._id}/payment`, {
+        paidAmount: paidAmount + val,
+        paymentMethod: method,
+      }, { _skipLoading: true });
       showToast.success(t('suppliersPage.paymentSuccess'));
       onSuccess?.();
       onClose();
@@ -2242,7 +2260,7 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body" style={{ padding: '1rem' }}>
-          {supplier && (
+          {purchase && (
             <div style={{
               padding: '0.75rem 1rem',
               borderRadius: 'var(--border-radius-md)',
@@ -2250,11 +2268,25 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
               border: '1px solid rgba(108,99,255,0.12)',
               marginBottom: '1rem',
             }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{supplier.name}</div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{supplier.phone}</div>
-              <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t('suppliersPage.currentDue')}:</span>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)' }}>{money(dueAmount)}</span>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                {purchase.purchaseNo} — {purchase.supplier?.name || ''}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                {purchase.supplierInvoiceNo ? `${t('purchasesPage.supplierInvoiceNo')}: ${purchase.supplierInvoiceNo}` : ''}
+              </div>
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t('sale.total')}:</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700 }}>{money(totalAmount)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t('common.paid')}:</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--secondary)' }}>{money(paidAmount)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t('suppliersPage.currentDue')}:</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)' }}>{money(dueAmount)}</span>
+                </div>
               </div>
             </div>
           )}
@@ -2265,9 +2297,8 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
               fontWeight: 500, marginBottom: '0.6rem', fontSize: '0.78rem',
             }}>{error}</div>
           )}
-          <form id="supplier-payment-form" onSubmit={handleSubmit}>
+          <form id="invoice-payment-form" onSubmit={handleSubmit}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Payment Amount with Exact button */}
               <div>
                 <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.2rem' }}>
                   {t('suppliersPage.paymentAmount')} <span style={{ color: 'var(--danger)' }}>*</span>
@@ -2277,11 +2308,13 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
                     type="number" step="0.01" className="form-control"
                     value={amount} onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
+                    disabled={saving}
                     style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', minHeight: '40px', flex: 1 }}
                   />
                   {dueAmount > 0 && (
                     <button
                       type="button"
+                      disabled={saving}
                       onClick={() => setAmount(String(dueAmount))}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -2290,12 +2323,13 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
                         border: '1.5px solid var(--primary)',
                         background: 'transparent',
                         color: 'var(--primary)',
-                        cursor: 'pointer', whiteSpace: 'nowrap',
+                        cursor: saving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                         transition: 'all 0.15s ease',
                         fontFamily: 'var(--font-family)',
                         minHeight: '40px',
+                        opacity: saving ? 0.5 : 1,
                       }}
-                      onMouseEnter={(e) => { e.target.style.background = 'rgba(108,99,255,0.08)'; }}
+                      onMouseEnter={(e) => { if (!saving) e.target.style.background = 'rgba(108,99,255,0.08)'; }}
                       onMouseLeave={(e) => { e.target.style.background = 'transparent'; }}
                     >
                       <BiCheck style={{ fontSize: '1rem' }} /> {t('posPage.payment.exact')}
@@ -2304,7 +2338,6 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
                 </div>
               </div>
 
-              {/* Card-style Payment Method selector (matching POS / Customer payment) */}
               <div>
                 <label className="form-label" style={{ fontSize: '0.72rem', marginBottom: '0.4rem' }}>
                   {t('sale.paymentMethod')}
@@ -2318,7 +2351,8 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
                     <button
                       key={pm.key}
                       type="button"
-                      onClick={() => setMethod(pm.key)}
+                      onClick={() => { if (!saving) setMethod(pm.key); }}
+                      disabled={saving}
                       style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                         padding: '0.6rem 0.4rem',
@@ -2326,10 +2360,11 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
                         border: `1.5px solid ${method === pm.key ? pm.color : 'var(--border-color)'}`,
                         background: method === pm.key ? `${pm.color}10` : 'var(--bg-card)',
                         color: method === pm.key ? pm.color : 'var(--text-secondary)',
-                        cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600,
+                        cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.72rem', fontWeight: 600,
                         transition: 'all 0.15s ease',
                         fontFamily: 'var(--font-family)',
                         minHeight: '60px',
+                        opacity: saving ? 0.6 : 1,
                         boxShadow: method === pm.key ? `0 2px 8px ${pm.color}30` : 'none',
                       }}
                     >
@@ -2348,6 +2383,7 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
                   className="form-control"
                   value={note} onChange={(e) => setNote(e.target.value)}
                   rows={2}
+                  disabled={saving}
                   placeholder={t('suppliersPage.paymentNotePlaceholder')}
                   style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', resize: 'vertical' }}
                 />
@@ -2357,13 +2393,14 @@ const SupplierPaymentDrawer = ({ open, onClose, supplier, onSuccess, t }) => {
         </div>
         <div className="drawer-footer" style={{ padding: '0.7rem 1rem', gap: '0.5rem' }}>
           <button type="button" className="btn-premium btn-premium-secondary" onClick={onClose}
+            disabled={saving}
             style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
             {t('common.cancel')}
           </button>
-          <button type="submit" form="supplier-payment-form" onClick={handleSubmit}
+          <button type="submit" form="invoice-payment-form" onClick={handleSubmit}
             className="btn-premium btn-premium-primary" disabled={saving}
             style={{ padding: '0.5rem 1.25rem', fontSize: '0.82rem', flex: 1, justifyContent: 'center' }}>
-            {saving ? <span className="spinner-border spinner-border-sm" /> : <BiCheck />} {t('suppliersPage.pay')}
+            {saving ? <><span className="spinner-border spinner-border-sm" /> {t('common.processing')}</> : <><BiCheck /> {t('suppliersPage.pay')}</>}
           </button>
         </div>
       </div>
@@ -2704,8 +2741,8 @@ const Purchases = () => {
                     <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')} onClick={() => handleView(purchase)}>
                       <BiShow />
                     </button>
-                    {purchase.supplier?.dueAmount > 0 && (
-                      <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} title={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase.supplier)}>
+                    {purchase.dueAmount > 0 && (
+                      <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} title={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase)}>
                         <BiCreditCard />
                       </button>
                     )}
@@ -2837,8 +2874,8 @@ const Purchases = () => {
                 <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => handleView(purchase)}>
                   <BiShow />
                 </button>
-                {purchase.supplier?.dueAmount > 0 && (
-                  <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase.supplier)}>
+                {purchase.dueAmount > 0 && (
+                  <button className="btn-action btn-action-payment" data-tooltip={t('suppliersPage.makePayment')} onClick={() => setPayingSupplier(purchase)}>
                     <BiCreditCard />
                   </button>
                 )}
@@ -2874,10 +2911,10 @@ const Purchases = () => {
         t={t}
       />
 
-      {/* Supplier Payment Drawer */}
-      <SupplierPaymentDrawer
+      {/* Invoice Payment Drawer */}
+      <InvoicePaymentDrawer
         open={!!payingSupplier}
-        supplier={payingSupplier}
+        purchase={payingSupplier}
         onClose={() => setPayingSupplier(null)}
         onSuccess={fetchPurchases}
         t={t}

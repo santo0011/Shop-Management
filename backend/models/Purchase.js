@@ -193,7 +193,7 @@ const purchaseSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'bank_transfer', 'mobile_banking', 'due'],
+    enum: ['cash', 'bank_transfer', 'upi', 'mobile_banking', 'card', 'cheque', 'other'],
     default: 'cash',
   },
   notes: {
@@ -240,6 +240,23 @@ const purchaseSchema = new mongoose.Schema({
   // previousDueAllocations above — a return adjusts this purchase's own
   // totals only, it does not retroactively undo FIFO allocations already
   // applied to/from other purchases.
+  // Individual payment records against this purchase, oldest first.
+  // Each time a payment is made (via PUT /purchases/:id/payment), a new
+  // record is pushed here. The aggregate paidAmount/dueAmount fields are
+  // kept in sync as the source of truth for fast queries; this array is
+  // purely for the Payment History display.
+  payments: [{
+    _id: false,
+    amount: { type: Number, required: true },
+    paymentMethod: {
+      type: String,
+      enum: ['cash', 'bank_transfer', 'upi', 'mobile_banking', 'card', 'cheque', 'other'],
+      default: 'cash',
+    },
+    notes: { type: String, default: '' },
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    paidAt: { type: Date, default: Date.now },
+  }],
   returns: [returnEntrySchema],
 }, {
   timestamps: true,

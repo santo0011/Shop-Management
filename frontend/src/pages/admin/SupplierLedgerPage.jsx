@@ -127,11 +127,13 @@ const PurchaseExpandDetails = ({ data, loading, t, shopSettings }) => {
         </div>
       </div>
 
-      {/* Section 5 — Payment History (if available) */}
-      {data.paidAmount > 0 && (
-        <div className="ledger-expand-section">
-          <div className="ledger-expand-section__title">{t('suppliersPage.paymentHistory')}</div>
-          <div className="ledger-expand-table-scroll">
+      {/* Section 5 — Payment History (all individual payments) */}
+      <div className="ledger-expand-section">
+        <div className="ledger-expand-section__title">
+          {t('suppliersPage.paymentHistory')}
+        </div>
+        <div className="ledger-expand-table-scroll">
+          {data.payments && data.payments.length > 0 ? (
             <table className="purchase-items-table">
               <thead>
                 <tr>
@@ -142,17 +144,25 @@ const PurchaseExpandDetails = ({ data, loading, t, shopSettings }) => {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>{formatDate(data.purchaseDate || data.createdAt)}</td>
-                  <td>{formatCurrency(data.paidAmount)}</td>
-                  <td style={{ textTransform: 'capitalize' }}>{(data.paymentMethod || '-').replace(/_/g, ' ')}</td>
-                  <td>{data.notes || '-'}</td>
-                </tr>
+                {[...data.payments]
+                  .sort((a, b) => new Date(a.paidAt) - new Date(b.paidAt))
+                  .map((pmt, idx) => (
+                    <tr key={idx}>
+                      <td>{formatDate(pmt.paidAt)}</td>
+                      <td style={{ fontWeight: 600 }}>{formatCurrency(pmt.amount)}</td>
+                      <td style={{ textTransform: 'capitalize' }}>{(pmt.paymentMethod || '-').replace(/_/g, ' ')}</td>
+                      <td>{pmt.notes || '-'}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
-          </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              {t('suppliersPage.noPaymentHistory')}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

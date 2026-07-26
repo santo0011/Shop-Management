@@ -24,7 +24,7 @@ const supplierPaymentSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'upi', 'mobile_banking', 'due'],
+    enum: ['cash', 'bank_transfer', 'upi', 'mobile_banking', 'card', 'cheque', 'other'],
     default: 'cash',
   },
   notes: {

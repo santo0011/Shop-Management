@@ -1150,6 +1150,7 @@
     "paymentHistory": "Payment History",
     "paymentDate": "Payment Date",
     "paymentAmount": "Payment Amount",
+    "noPaymentHistory": "No payment history found",
     "makePayment": "Make Payment",
     "invalidAmount": "Please enter a valid amount",
     "amountExceedsDue": "Payment amount cannot be greater than the remaining due amount.",

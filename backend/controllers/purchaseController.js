@@ -221,7 +221,7 @@ const createPurchase = async (req, res) => {
     const allocation = await allocatePreviousDue(req.user.shop, supplier, previousDuePaymentAmount || 0, !!includePreviousDue);
     const currentPurchasePaid = Math.min(Math.max(0, Number(paidAmount) || 0), calcTotalAmount);
 
-    const purchase = await Purchase.create({
+    const purchaseData = {
       shop: req.user.shop,
       supplier,
       purchaseNo,
@@ -248,7 +248,20 @@ const createPurchase = async (req, res) => {
       notes,
       invoiceImage: invoiceImage || '',
       createdBy: req.user._id,
-    });
+    };
+
+    // Record the initial payment in the payment history
+    if (currentPurchasePaid > 0) {
+      purchaseData.payments = [{
+        amount: currentPurchasePaid,
+        paymentMethod: paymentMethod || 'cash',
+        notes: notes || '',
+        paidBy: req.user._id,
+        paidAt: new Date(),
+      }];
+    }
+
+    const purchase = await Purchase.create(purchaseData);
 
     // Sync each product's stock and latest pricing/batch info
     for (const item of calculatedItems) {
@@ -290,8 +303,19 @@ const updatePurchasePayment = async (req, res) => {
     const purchase = await Purchase.findOne({ _id: req.params.id, shop: req.user.shop });
     if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
 
-    const { paidAmount, paymentMethod } = req.body;
+    const { paidAmount, paymentMethod, notes } = req.body;
     const additionalPaid = paidAmount - purchase.paidAmount;
+
+    if (additionalPaid > 0) {
+      // Push a payment record for history
+      purchase.payments.push({
+        amount: additionalPaid,
+        paymentMethod: paymentMethod || purchase.paymentMethod,
+        notes: notes || '',
+        paidBy: req.user._id,
+        paidAt: new Date(),
+      });
+    }
 
     purchase.paidAmount = paidAmount;
     purchase.dueAmount = purchase.totalAmount - paidAmount;
