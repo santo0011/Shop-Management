@@ -86,13 +86,9 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
   // ─── GST Logic ──────────────────────────────────────────────
   const businessState = shopInfo?.settings?.businessState || shopInfo?.state || '';
   const customerState = sale?.customer?.state || '';
-  // Walk-in (no customer state) — always treat as Intra-State (CGST + SGST).
-  // Only Inter-State (IGST) when a registered customer from a different state.
   const isIntrastate = !customerState || (businessState && customerState && businessState.toLowerCase().trim() === customerState.toLowerCase().trim());
   const gstRate = sale?.gstRate || 0;
 
-  // Total discount - stored as a single combined value (item discounts + extra + round-off)
-  // The backend now saves the frontend's combined discount directly
   const totalDiscount = sale?.discount || 0;
 
   return (
@@ -232,8 +228,6 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                     const itemSgst = item.sgst || 0;
                     const itemIgst = item.igst || 0;
                     const itemGstAmt = item.gstAmount || 0;
-                    // Calculate actual discount amount from the difference between base total and taxable amount
-                    // This works regardless of whether discount was applied as percentage or price reduction
                     const baseTotal = (item.price * item.quantity);
                     const itemTaxable = item.taxableAmount || baseTotal;
                     const itemDiscountAmt = Math.max(0, baseTotal - itemTaxable);
@@ -279,7 +273,6 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                 background: 'var(--bg-card)',
                 boxShadow: '0 2px 12px rgba(108,99,255,0.08)',
               }}>
-                {/* Header */}
                 <div style={{
                   padding: '0.6rem 1rem',
                   background: 'linear-gradient(135deg, rgba(108,99,255,0.08), rgba(0,217,166,0.05))',
@@ -293,58 +286,41 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                     {t('salesPage.drawer.billingSummary')}
                   </span>
                 </div>
-
-                {/* Summary Rows */}
                 <div style={{ padding: '0.5rem 1rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {/* Subtotal */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>{t('sale.subtotal')}</span>
                     <span style={{ fontWeight: 600 }}>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
                   </div>
-
-                  {/* Discount - always show (combined: item discounts + extra + round-off) */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: totalDiscount > 0 ? '#e74c3c' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
                     <span>{t('sale.discount')}</span>
                     <span style={{ fontWeight: totalDiscount > 0 ? 600 : 400 }}>₹{Number(totalDiscount).toFixed(2)}</span>
                   </div>
-
-                  {/* Taxable Amount */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-light)' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>{t('salesPage.drawer.taxableAmount')}</span>
                     <span style={{ fontWeight: 600 }}>₹{Number(sale.taxableAmount || 0).toFixed(2)}</span>
                   </div>
-
-                  {/* CGST (if intra-state) */}
                   {isIntrastate && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.cgst > 0 ? '#17A2B8' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
                       <span>CGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${(gstRate / 2)}%` : ''})</span></span>
                       <span style={{ fontWeight: sale.cgst > 0 ? 600 : 400 }}>₹{Number(sale.cgst || 0).toFixed(2)}</span>
                     </div>
                   )}
-
-                  {/* SGST (if intra-state) */}
                   {isIntrastate && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.sgst > 0 ? '#17A2B8' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
                       <span>SGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${(gstRate / 2)}%` : ''})</span></span>
                       <span style={{ fontWeight: sale.sgst > 0 ? 600 : 400 }}>₹{Number(sale.sgst || 0).toFixed(2)}</span>
                     </div>
                   )}
-
-                  {/* IGST (if inter-state) */}
                   {!isIntrastate && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.igst > 0 ? '#6C63FF' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
                       <span>IGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${gstRate}%` : ''})</span></span>
                       <span style={{ fontWeight: sale.igst > 0 ? 600 : 400 }}>₹{Number(sale.igst || 0).toFixed(2)}</span>
                     </div>
                   )}
-
-                  {/* Total GST - always show */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-light)' }}>
                     <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{t('salesPage.drawer.totalGst')}</span>
                     <span style={{ fontWeight: 700, color: sale.gstAmount > 0 ? '#6C63FF' : 'var(--text-muted)' }}>₹{Number(sale.gstAmount || 0).toFixed(2)}</span>
                   </div>
-
-                  {/* Grand Total */}
                   <div style={{
                     display: 'flex', justifyContent: 'space-between', padding: '0.55rem 0',
                     fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700,
@@ -357,7 +333,6 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                 </div>
               </div>
 
-              {/* Footer */}
               {shopInfo?.address && (
                 <div style={{ textAlign: 'center', padding: '0.6rem 0', borderTop: '1px dashed var(--border-color)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                   {formatAddress(shopInfo.address)}
@@ -383,12 +358,11 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
   const [refundMethod, setRefundMethod] = useState('cash');
   const [processing, setProcessing] = useState(false);
   const [showConfirmReturnAll, setShowConfirmReturnAll] = useState(false);
+  const [returnHistory, setReturnHistory] = useState([]);
 
   useEffect(() => {
     if (sale) {
       setReturnItems(sale.items?.map((item) => {
-        // Use the stored final per-unit price from the sale
-        // item.total already accounts for price, discount, and GST adjustments
         const finalUnitPrice = item.quantity > 0 ? (item.total || 0) / item.quantity : 0;
         return {
           productId: item.product?._id || item.productId,
@@ -402,6 +376,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
           itemReason: '',
         };
       }) || []);
+      setReturnHistory(sale.returns || []);
       setReason('');
       setRefundMethod('cash');
       setShowConfirmReturnAll(false);
@@ -410,6 +385,14 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
 
   const totalRefund = returnItems.reduce((sum, i) => sum + (i.refundAmount || 0), 0);
   const hasItems = returnItems.some(i => i.returnQty > 0);
+  const allFullyReturned = returnItems.every(i => i.maxReturnable <= 0);
+
+  const currentDue = sale?.dueAmount || 0;
+  const currentPaid = sale?.paidAmount || 0;
+  const willReduceDue = totalRefund > 0 && currentDue > 0 && totalRefund <= currentDue;
+  const willReduceBoth = totalRefund > 0 && currentDue > 0 && totalRefund > currentDue;
+  const cashRefundAmount = willReduceBoth ? totalRefund - currentDue : (currentDue === 0 ? totalRefund : 0);
+  const dueReductionAmount = Math.min(totalRefund, currentDue);
 
   const handleQtyChange = (idx, val) => {
     const next = [...returnItems];
@@ -419,7 +402,6 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
     setReturnItems(next);
   };
 
-  // "Return All" flow
   const handleReturnAllClick = () => {
     const next = returnItems.map(i => ({
       ...i,
@@ -453,8 +435,6 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
       showToast.error(err.response?.data?.message || t('salesPage.returnDrawer.returnFailed'));
     } finally { setProcessing(false); }
   };
-
-  const allFullyReturned = returnItems.every(i => i.maxReturnable <= 0);
 
   return (
     <>
@@ -500,70 +480,131 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {returnItems.map((item, idx) => (
-                    item.maxReturnable <= 0 ? null : (
-                      <div key={idx} style={{ padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', marginBottom: 4 }}>{item.productName}</div>
-                        <div style={{ display: 'flex', gap: 12, fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
-                          <span>{t('salesPage.returnDrawer.sold')} <strong style={{ color: 'var(--text-primary)' }}>{item.soldQty}</strong></span>
-                          <span>{t('salesPage.returnDrawer.returned')} <strong style={{ color: 'var(--text-primary)' }}>{item.returnedQty}</strong></span>
-                          <span>{t('salesPage.returnDrawer.available')} <strong style={{ color: 'var(--text-primary)' }}>{item.maxReturnable}</strong></span>
+                  {returnItems.map((item, idx) => {
+                    const netUnitPrice = item.price;
+                    return item.maxReturnable <= 0 ? null : (
+                      <div key={idx} style={{
+                        padding: '0.6rem',
+                        borderRadius: 'var(--border-radius-md)',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                      }}>
+                        {/* Product header - compact */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(255,107,107,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <BiUndo size={12} style={{ color: '#FF6B6B' }} />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{item.productName}</div>
+                              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>₹{Number(netUnitPrice).toFixed(2)} × {item.soldQty}</div>
+                            </div>
+                          </div>
+                          {item.returnedQty > 0 && (
+                            <span style={{ fontSize: '0.55rem', fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'rgba(108,99,255,0.1)', color: '#6C63FF' }}>{item.returnedQty} ret</span>
+                          )}
                         </div>
-                        {item.maxReturnable > 0 && (
-                          <>
-                            <div style={{ display: 'flex', gap: 8, marginBottom: 6, minWidth: 0 }}>
-                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.qtyToReturn')}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)', minWidth: 0 }}>
-                                  <button onClick={() => handleQtyChange(idx, item.returnQty - 1)} disabled={item.returnQty <= 0} style={{ width: 30, height: 30, flexShrink: 0, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                                  <input type="number" value={item.returnQty} onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 0)} min="0" max={item.maxReturnable} style={{ flex: 1, border: 'none', outline: 'none', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', width: 50, minWidth: 0, padding: '4px 0', MozAppearance: 'textfield' }} />
-                                  <button onClick={() => handleQtyChange(idx, item.returnQty + 1)} disabled={item.returnQty >= item.maxReturnable} style={{ width: 30, height: 30, flexShrink: 0, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                                </div>
-                              </div>
-                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundAmount')}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)', minWidth: 0 }}>
-                                  <span style={{ padding: '0 6px 0 10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-input)', lineHeight: '30px', borderRight: '1px solid var(--border-color)', flexShrink: 0 }}>₹</span>
-                                  <input type="number" value={item.refundAmount} onChange={(e) => { const n = [...returnItems]; const maxRefund = n[idx].returnQty * n[idx].price; n[idx].refundAmount = Math.max(0, Math.min(Number(e.target.value) || 0, maxRefund)); setReturnItems(n); }} min="0" max={item.returnQty * item.price} style={{ flex: 1, border: 'none', outline: 'none', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', minWidth: 0, width: '100%', MozAppearance: 'textfield' }} />
-                                </div>
-                              </div>
+
+                        {/* Qty stats + Price row in one line */}
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                          {[
+                            { label: 'Sold', value: item.soldQty, bg: 'var(--bg-input)', color: 'var(--text-primary)' },
+                            { label: 'Ret.', value: item.returnedQty, bg: 'var(--bg-input)', color: item.returnedQty > 0 ? '#6C63FF' : 'var(--text-muted)' },
+                            { label: 'Avail', value: item.maxReturnable, bg: 'rgba(46,204,113,0.08)', color: '#2ecc71' },
+                          ].map((s, si) => (
+                            <div key={si} style={{ flex: 1, textAlign: 'center', padding: '3px 2px', borderRadius: 4, background: s.bg }}>
+                              <div style={{ fontSize: '0.45rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{s.label}</div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: s.color }}>{s.value}</div>
                             </div>
-                            <div style={{ marginTop: 4 }}>
-                              <input type="text" placeholder={t('salesPage.returnDrawer.reasonPlaceholder')} value={item.itemReason} onChange={(e) => { const n = [...returnItems]; n[idx].itemReason = e.target.value; setReturnItems(n); }} style={{ width: '100%', padding: '6px 10px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
+                          ))}
+                          <div style={{ flex: 1, textAlign: 'center', padding: '3px 2px', borderRadius: 4, background: 'rgba(108,99,255,0.04)' }}>
+                            <div style={{ fontSize: '0.45rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>₹/Unit</div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6C63FF' }}>₹{Number(netUnitPrice).toFixed(2)}</div>
+                          </div>
+                        </div>
+
+                        {/* Qty control + Refund */}
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Return Qty</div>
+                            <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+                              <button onClick={() => handleQtyChange(idx, item.returnQty - 1)} disabled={item.returnQty <= 0} style={{ width: 26, height: 26, flexShrink: 0, border: 'none', background: item.returnQty > 0 ? 'var(--bg-input)' : 'transparent', color: item.returnQty > 0 ? 'var(--text-secondary)' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, cursor: item.returnQty > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                              <input type="number" value={item.returnQty} onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 0)} min="0" max={item.maxReturnable} style={{ flex: 1, border: 'none', outline: 'none', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', width: 30, padding: '2px 0', MozAppearance: 'textfield' }} />
+                              <button onClick={() => handleQtyChange(idx, item.returnQty + 1)} disabled={item.returnQty >= item.maxReturnable} style={{ width: 26, height: 26, flexShrink: 0, border: 'none', background: item.returnQty < item.maxReturnable ? 'var(--bg-input)' : 'transparent', color: item.returnQty < item.maxReturnable ? 'var(--text-secondary)' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, cursor: item.returnQty < item.maxReturnable ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                             </div>
-                          </>
-                        )}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Refund</div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 26, borderRadius: 'var(--border-radius-sm)', fontWeight: 700, fontSize: '0.78rem', background: 'rgba(108,99,255,0.06)', border: '1.5px solid rgba(108,99,255,0.2)', color: '#6C63FF' }}>
+                              ₹{(item.returnQty > 0 ? item.refundAmount : 0).toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Reason */}
+                        <input type="text" placeholder="Reason (optional)" value={item.itemReason} onChange={(e) => { const n = [...returnItems]; n[idx].itemReason = e.target.value; setReturnItems(n); }} style={{ width: '100%', padding: '3px 8px', fontSize: '0.65rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
                       </div>
-                    )
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Refund Details */}
+              {/* Refund Summary */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                  <BiWallet size={16} /><span>{t('salesPage.returnDrawer.refundDetails')}</span>
+                  <BiWallet size={16} /><span>Summary</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(var(--primary-rgb), 0.06)', border: '1px solid rgba(var(--primary-rgb), 0.12)', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                    <span>{t('salesPage.totalRefund')}</span>
-                    <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{Number(totalRefund || 0).toFixed(2)}</span>
+                <div style={{ padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total Refund</span>
+                    <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{Number(totalRefund || 0).toFixed(2)}</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundMethod')}</label>
-                    <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}>
+                  {dueReductionAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '4px 6px', borderRadius: 4, background: 'rgba(255,107,107,0.06)' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#FF6B6B' }}>Due Reduced</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FF6B6B' }}>-₹{Number(dueReductionAmount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {cashRefundAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '4px 6px', borderRadius: 4, background: 'rgba(46,204,113,0.06)' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#2ecc71' }}>Cash Refund</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2ecc71' }}>₹{Number(cashRefundAmount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 8, marginTop: 4 }}>
+                    <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none', marginBottom: 6 }}>
                       <option value="cash">{t('sale.cash')}</option>
                       <option value="card">{t('sale.card')}</option>
                       <option value="upi">{t('sale.upi')}</option>
                       <option value="mobile_banking">{t('sale.mobileBanking')}</option>
                     </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.overallReasonLabel')}</label>
-                    <input type="text" placeholder={t('salesPage.returnDrawer.reasonExamplePlaceholder')} value={reason} onChange={(e) => setReason(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }} />
+                    <input type="text" placeholder="Overall return reason" value={reason} onChange={(e) => setReason(e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                 </div>
               </div>
+
+              {/* Return History */}
+              {returnHistory.length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                    <BiFile size={16} /><span>Return History ({returnHistory.length})</span>
+                  </div>
+                  {returnHistory.map((ret, ri) => (
+                    <div key={ri} style={{ padding: '0.5rem 0.7rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', marginBottom: 6, fontSize: '0.72rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600 }}>{formatDate(ret.returnDate)}</span>
+                        <span style={{ fontWeight: 700, color: '#e74c3c' }}>-₹{Number(ret.totalRefund || 0).toFixed(2)}</span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        {ret.items?.map((ritem, rii) => (
+                          <span key={rii}>{ritem.productName} x{ritem.quantity}{rii < ret.items.length - 1 ? ', ' : ''}</span>
+                        ))}
+                      </div>
+                      {ret.reason && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>{ret.reason}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -571,7 +612,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
           <div className="drawer-footer">
             <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.cancel')}</button>
             <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={handleSubmit} disabled={!hasItems || processing}>
-              {processing ? <><span className="spinner-border spinner-border-sm" /> {t('salesPage.returnDrawer.processing')}</> : <><BiUndo size={16} /> {t('salesPage.returnDrawer.processReturn', { amount: Number(totalRefund || 0).toFixed(2) })}</>}
+              {processing ? <><span className="spinner-border spinner-border-sm" /> Processing...</> : <><BiUndo size={16} /> Process Return (₹{Number(totalRefund || 0).toFixed(2)})</>}
             </button>
           </div>
         )}
@@ -620,10 +661,10 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 <BiUndo size={24} />
               </div>
               <h5 style={{ fontWeight: 700, fontSize: '1rem', margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
-                {t('salesPage.returnDrawer.confirmReturnAllTitle')}
+                Return All Products?
               </h5>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                {t('salesPage.returnDrawer.confirmReturnAllDesc')}
+                This will return all remaining returnable quantities for every item.
               </p>
             </div>
             <div
@@ -639,13 +680,13 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 className="btn-premium btn-premium-secondary btn-premium-sm"
                 onClick={() => setShowConfirmReturnAll(false)}
               >
-                {t('common.cancel')}
+                Cancel
               </button>
               <button
                 className="btn-premium btn-premium-primary btn-premium-sm"
                 onClick={executeReturnAll}
               >
-                <BiCheck size={16} /> {t('salesPage.returnDrawer.confirmReturnAllBtn')}
+                <BiCheck size={16} /> Confirm
               </button>
             </div>
           </div>
@@ -659,7 +700,6 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
 const SalesSkeletonLoader = () => (
   <div>
     <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
-    {/* Page Header */}
     <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
       <div style={{ flex: 1 }}>
         <div style={{
@@ -682,8 +722,6 @@ const SalesSkeletonLoader = () => (
         animation: 'shimmer 1.5s infinite',
       }} />
     </div>
-
-    {/* Stat Cards row */}
     <div className="row g-3 mb-4">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="col-6 col-md-3">
@@ -696,105 +734,29 @@ const SalesSkeletonLoader = () => (
                 animation: 'shimmer 1.5s infinite',
               }} />
               <div style={{ flex: 1 }}>
-                <div style={{
-                  height: 10, width: '60%', marginBottom: 6,
-                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-                  backgroundSize: '200% 100%', borderRadius: 4,
-                  animation: 'shimmer 1.5s infinite',
-                }} />
-                <div style={{
-                  height: 20, width: '80%',
-                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-                  backgroundSize: '200% 100%', borderRadius: 6,
-                  animation: 'shimmer 1.5s infinite',
-                }} />
+                <div style={{ height: 10, width: '60%', marginBottom: 6, background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} />
+                <div style={{ height: 20, width: '80%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 6, animation: 'shimmer 1.5s infinite' }} />
               </div>
             </div>
           </div>
         </div>
       ))}
     </div>
-
-    {/* Filter Bar */}
     <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-      <div style={{
-        height: 36, width: 200,
-        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-        backgroundSize: '200% 100%', borderRadius: 8,
-        animation: 'shimmer 1.5s infinite',
-      }} />
-      <div style={{
-        height: 36, width: 90,
-        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-        backgroundSize: '200% 100%', borderRadius: 8,
-        animation: 'shimmer 1.5s infinite',
-      }} />
-      <div style={{
-        height: 36, width: 90,
-        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-        backgroundSize: '200% 100%', borderRadius: 8,
-        animation: 'shimmer 1.5s infinite',
-      }} />
-      <div style={{
-        height: 36, width: 90,
-        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-        backgroundSize: '200% 100%', borderRadius: 8,
-        animation: 'shimmer 1.5s infinite',
-      }} />
-      <div style={{
-        height: 36, width: 140,
-        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-        backgroundSize: '200% 100%', borderRadius: 8,
-        animation: 'shimmer 1.5s infinite',
-      }} />
-    </div>
-
-    {/* Table skeleton */}
-    <div className="sales-table-container desktop-table" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
-      {/* Table header */}
-      <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
-        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-          <div key={i} style={{
-            flex: 1, height: 12,
-            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-            backgroundSize: '200% 100%', borderRadius: 4,
-            animation: 'shimmer 1.5s infinite',
-          }} />
-        ))}
-      </div>
-      {/* Table rows */}
-      {[1, 2, 3, 4, 5].map((r) => (
-        <div key={r} style={{
-          display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
-          borderTop: '1px solid var(--border-color)',
-        }}>
-          {[1, 2, 3, 4, 5, 6, 7].map((c) => (
-            <div key={c} style={{
-              flex: 1, height: 10,
-              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-              backgroundSize: '200% 100%', borderRadius: 4,
-              animation: 'shimmer 1.5s infinite',
-            }} />
-          ))}
-        </div>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} style={{ height: 36, width: i === 1 ? 200 : 90, background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 8, animation: 'shimmer 1.5s infinite' }} />
       ))}
     </div>
   </div>
 );
 
-// ─── Table Inline Skeleton (for filter refreshes) ────────────
 const TableSkeletonRows = () => (
   <>
     {[1, 2, 3, 4, 5].map((r) => (
       <tr key={r} style={{ opacity: 0.5 }}>
         {[1, 2, 3, 4, 5, 6, 7].map((c) => (
           <td key={c} style={{ padding: '0.75rem 1rem' }}>
-            <div style={{
-              height: 10, width: c === 3 ? '50%' : c === 2 ? '70%' : '40%',
-              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-              backgroundSize: '200% 100%', borderRadius: 4,
-              animation: 'shimmer 1.5s infinite',
-            }} />
+            <div style={{ height: 10, width: c === 3 ? '50%' : c === 2 ? '70%' : '40%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} />
           </td>
         ))}
       </tr>
@@ -814,7 +776,6 @@ const Sales = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
-  // Default to last 30 days on initial load
   const getDefaultDateRange = () => {
     const end = new Date();
     const start = new Date();
@@ -854,11 +815,8 @@ const Sales = () => {
   }, []);
 
   const fetchSales = useCallback(async ({ page: p = 1, isSearch = false } = {}) => {
-    if (isFirstLoad.current) {
-      setInitialLoading(true);
-    } else {
-      setRefreshing(true);
-    }
+    if (isFirstLoad.current) setInitialLoading(true);
+    else setRefreshing(true);
     if (isSearch) setSearching(true);
     try {
       const params = new URLSearchParams({
@@ -894,47 +852,33 @@ const Sales = () => {
   const applyDatePreset = (key) => {
     setDatePreset(key);
     if (key === 'custom') return;
-
     const now = new Date();
     let start = new Date(now);
     const end = new Date(now);
-
-    if (key === '7d') {
-      start.setDate(start.getDate() - 6);
-    } else if (key === '30d') {
-      start.setDate(start.getDate() - 29);
-    } else if (key === 'month') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
+    if (key === '7d') start.setDate(start.getDate() - 6);
+    else if (key === '30d') start.setDate(start.getDate() - 29);
+    else if (key === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
     setStartDate(toDateInputValue(start));
     setEndDate(toDateInputValue(end));
   };
 
   const handleView = (sale) => { setViewingSale(sale); setDrawerOpen(true); };
-
   const handleReturn = (sale) => { setReturningSale(sale); setReturnDrawerOpen(true); };
-
   const handleReturnProcessed = (updatedSale) => {
     setSales(prev => prev.map(s => s._id === updatedSale._id ? updatedSale : s));
     refreshAll();
   };
-
   const handleCopyInvoice = (invoiceNo) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(invoiceNo || '');
       showToast.success(t('salesPage.invoiceNumberCopied'));
     }
   };
-
   const handlePrintClick = (sale) => {
     setPrintingSale(sale);
     setShowPrintPreview(true);
   };
 
-  // All four read from `stats`, which comes from the same filtered response
-  // as `sales`/`total` (see fetchSales) — always the currently selected date
-  // range + payment status + search, same as the table below.
   const statCards = [
     { label: t('salesPage.stats.totalSales'), value: stats?.totalSales || 0, icon: BiDollar, color: 'primary', isCurrency: true },
     { label: t('salesPage.stats.totalRevenue'), value: stats?.totalRevenue || 0, icon: BiWallet, color: 'success', isCurrency: true },
@@ -971,40 +915,24 @@ const Sales = () => {
             <BiSearch className="search-icon" />
             <input className="form-control sales-filter-input" placeholder={t('salesPage.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-
           <div className="sales-date-filters-scroll">
             <div className="sales-date-segmented" role="tablist" aria-label="Date filter">
               {DATE_PRESETS.map((p, idx) => (
                 <React.Fragment key={p.key}>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={datePreset === p.key}
-                    className={`sales-date-pill ${datePreset === p.key ? 'active' : ''}`}
-                    onClick={() => applyDatePreset(p.key)}
-                  >
-                    <BiCalendar />
-                    <span>{p.label}</span>
+                  <button type="button" role="tab" aria-selected={datePreset === p.key} className={`sales-date-pill ${datePreset === p.key ? 'active' : ''}`} onClick={() => applyDatePreset(p.key)}>
+                    <BiCalendar /><span>{p.label}</span>
                   </button>
                   {idx === 2 && <span className="sales-date-break" aria-hidden="true" />}
                 </React.Fragment>
               ))}
             </div>
           </div>
-
           {datePreset === 'custom' && (
             <>
-              <div className="sales-filter">
-                <BiCalendar size={14} className="sales-filter-icon-abs" />
-                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              </div>
-              <div className="sales-filter">
-                <BiCalendar size={14} className="sales-filter-icon-abs" />
-                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
+              <div className="sales-filter"><BiCalendar size={14} className="sales-filter-icon-abs" /><input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+              <div className="sales-filter"><BiCalendar size={14} className="sales-filter-icon-abs" /><input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
             </>
           )}
-
           <div className="sales-filter">
             <select className="form-control sales-filter-input" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
               {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -1055,25 +983,16 @@ const Sales = () => {
                     <td><span className="sales-amount">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></td>
                     <td>
                       <div className="sales-status-badge" style={{ background: st.bg, color: st.color }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color, display: 'inline-block' }} />
-                        {st.label}
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color, display: 'inline-block' }} />{st.label}
                       </div>
                     </td>
                     <td>
-                      <div className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>
-                        {rs.label}
-                      </div>
+                      <div className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>{rs.label}</div>
                     </td>
                     <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
-                      <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} title={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
-                        <BiShow />
-                      </button>
-                      <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
-                        <BiPrinter />
-                      </button>
-                      <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
-                        <BiUndo />
-                      </button>
+                      <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow /></button>
+                      <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter /></button>
+                      <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo /></button>
                     </td>
                   </tr>
                 );
@@ -1083,158 +1002,45 @@ const Sales = () => {
         </div>
       </div>
 
-      {/* ─── Mobile: Sale Cards ────────────────────────────────────────── */}
       <div className="mobile-cards">
         {refreshing ? (
-          <>
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="expandable-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <div style={{
-                    height: 14, width: '35%',
-                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-                    backgroundSize: '200% 100%', borderRadius: 4,
-                    animation: 'shimmer 1.5s infinite',
-                  }} />
-                  <div style={{
-                    height: 14, width: '25%',
-                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-                    backgroundSize: '200% 100%', borderRadius: 4,
-                    animation: 'shimmer 1.5s infinite',
-                  }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <div style={{
-                    height: 10, width: '40%',
-                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-                    backgroundSize: '200% 100%', borderRadius: 4,
-                    animation: 'shimmer 1.5s infinite',
-                  }} />
-                  <div style={{
-                    height: 10, width: '20%',
-                    background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
-                    backgroundSize: '200% 100%', borderRadius: 4,
-                    animation: 'shimmer 1.5s infinite',
-                  }} />
-                </div>
-              </div>
-            ))}
-          </>
+          <>{[1, 2, 3].map((i) => (<div key={i} className="expandable-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><div style={{ height: 14, width: '35%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} /><div style={{ height: 14, width: '25%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} /></div></div>))}</>
         ) : searching ? (
-          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-          </div>
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div>
         ) : sales.length === 0 ? (
-          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.35 }}>🧾</div>
-            <h5 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t('salesPage.noSalesFound')}</h5>
-          </div>
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}><div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.35 }}>🧾</div><h5 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t('salesPage.noSalesFound')}</h5></div>
         ) : sales.map((sale) => {
           const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
           const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
           const hasReturn = (sale.returnStatus && sale.returnStatus !== 'none');
           return (
-            <ExpandableCard
-              key={sale._id}
-              compact={
-                <>
-                  <div className="expandable-card__compact-row">
-                    <span className="expandable-card__name"><BiHash size={12} style={{ marginRight: 2 }} /> {sale.invoiceNo || t('common.notAvailable')}</span>
-                    <span className="expandable-card__price">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__meta">
-                    <span className="expandable-card__meta-item">
-                      <BiUser />
-                      <span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
-                    </span>
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      {hasReturn ? (
-                        <span className="sales-status-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span>
-                      ) : (
-                        <span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
-                      )}
-                    </div>
-                  </div>
-                </>
-              }
-              expanded={
-                <div className="expandable-card__rows">
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('sale.invoice')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{sale.invoiceNo || t('common.notAvailable')}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('sale.customer')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('common.date')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{formatDate(sale.createdAt)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.totalAmount')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.paidAmount')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.dueAmount')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value" style={sale.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{Number(sale.dueAmount || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.paymentStatus')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value"><span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.returnStatus')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value"><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span></span>
-                  </div>
-                </div>
-              }
-              actions={
-                <>
-                  <button className="btn-action btn-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
-                    <BiShow />
-                  </button>
-                  <button className="btn-action btn-action-toggle" title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
-                    <BiPrinter />
-                  </button>
-                  <button className="btn-action btn-action-edit" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
-                    <BiUndo />
-                  </button>
-                </>
-              }
+            <ExpandableCard key={sale._id}
+              compact={<>
+                <div className="expandable-card__compact-row"><span className="expandable-card__name"><BiHash size={12} style={{ marginRight: 2 }} /> {sale.invoiceNo || t('common.notAvailable')}</span><span className="expandable-card__price">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__meta"><span className="expandable-card__meta-item"><BiUser /><span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span></span><div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>{hasReturn ? (<span className="sales-status-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span>) : (<span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>)}</div></div>
+              </>}
+              expanded={<div className="expandable-card__rows">
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('sale.invoice')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{sale.invoiceNo || t('common.notAvailable')}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('sale.customer')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('common.date')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{formatDate(sale.createdAt)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.totalAmount')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.paidAmount')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">₹{Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.dueAmount')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value" style={sale.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{Number(sale.dueAmount || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.paymentStatus')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value"><span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.returnStatus')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value"><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span></span></div>
+              </div>}
+              actions={<><button className="btn-action btn-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow /></button><button className="btn-action btn-action-toggle" title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter /></button><button className="btn-action btn-action-edit" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo /></button></>}
             />
           );
         })}
       </div>
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        totalCount={total}
-        pageSize={20}
-        onPageChange={setPage}
-      />
+      <Pagination page={page} totalPages={totalPages} totalCount={total} pageSize={20} onPageChange={setPage} />
 
       <SaleViewDrawer open={drawerOpen} onClose={() => { setDrawerOpen(false); setViewingSale(null); }} sale={viewingSale} shopInfo={shopInfo} onPrint={handlePrintClick} onCopyInvoice={handleCopyInvoice} />
       <ReturnDrawer open={returnDrawerOpen} onClose={() => { setReturnDrawerOpen(false); setReturningSale(null); }} sale={returningSale} onReturnProcessed={handleReturnProcessed} />
       {showPrintPreview && printingSale && (
-        <PrintPreview
-          sale={printingSale}
-          shopInfo={shopInfo}
-          onClose={() => { setShowPrintPreview(false); setPrintingSale(null); }}
-        />
+        <PrintPreview sale={printingSale} shopInfo={shopInfo} onClose={() => { setShowPrintPreview(false); setPrintingSale(null); }} />
       )}
     </div>
   );

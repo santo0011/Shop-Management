@@ -11,8 +11,6 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
   const template = shopInfo?.settings?.invoiceTemplate || 'modern';
   const printMode = shopInfo?.settings?.printMode || 'thermal';
   const isA4 = size === 'a4';
-  // "Normal" print mode always uses the wide/desktop layout even on
-  // thermal-sized paper; otherwise thermal formatting follows paper size.
   const isThermal = printMode === 'normal' ? false : !isA4;
 
   const showLogo = shopInfo?.settings?.showLogo !== false;
@@ -28,32 +26,22 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
 
   const printCopies = Math.max(1, shopInfo?.settings?.printCopies || 1);
   const footerMsg = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
-  const taxName = shopInfo?.settings?.taxName || t('posPage.receipt.defaultTaxName');
   const gstRate = Number(sale?.gstRate ?? shopInfo?.settings?.defaultGstRate ?? 0);
   const cgst = Number(sale?.cgst || 0);
   const sgst = Number(sale?.sgst || 0);
   const igst = Number(sale?.igst || 0);
-  const gstAmount = Number(sale?.gstAmount || sale?.tax || 0);
   const isIntrastate = cgst > 0 || sgst > 0;
 
-  // sale.totalAmount is the stored Final Payable amount.
-  // For newer sales, the discount already includes any round-off adjustment,
-  // so the "grand total before round-off" is just payableAmount.
-  // For older sales that still have a stored roundOff field, we reconstruct
-  // the pre-round Grand Total for backward-compatible display.
   const payableAmount = Number(sale?.totalAmount ?? sale?.grandTotal ?? 0);
   const roundOff = Number(sale?.roundOff || 0);
   const rawGrandTotal = payableAmount - roundOff;
 
-  // Translated display label for a payment method key — printing the raw
-  // stored value (e.g. "MOBILE_BANKING") would bypass the rename to "Other".
   const PAYMENT_METHOD_LABELS = {
     cash: t('sale.cash'), card: t('sale.card'), upi: t('sale.upi'),
     mobile_banking: t('sale.mobileBanking'), due: t('common.due'),
   };
   const paymentMethodLabel = (method) => (PAYMENT_METHOD_LABELS[method] || method || t('sale.cash')).toUpperCase();
 
-  // ─── Helpers ────────────────────────────────────────────────────────────
   const formatAddress = (addr) => {
     if (!addr) return '';
     if (typeof addr === 'string') return addr;
@@ -85,20 +73,23 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
     });
   };
 
-  // A Custom Quantity line item stores what the cashier actually entered
-  // (enteredQuantity/enteredUnit, e.g. "200 ml") separately from the Base
-  // Unit amount used for stock/pricing (quantity/unit, e.g. "0.2 liter") —
-  // the invoice must always show what the customer was sold, not the
-  // internal Base Unit conversion. Ordinary line items have no
-  // enteredQuantity, so this just falls back to quantity/unit unchanged.
   const displayQty = (item) => item.enteredQuantity ?? item.quantity;
   const displayUnit = (item) => item.enteredUnit ?? item.unit ?? '';
 
+  // ─── Shared item row renderer ─────────────────────────────────────────────
+  // All 4 templates use this single renderer so layout is always consistent.
+  const renderItemRow = (item, idx) => (
+    <div key={idx} className="receipt-item-row">
+      <div className="receipt-col-item">
+        <span className="receipt-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span>
+        <span className="receipt-item-qty-line">{displayQty(item)} {displayUnit(item)}</span>
+        {item.discount > 0 && <span className="receipt-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</span>}
+      </div>
+      <div className="receipt-col-price">₹{Number(item.price).toFixed(2)}</div>
+    </div>
+  );
+
   // ─── Single source of truth for receipt styling ──────────────────────────
-  // This exact CSS text is used both for the on-screen preview (injected via
-  // a <style> tag) and for the print window's <head>. They must never diverge
-  // — that divergence (preview using stale CSS from index.css while print
-  // used its own embedded stylesheet) was the original bug.
   const buildReceiptCss = () => {
     const contentWidth = isA4 ? '190mm' : isThermal ? (size === '58mm' ? '48mm' : '72mm') : '100%';
     const fontFamily = isThermal ? "'Courier New', monospace" : "'Inter', -apple-system, sans-serif";
@@ -119,13 +110,13 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       background: #fff;
     }
     .receipt { width: 100%; }
-    .receipt-header, .receipt-modern-header, .receipt-minimal-header, .receipt-grocery-header {
+    .receipt-header, .receipt-grocery-header {
       text-align: center;
       margin-bottom: ${isThermal ? '4px' : '12px'};
     }
     .receipt-logo { margin-bottom: ${isThermal ? '3px' : '8px'}; }
     .receipt-logo-img { max-width: ${isThermal ? '50px' : '80px'}; max-height: ${isThermal ? '50px' : '80px'}; }
-    .receipt-logo-placeholder, .receipt-modern-logo-placeholder, .receipt-grocery-logo-placeholder {
+    .receipt-logo-placeholder, .receipt-grocery-logo-placeholder {
       width: ${isThermal ? '36px' : '60px'}; height: ${isThermal ? '36px' : '60px'};
       margin: 0 auto; border-radius: 50%;
       background: linear-gradient(135deg, #6C63FF, #00D9A6);
@@ -144,12 +135,11 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       display: flex; font-weight: 700; font-size: ${isThermal ? '9px' : '11px'};
       border-bottom: 1px solid #333; padding-bottom: 3px; margin-bottom: 3px;
     }
-    .receipt-col-item { flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: ${isThermal ? 'nowrap' : 'normal'}; }
-    .receipt-col-qty { flex: 0.6; text-align: center; }
-    .receipt-col-price { flex: 0.8; text-align: right; }
-    .receipt-col-total { flex: 0.8; text-align: right; }
-    .receipt-item-row { display: flex; font-size: ${isThermal ? '9px' : '11px'}; margin-bottom: 2px; padding-bottom: 2px; border-bottom: 1px dotted #ddd; }
-    .receipt-item-name { display: block; word-break: break-word; }
+    .receipt-col-item { flex: 1; overflow: hidden; word-break: break-word; }
+    .receipt-col-price { flex: 0 0 auto; text-align: right; white-space: nowrap; margin-left: auto; padding-left: 8px; }
+    .receipt-item-row { display: flex; font-size: ${isThermal ? '9px' : '11px'}; margin-bottom: 2px; padding-bottom: 3px; border-bottom: 1px dotted #ddd; }
+    .receipt-item-name { display: block; word-break: break-word; line-height: 1.35; }
+    .receipt-item-qty-line { display: block; font-size: ${isThermal ? '8px' : '10px'}; color: #666; margin-top: 1px; line-height: 1.3; }
     .receipt-item-discount { font-size: 8px; color: #e74c3c; }
     .receipt-totals { margin-bottom: ${isThermal ? '4px' : '8px'}; }
     .receipt-total-row { display: flex; justify-content: space-between; font-size: ${isThermal ? '10px' : '12px'}; margin-bottom: 2px; }
@@ -178,7 +168,6 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
     .receipt-modern-item-details { display: flex; justify-content: space-between; font-size: ${isThermal ? '9px' : '11px'}; color: #555; }
     .receipt-modern-item-total { font-weight: 700; color: #333; }
     .receipt-modern-item-discount { font-size: 8px; color: #e74c3c; }
-    .receipt-grocery-item-discount { font-size: 8px; color: #e74c3c; }
     .receipt-modern-totals { margin-bottom: 6px; }
     .receipt-modern-total-row { display: flex; justify-content: space-between; font-size: ${isThermal ? '10px' : '12px'}; margin-bottom: 2px; }
     .receipt-modern-grand-total { display: flex; justify-content: space-between; font-size: ${isThermal ? '13px' : '18px'}; font-weight: 800; padding: 4px 0; border-top: 2px solid #6C63FF; margin-top: 4px; }
@@ -198,8 +187,8 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
     .receipt-minimal-items { margin-bottom: 4px; }
     .receipt-minimal-item { padding: 3px 0; border-bottom: 1px dotted #eee; }
     .receipt-minimal-item-name { font-size: ${isThermal ? '10px' : '12px'}; font-weight: 500; }
-    .receipt-minimal-item-line { display: flex; justify-content: space-between; font-size: ${isThermal ? '9px' : '11px'}; color: #666; }
-    .receipt-minimal-item-total { font-weight: 600; color: #333; }
+    .receipt-minimal-item-line { display: flex; font-size: ${isThermal ? '9px' : '11px'}; }
+    .receipt-minimal-item-line .receipt-item-name { font-size: ${isThermal ? '10px' : '12px'}; }
     .receipt-minimal-totals { margin-bottom: 4px; }
     .receipt-minimal-total-row { display: flex; justify-content: space-between; font-size: ${isThermal ? '10px' : '12px'}; margin-bottom: 2px; }
     .receipt-minimal-grand { font-size: ${isThermal ? '13px' : '16px'}; font-weight: 800; border-top: 1px solid #333; padding-top: 4px; margin-top: 4px; }
@@ -218,11 +207,7 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
     .receipt-grocery-info-row { display: flex; justify-content: space-between; font-size: ${isThermal ? '9px' : '11px'}; color: #555; margin-bottom: 2px; }
     .receipt-grocery-items { margin-bottom: 4px; }
     .receipt-grocery-items-header { display: flex; font-weight: 700; font-size: ${isThermal ? '9px' : '11px'}; border-bottom: 1px solid #2ecc71; padding-bottom: 3px; margin-bottom: 3px; color: #2ecc71; }
-    .receipt-grocery-item { display: flex; font-size: ${isThermal ? '9px' : '11px'}; padding: 2px 0; border-bottom: 1px dotted #eee; }
-    .receipt-grocery-item-name { flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .receipt-grocery-item-qty { flex: 0.6; text-align: center; }
-    .receipt-grocery-item-price { flex: 0.7; text-align: right; }
-    .receipt-grocery-item-total { flex: 0.7; text-align: right; font-weight: 600; }
+    .receipt-grocery-item { display: flex; font-size: ${isThermal ? '9px' : '11px'}; padding: 3px 0; border-bottom: 1px dotted #eee; }
     .receipt-grocery-totals { margin-bottom: 4px; }
     .receipt-grocery-total-row { display: flex; justify-content: space-between; font-size: ${isThermal ? '10px' : '12px'}; margin-bottom: 2px; }
     .receipt-grocery-grand { font-size: ${isThermal ? '13px' : '16px'}; font-weight: 800; color: #2ecc71; border-top: 1px solid #2ecc71; padding-top: 4px; margin-top: 4px; }
@@ -230,11 +215,29 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
     .receipt-grocery-payment { background: #2ecc71; color: #fff; padding: 1px 6px; border-radius: 3px; font-weight: 700; }
     .receipt-grocery-footer { text-align: center; font-size: ${isThermal ? '9px' : '11px'}; color: #2ecc71; margin-top: 6px; }
     .receipt-grocery-footer-small { font-size: 8px; color: #888; }
+
+    /* Modern item layout override — use the same shared item row as classic */
+    .receipt-modern .receipt-items-header {
+      display: flex; font-weight: 700; font-size: ${isThermal ? '9px' : '11px'};
+      padding: 4px 0; border-bottom: 1px solid #333; margin-bottom: 3px;
+    }
+    .receipt-modern .receipt-modern-item-details {
+      display: flex; align-items: flex-start;
+    }
+    .receipt-modern .receipt-modern-item-total { display: none; }
+    .receipt-modern .receipt-item-name { font-weight: 600; }
+
+    /* Minimal override — use shared item row */
+    .receipt-minimal .receipt-minimal-item-line { display: flex; }
+    .receipt-minimal .receipt-minimal-item-total { display: none; }
+
+    /* Grocery override — use shared item row */
+    .receipt-grocery .receipt-grocery-item-qty { display: none; }
+    .receipt-grocery .receipt-grocery-item-total { display: none; }
+    .receipt-grocery-item { display: flex; align-items: flex-start; }
     `;
   };
 
-  // ─── Build the complete printable HTML — reuses buildReceiptCss() so the
-  // print output can never drift from what's on screen. ────────────────────
   const getPrintHtml = () => {
     const content = previewRef.current?.innerHTML || '';
     const pageWidth = size === '58mm' ? '58mm' : size === '80mm' ? '80mm' : '210mm';
@@ -267,6 +270,37 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       for (let i = 0; i < printCopies; i++) printWindow.print();
     }, 500);
   };
+
+  // ─── Shared billing summary (used by all templates) ──────────────────────
+  const renderBillingSummary = () => (
+    <div className="receipt-totals">
+      <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
+      {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
+      <div className="receipt-total-row"><span>{t('salesPage.drawer.taxableAmount')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
+      {isIntrastate ? (
+        <>
+          {cgst > 0 && <div className="receipt-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
+          {sgst > 0 && <div className="receipt-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
+        </>
+      ) : (
+        igst > 0 && <div className="receipt-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
+      )}
+      <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.grandTotal')}</span><span className="receipt-grand-total">₹{Number((rawGrandTotal || 0) + cgst + sgst + igst).toFixed(2)}</span></div>
+      {roundOff !== 0 && <div className="receipt-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
+      <div className="receipt-total-row"><span>{t('posPage.totals.payable')}</span><span>₹{Number(payableAmount || 0).toFixed(2)}</span></div>
+      <div className="receipt-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
+      {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
+      <div className="receipt-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-payment-method">{paymentMethodLabel(sale?.paymentMethod)}</span></div>
+    </div>
+  );
+
+  // ─── Shared items header (name | price) ───────────────────────────────────
+  const renderItemsHeader = () => (
+    <div className="receipt-items-header">
+      <span className="receipt-col-item" style={{ fontWeight: 700 }}>{t('posPage.receipt.item')}</span>
+      <span className="receipt-col-price" style={{ fontWeight: 700 }}>{t('common.price')}</span>
+    </div>
+  );
 
   const InvoiceQR = ({ invoiceNo, size = 60 }) => {
     const chars = (invoiceNo || 'INV').split('');
@@ -307,6 +341,17 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
     );
   };
 
+  // ─── Classic footer ──────────────────────────────────────────────────────
+  const renderFooter = () => (
+    showFooter && (
+      <div className="receipt-footer">
+        <p>{footerMsg}</p>
+        {showBarcode && <div className="receipt-barcode"><InvoiceBarcode value={sale?.invoiceNo} width={isThermal ? (size === '58mm' ? 90 : 120) : 160} height={isThermal ? 28 : 36} /></div>}
+        {showQR && !isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}
+      </div>
+    )
+  );
+
   // ─── Template renderers ─────────────────────────────────────────────────
   const renderClassic = () => (
     <div className="receipt">
@@ -334,54 +379,15 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
         <div className="receipt-info-row"><span className="receipt-label">{t('sale.invoice')}</span><span className="receipt-value">{sale?.invoiceNo || t('common.notAvailable')}</span></div>
         <div className="receipt-info-row"><span className="receipt-label">{t('common.date')}</span><span className="receipt-value">{formatDate(sale?.createdAt)}</span></div>
         <div className="receipt-info-row"><span className="receipt-label">{t('sale.customer')}</span><span className="receipt-value">{sale?.customer?.name || t('posPage.customer.walkIn')}</span></div>
-        <div className="receipt-info-row"><span className="receipt-label">{t('posPage.receipt.cashier')}</span><span className="receipt-value">{t('posPage.receipt.cashier')}</span></div>
       </div>
       <div className="receipt-divider" />
       <div className="receipt-items">
-        <div className="receipt-items-header">
-          <span className="receipt-col-item">{t('posPage.receipt.item')}</span>
-          <span className="receipt-col-qty">{t('posPage.receipt.qty')}</span>
-          <span className="receipt-col-price">{t('common.price')}</span>
-          <span className="receipt-col-total">{t('common.total')}</span>
-        </div>
-        {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-item-row">
-            <div className="receipt-col-item">
-              <span className="receipt-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span>
-              {item.discount > 0 && <span className="receipt-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</span>}
-            </div>
-            <div className="receipt-col-qty">{displayQty(item)} {displayUnit(item)}</div>
-            <div className="receipt-col-price">₹{Number(item.price).toFixed(2)}</div>
-            <div className="receipt-col-total">₹{Number(item.total).toFixed(2)}</div>
-          </div>
-        ))}
+        {renderItemsHeader()}
+        {sale?.items?.map((item, idx) => renderItemRow(item, idx))}
       </div>
       <div className="receipt-divider" />
-      <div className="receipt-totals">
-        <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {isIntrastate ? (
-          <>
-            {cgst > 0 && <div className="receipt-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
-            {sgst > 0 && <div className="receipt-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
-          </>
-        ) : (
-          igst > 0 && <div className="receipt-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
-        )}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.payable')}</span><span className="receipt-grand-total">₹{Number(payableAmount || 0).toFixed(2)}</span></div>
-        <div className="receipt-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
-        <div className="receipt-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-payment-method">{paymentMethodLabel(sale?.paymentMethod)}</span></div>
-      </div>
-      {showFooter && (
-        <div className="receipt-footer">
-          <p>{footerMsg}</p>
-          {showBarcode && <div className="receipt-barcode"><InvoiceBarcode value={sale?.invoiceNo} width={isThermal ? (size === '58mm' ? 90 : 120) : 160} height={isThermal ? 28 : 36} /></div>}
-          {showQR && !isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 80 : 50} /></div>}
-        </div>
-      )}
+      {renderBillingSummary()}
+      {renderFooter()}
     </div>
   );
 
@@ -406,45 +412,15 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-modern-meta">
         <span className="receipt-modern-meta-item">📅 {formatDate(sale?.createdAt)}</span>
         <span className="receipt-modern-meta-item">👤 {sale?.customer?.name || t('posPage.customer.walkIn')}</span>
-        <span className="receipt-modern-meta-item">👨‍💼 {t('posPage.receipt.cashier')}</span>
       </div>
       <div className="receipt-modern-divider" />
       <div className="receipt-modern-items">
-        <div className="receipt-modern-items-header">
-          <span>{t('posPage.receipt.item')}</span><span>{t('posPage.receipt.qty')}</span><span>{t('common.price')}</span><span>{t('common.total')}</span>
-        </div>
-        {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-modern-item">
-            <div className="receipt-modern-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div>
-            <div className="receipt-modern-item-details">
-              <span>{displayQty(item)} {displayUnit(item)}</span>
-              <span>₹{Number(item.price).toFixed(2)}</span>
-              <span className="receipt-modern-item-total">₹{Number(item.total).toFixed(2)}</span>
-            </div>
-            {item.discount > 0 && <div className="receipt-modern-item-discount">-{t('posPage.receipt.percentOff', { discount: item.discount })}</div>}
-          </div>
-        ))}
+        {renderItemsHeader()}
+        {sale?.items?.map((item, idx) => renderItemRow(item, idx))}
       </div>
       <div className="receipt-modern-divider" />
-      <div className="receipt-modern-totals">
-        <div className="receipt-modern-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {isIntrastate ? (
-          <>
-            {cgst > 0 && <div className="receipt-modern-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
-            {sgst > 0 && <div className="receipt-modern-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
-          </>
-        ) : (
-          igst > 0 && <div className="receipt-modern-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
-        )}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-modern-total-row receipt-modern-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
-        <div className="receipt-modern-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-modern-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
-        <div className="receipt-modern-grand-total"><span>{t('posPage.totals.payable')}</span><span className="receipt-modern-grand-amount">₹{Number(payableAmount || 0).toFixed(2)}</span></div>
-        <div className="receipt-modern-total-row"><span>{t('common.paid')}</span><span className="receipt-modern-paid">₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-modern-total-row"><span>{t('common.due')}</span><span className="receipt-modern-due">₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
-        <div className="receipt-modern-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-modern-payment-badge">{paymentMethodLabel(sale?.paymentMethod)}</span></div>
-      </div>
-      {showFooter && (
+      {renderBillingSummary()}
+      {renderFooter && (
         <div className="receipt-modern-footer">
           <p>{footerMsg}</p>
           {showBarcode && <div className="receipt-barcode"><InvoiceBarcode value={sale?.invoiceNo} width={isThermal ? (size === '58mm' ? 90 : 120) : 160} height={isThermal ? 28 : 36} /></div>}
@@ -472,41 +448,12 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       </div>
       <div className="receipt-minimal-divider" />
       <div className="receipt-minimal-items">
-        {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-minimal-item">
-            <div className="receipt-minimal-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</div>
-            <div className="receipt-minimal-item-line">
-              <span>{displayQty(item)} {displayUnit(item)} x ₹{Number(item.price).toFixed(2)}</span>
-              <span className="receipt-minimal-item-total">₹{Number(item.total).toFixed(2)}</span>
-            </div>
-          </div>
-        ))}
+        {renderItemsHeader()}
+        {sale?.items?.map((item, idx) => renderItemRow(item, idx))}
       </div>
       <div className="receipt-minimal-divider" />
-      <div className="receipt-minimal-totals">
-        <div className="receipt-minimal-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {isIntrastate ? (
-          <>
-            {cgst > 0 && <div className="receipt-minimal-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
-            {sgst > 0 && <div className="receipt-minimal-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
-          </>
-        ) : (
-          igst > 0 && <div className="receipt-minimal-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
-        )}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
-        <div className="receipt-minimal-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-minimal-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
-        <div className="receipt-minimal-total-row receipt-minimal-grand"><span>{t('posPage.totals.payable')}</span><span>₹{Number(payableAmount || 0).toFixed(2)}</span></div>
-        <div className="receipt-minimal-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-minimal-total-row receipt-minimal-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
-      </div>
-      {showFooter && (
-        <div className="receipt-minimal-footer">
-          <p>{footerMsg}</p>
-          {showBarcode && <div className="receipt-barcode"><InvoiceBarcode value={sale?.invoiceNo} width={isThermal ? (size === '58mm' ? 80 : 110) : 150} height={isThermal ? 26 : 32} /></div>}
-          {showQR && !isThermal && <div className="receipt-qr"><InvoiceQR invoiceNo={sale?.invoiceNo} size={isA4 ? 70 : 40} /></div>}
-        </div>
-      )}
+      {renderBillingSummary()}
+      {renderFooter()}
     </div>
   );
 
@@ -529,39 +476,15 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
       <div className="receipt-grocery-divider" />
       <div className="receipt-grocery-info">
         <div className="receipt-grocery-info-row"><span>🧾 {sale?.invoiceNo || t('common.notAvailable')}</span><span>📅 {formatDate(sale?.createdAt)}</span></div>
-        <div className="receipt-grocery-info-row"><span>👤 {sale?.customer?.name || t('posPage.customer.walkInCustomer')}</span><span>👨‍💼 {t('posPage.receipt.cashier')}</span></div>
+        <div className="receipt-grocery-info-row"><span>👤 {sale?.customer?.name || t('posPage.customer.walkInCustomer')}</span></div>
       </div>
       <div className="receipt-grocery-divider" />
       <div className="receipt-grocery-items">
-        <div className="receipt-grocery-items-header"><span>{t('posPage.receipt.item')}</span><span>{t('posPage.receipt.qty')}</span><span>₹</span><span>{t('common.total')}</span></div>
-        {sale?.items?.map((item, idx) => (
-          <div key={idx} className="receipt-grocery-item">
-            <span className="receipt-grocery-item-name">{item.product?.name || item.name || t('posPage.receipt.item')}</span>
-            <span className="receipt-grocery-item-qty">{displayQty(item)}{displayUnit(item)}</span>
-            <span className="receipt-grocery-item-price">₹{Number(item.price).toFixed(2)}</span>
-            <span className="receipt-grocery-item-total">₹{Number(item.total).toFixed(2)}</span>
-          </div>
-        ))}
+        {renderItemsHeader()}
+        {sale?.items?.map((item, idx) => renderItemRow(item, idx))}
       </div>
       <div className="receipt-grocery-divider" />
-      <div className="receipt-grocery-totals">
-        <div className="receipt-grocery-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-        {isIntrastate ? (
-          <>
-            {cgst > 0 && <div className="receipt-grocery-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
-            {sgst > 0 && <div className="receipt-grocery-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
-          </>
-        ) : (
-          igst > 0 && <div className="receipt-grocery-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
-        )}
-        {Number(sale?.discount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row"><span>{t('posPage.totals.grandTotal')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
-        {roundOff !== 0 && <div className="receipt-grocery-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row receipt-grocery-grand"><span>{t('posPage.totals.payable')}</span><span>₹{Number(payableAmount || 0).toFixed(2)}</span></div>
-        <div className="receipt-grocery-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
-        {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-grocery-total-row receipt-grocery-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
-        <div className="receipt-grocery-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-grocery-payment">{paymentMethodLabel(sale?.paymentMethod)}</span></div>
-      </div>
+      {renderBillingSummary()}
       <div className="receipt-grocery-divider" />
       {showFooter && (
         <div className="receipt-grocery-footer">
@@ -612,7 +535,6 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div
           style={{
             display: 'flex',
@@ -656,7 +578,6 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
           </div>
         </div>
 
-        {/* Preview Content — the exact same markup + CSS is sent to the printer */}
         <div
           style={{
             flex: 1,
@@ -668,7 +589,6 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
             minHeight: '200px',
           }}
         >
-          {/* Scoped to buildReceiptCss() — identical rules are embedded in the print window */}
           <style>{buildReceiptCss()}</style>
           <div ref={previewRef}>
             <div className="receipt-canvas">
@@ -677,7 +597,6 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
           </div>
         </div>
 
-        {/* Bottom Actions */}
         <div
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8,

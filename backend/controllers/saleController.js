@@ -530,10 +530,18 @@ const processReturn = async (req, res) => {
     const prevPaidAmount = sale.paidAmount || 0;
     const prevDueAmount = sale.dueAmount || 0;
 
-    sale.paidAmount = Math.max(0, (sale.paidAmount || 0) - totalRefund);
+    // Step 1: Reduce totalAmount by the refund
     sale.totalAmount = Math.floor(Math.max(0, (sale.totalAmount || 0) - totalRefund));
 
-    sale.dueAmount = Math.max(0, sale.totalAmount - sale.paidAmount);
+    // Step 2: Reduce due first (always prefer reducing due over refunding cash)
+    const newTotal = sale.totalAmount;
+    const currentPaid = sale.paidAmount || 0;
+    sale.dueAmount = Math.max(0, newTotal - currentPaid);
+
+    // Step 3: Only refund cash if paid amount exceeds the new total
+    // (i.e. customer overpaid relative to the reduced invoice)
+    const excessPaid = Math.max(0, currentPaid - newTotal);
+    sale.paidAmount = currentPaid - excessPaid;
 
     if (sale.dueAmount === 0 && sale.paidAmount > 0) {
       sale.paymentStatus = 'paid';
