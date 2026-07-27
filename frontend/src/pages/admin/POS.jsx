@@ -56,36 +56,69 @@ const PROGRESS_STEPS = [
   { key: 'generating', icon: '📄' },
 ];
 
-const PremiumGeneratingOverlay = ({ t, progressStep, isFadingOut }) => (
-  <div className={`pos-premium-overlay ${isFadingOut ? 'pos-premium-fade-out' : ''}`}>
-    <div className="pos-premium-modal">
-      <div className="pos-premium-spinner-ring">
-        <svg viewBox="0 0 60 60" className="pos-premium-svg">
-          <circle cx="30" cy="30" r="26" fill="none" strokeWidth="3" className="pos-premium-track" />
-          <circle cx="30" cy="30" r="26" fill="none" strokeWidth="3" className="pos-premium-arc" />
-        </svg>
-        <div className="pos-premium-spinner-icon"><BiReceipt size={22} /></div>
-      </div>
-      <h4 className="pos-premium-title">{t('posPage.generating.title')}</h4>
-      <p className="pos-premium-subtitle">{t('posPage.generating.subtitle')}</p>
-      <div className="pos-premium-steps">
-        {PROGRESS_STEPS.map((step, idx) => {
-          const isActive = idx <= progressStep;
-          const isCurrent = idx === progressStep;
-          return (
-            <div key={step.key} className={`pos-premium-step ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
-              <div className="pos-premium-step-dot">
-                {isCurrent ? <span className="pos-premium-step-spinner-sm" /> : isActive ? <BiCheck size={14} /> : <span className="pos-premium-step-dot-empty" />}
-              </div>
-              <span className="pos-premium-step-label">{t(`posPage.confirmSale.${step.key}Sale`)}</span>
-              {idx < PROGRESS_STEPS.length - 1 && <div className={`pos-premium-step-line ${isActive ? 'active' : ''}`} />}
+const PremiumGeneratingOverlay = ({ t, progressStep, isFadingOut, lastSale }) => {
+  const isSuccess = progressStep >= PROGRESS_STEPS.length - 1;
+  return (
+    <div className={`pos-premium-overlay ${isFadingOut ? 'pos-premium-fade-out' : ''}`}>
+      <svg width="0" height="0" style={{position:'absolute'}}>
+        <defs>
+          <linearGradient id="posGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--primary)" />
+            <stop offset="100%" stopColor="var(--secondary)" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="pos-premium-modal">
+        {!isSuccess ? (
+          <>
+            <div className="pos-premium-spinner-ring">
+              <svg viewBox="0 0 60 60" className="pos-premium-svg">
+                <circle cx="30" cy="30" r="26" fill="none" strokeWidth="3" className="pos-premium-track" />
+                <circle cx="30" cy="30" r="26" fill="none" strokeWidth="3" className="pos-premium-arc" />
+              </svg>
+              <div className="pos-premium-spinner-icon"><BiReceipt size={22} /></div>
             </div>
-          );
-        })}
+            <h4 className="pos-premium-title">{t('posPage.generating.title')}</h4>
+            <p className="pos-premium-subtitle">{t('posPage.generating.subtitle')}</p>
+            <div className="pos-premium-steps">
+              {PROGRESS_STEPS.map((step, idx) => {
+                const isActive = idx <= progressStep;
+                const isCurrent = idx === progressStep;
+                return (
+                  <div key={step.key} className={`pos-premium-step ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
+                    <div className="pos-premium-step-dot">
+                      {isCurrent ? <span className="pos-premium-step-spinner-sm" /> : isActive ? <BiCheck size={14} /> : <span className="pos-premium-step-dot-empty" />}
+                    </div>
+                    <span className="pos-premium-step-label">{t(`posPage.confirmSale.${step.key}Sale`)}</span>
+                    {idx < PROGRESS_STEPS.length - 1 && <div className={`pos-premium-step-line ${isActive ? 'active' : ''}`} />}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="pos-premium-success-icon">
+              <div className="pos-premium-success-glow" />
+              <svg viewBox="0 0 60 60">
+                <circle cx="30" cy="30" r="26" className="pos-premium-success-circle" />
+                <polyline points="20,30 27,37 40,23" className="pos-premium-check" />
+              </svg>
+            </div>
+            <h4 className="pos-premium-success-title">{t('posPage.generating.successTitle') || 'Sale Completed Successfully'}</h4>
+            <p className="pos-premium-success-subtitle">{t('posPage.generating.successSubtitle') || 'Invoice has been generated'}</p>
+            {lastSale?.invoiceNo && (
+              <div className="pos-premium-invoice-badge">
+                <BiReceipt size={14} />
+                <span>{t('posPage.generating.invoiceNo') || 'Invoice'}: #{lastSale.invoiceNo}</span>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
   const { t } = useTranslation();
@@ -137,14 +170,8 @@ const ConfirmSaleModal = ({ data, onConfirm, onCancel, loading }) => {
           <div style={{borderTop:'1px solid var(--border-color)',paddingTop:'8px',marginBottom:'10px'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 8px',borderRadius:'8px',background:'rgba(108,99,255,0.06)',border:'1px solid rgba(108,99,255,0.15)',marginBottom:'6px'}}>
               <span style={{fontSize:'0.75rem',fontWeight:600,color:'var(--text-secondary)'}}>{t('posPage.totals.grandTotal')}</span>
-              <span style={{fontSize:'0.85rem',fontWeight:800,color:'#6C63FF'}}>₹{Number(data.grandTotal||0).toFixed(2)}</span>
+              <span style={{fontSize:'0.85rem',fontWeight:800,color:'#6C63FF'}}>₹{Number(data.payableAmount||0).toFixed(2)}</span>
             </div>
-            {data.roundOffDiscount > 0 && (
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 8px'}}>
-                <span style={{fontSize:'0.68rem',color:'var(--text-muted)'}}>{t('posPage.totals.roundOffDiscount')}</span>
-                <span style={{fontSize:'0.68rem',fontWeight:600,color:'#FF6B6B'}}>-₹{Number(data.roundOffDiscount||0).toFixed(2)}</span>
-              </div>
-            )}
           </div>
           {data.dueAmount > 0 && (
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 10px',borderRadius:'8px',background:'rgba(255,107,107,0.08)',border:'1px solid rgba(255,107,107,0.2)',marginBottom:'8px'}}>
@@ -440,7 +467,11 @@ const POS = () => {
   const gstRate = shopInfo?.settings?.defaultGstRate ?? 18;
   const businessState = shopInfo?.settings?.businessState || 'West Bengal';
   const customerState = selectedCustomerData?.state || '';
-  const isIntrastate = businessState && customerState && businessState.toLowerCase().trim() === customerState.toLowerCase().trim();
+  // Walk-in customer (no customer selected) — always use Intra-State (CGST + SGST).
+  // Only use Inter-State (IGST) when a registered customer from a different state
+  // is explicitly selected.
+  const hasSelectedCustomer = !!selectedCustomerData;
+  const isIntrastate = !hasSelectedCustomer || (businessState && customerState && businessState.toLowerCase().trim() === customerState.toLowerCase().trim());
   const receiptFooter = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const itemDiscount = cart.reduce((sum, item) => sum + ((item.price * item.discount / 100) * item.quantity), 0);
@@ -448,6 +479,8 @@ const POS = () => {
   const manualDiscount = itemDiscount + extraDiscount;
   const taxableAmount = subtotal - manualDiscount;
   const gstAmount = taxableAmount > 0 ? Math.round(taxableAmount * (gstRate / 100) * 100) / 100 : 0;
+  // Walk-in: always show CGST+SGST (isIntrastate=true), no IGST.
+  // Registered customer: CGST+SGST if same state, IGST if different state.
   const cgst = isIntrastate ? gstAmount / 2 : 0;
   const sgst = isIntrastate ? gstAmount / 2 : 0;
   const igst = !isIntrastate ? gstAmount : 0;
@@ -475,12 +508,22 @@ const POS = () => {
   const paidTowardPreviousDue = includePreviousDue && hasPreviousDue ? Math.min(rawPaid, previousDueAmount) : 0;
   const remainingAfterPrevDue = rawPaid - paidTowardPreviousDue;
   const paidTowardCurrentInvoice = Math.min(remainingAfterPrevDue, payableAmount);
-  const currentInvoiceDue = payableAmount - paidTowardCurrentInvoice;
-  const remainingPreviousDue = previousDueAmount - paidTowardPreviousDue;
-  const dueAmount = remainingPreviousDue + currentInvoiceDue;
+  // Current invoice due — only the new sale's unpaid amount (never previous due)
+  const currentInvoiceDue = Math.max(0, payableAmount - paidTowardCurrentInvoice);
+  // Remaining previous due after any payment toward it
+  const remainingPreviousDue = includePreviousDue && hasPreviousDue
+    ? Math.max(0, previousDueAmount - paidTowardPreviousDue)
+    : 0;
+  // Total due customer must pay = current invoice due + any unpaid previous due
+  const dueAmount = currentInvoiceDue + remainingPreviousDue;
   const change = Math.max(0, rawPaid - totalPayable);
   const confirmedPaidAmount = paidTowardCurrentInvoice;
   const confirmedPrevDuePayment = paidTowardPreviousDue;
+
+  // The current bill's standalone due (without previous due) — used for
+  // the saved Sale document's dueAmount so the invoice only reflects the
+  // current sale's unpaid balance.
+  const currentBillDueOnly = Math.max(0, payableAmount - paidTowardCurrentInvoice);
 
   useEffect(() => { try { localStorage.setItem('pos_last_payment', paymentMethod); } catch {} }, [paymentMethod]);
 
@@ -507,26 +550,101 @@ const POS = () => {
     startProgressAnimation();
     try {
       const targetCustomerId = customer;
+      // Use confirmData (the single source of truth shown in the modal)
+      // rather than live state values, ensuring the saved Sale document
+      // matches exactly what the user saw and confirmed.
+      const cData = confirmData;
+      const gstRate = cData.gstRate || 0;
+      const isIntra = cData.isIntrastate;
+      // Calculate per-item GST breakdown so the Sales Details drawer
+      // displays correct per-item CGST/SGST/IGST/discount values.
+      // First compute each item's base total and per-item discount
+      const itemBaseTotals = cart.map(item => item.quantity * item.price);
+      const cartSubtotal = itemBaseTotals.reduce((s, v) => s + v, 0);
+      // Distribute the total discount (header extra + round-off) proportionally
+      // across items so per-item discount reflects the full discount applied.
+      const headerDiscountPortion = Math.max(0, cData.discount - cart.reduce((sum, item) => sum + ((item.price * (item.discount || 0) / 100) * item.quantity), 0));
+      const itemsWithGst = cart.map((item, idx) => {
+        const baseTotal = itemBaseTotals[idx];
+        const itemDiscountPct = item.discount || 0;
+        const itemPerUnitDiscountAmt = baseTotal * itemDiscountPct / 100;
+        // Distribute header discount proportionally by item's share of subtotal
+        const itemHeaderDiscountShare = cartSubtotal > 0 ? (baseTotal / cartSubtotal) * headerDiscountPortion : 0;
+        const totalItemDiscount = itemPerUnitDiscountAmt + itemHeaderDiscountShare;
+        const itemTaxable = Math.max(0, baseTotal - totalItemDiscount);
+        const itemGstAmount = itemTaxable > 0 ? Math.round(itemTaxable * (gstRate / 100) * 100) / 100 : 0;
+        const itemCgst = isIntra && itemGstAmount > 0 ? itemGstAmount / 2 : 0;
+        const itemSgst = isIntra && itemGstAmount > 0 ? itemGstAmount / 2 : 0;
+        const itemIgst = !isIntra && itemGstAmount > 0 ? itemGstAmount : 0;
+        const itemTotal = itemTaxable + itemGstAmount;
+        return {
+          product: item.product._id,
+          quantity: item.quantity,
+          unit: item.product.unit,
+          price: item.price,
+          discount: itemDiscountPct,
+          gstRate,
+          taxableAmount: itemTaxable,
+          gstAmount: itemGstAmount,
+          cgst: itemCgst,
+          sgst: itemSgst,
+          igst: itemIgst,
+          total: itemTotal,
+          ...(item.isCustomQty ? {
+            enteredQuantity: item.enteredQuantity,
+            enteredUnit: item.enteredUnit,
+            extraCharge: item.extraCharge || 0,
+          } : {}),
+        };
+      });
       const payload = {
         customer: customer || null,
-        items: cart.map(item => ({
-          product: item.product._id, quantity: item.quantity, unit: item.product.unit,
-          price: item.price, discount: item.discount, gstRate, total: item.total,
-          ...(item.isCustomQty ? { enteredQuantity: item.enteredQuantity, enteredUnit: item.enteredUnit, extraCharge: item.extraCharge || 0 } : {}),
-        })),
-        subtotal, discount: totalDiscount, gstRate, gstAmount, cgst, sgst, igst, taxableAmount,
-        totalAmount: payableAmount, paidAmount: confirmedPaidAmount, dueAmount: Math.max(0, payableAmount - confirmedPaidAmount),
-        paymentMethod: selectedPayment, posType: 'pos', notes: customerNote,
-        roundOffDiscount,
+        items: itemsWithGst,
+        subtotal: cData.subtotal,
+        discount: cData.discount,
+        gstRate,
+        gstAmount: cData.gstAmount,
+        cgst: cData.cgst,
+        sgst: cData.sgst,
+        igst: cData.igst,
+        taxableAmount: cData.subtotal - (cData.discount - cData.roundOffDiscount),
+        totalAmount: cData.payableAmount,
+        paidAmount: confirmedPaidAmount,
+        // dueAmount should reflect ONLY the current bill's unpaid balance,
+        // never the previous due — that stays on the Customer record.
+        dueAmount: currentBillDueOnly,
+        // Send previous-due payment separately so the backend can allocate
+        // it across older unpaid invoices in FIFO order.
+        prevDuePayment: confirmedPrevDuePayment,
+        roundOffDiscount: cData.roundOffDiscount,
+        paymentMethod: selectedPayment,
+        posType: 'pos',
+        notes: customerNote,
       };
       const { data } = await api.post('/sales', payload, { _skipLoading: true });
       advanceProgressToStep2();
-      const saleDetail = await api.get(`/sales/${data._id || data.sale}`);
+      const saleDetail = await api.get(`/sales/${data._id || data.sale}`, { _skipLoading: true });
       const saleData = saleDetail.data.sale || saleDetail.data;
-      setLastSale({ ...saleData, invoiceNo: data.invoiceNo || saleData.invoiceNo, totalAmount: data.totalAmount || saleData.totalAmount || payableAmount, roundOff: data.roundOff ?? saleData.roundOff ?? roundOffDiscount, paidAmount: data.paidAmount || saleData.paidAmount || paidAmount, dueAmount: data.dueAmount || saleData.dueAmount || dueAmount, paymentMethod: selectedPayment, notes: customerNote });
-      if (confirmedPrevDuePayment > 0 && targetCustomerId) {
-        try { await api.post(`/customers/${targetCustomerId}/payment`, { amount: confirmedPrevDuePayment, paymentMethod: selectedPayment, notes: `Previous due settled during POS checkout (Invoice ${data.invoiceNo || ''})` }); } catch (payErr) { showToast.warning(t('posPage.previousDue.paymentRecordFailed')); }
-      }
+      // Use stored database values for the invoice preview — never recalculate
+      setLastSale({
+        ...saleData,
+        invoiceNo: data.invoiceNo || saleData.invoiceNo,
+        totalAmount: saleData.totalAmount,
+        subtotal: saleData.subtotal,
+        discount: saleData.discount,
+        gstAmount: saleData.gstAmount,
+        cgst: saleData.cgst,
+        sgst: saleData.sgst,
+        igst: saleData.igst,
+        paidAmount: saleData.paidAmount || confirmedPaidAmount,
+        dueAmount: saleData.dueAmount,
+        paymentMethod: selectedPayment,
+        notes: customerNote,
+      });
+      // Previous-due payment is now handled by the backend's createSale
+      // via the prevDuePayment field in the payload — it allocates the
+      // amount across older unpaid invoices in FIFO order. No separate
+      // API call needed, which would double-count the payment.
       setIsFadingOut(true);
       fadeTimerRef.current = setTimeout(() => {
         setLoading(false); setProgressStep(0); setIsFadingOut(false); setShowInvoice(true);
@@ -741,7 +859,7 @@ const POS = () => {
         </div>
       </div>
 
-      {loading && <PremiumGeneratingOverlay t={t} progressStep={progressStep} isFadingOut={isFadingOut} />}
+      {loading && <PremiumGeneratingOverlay t={t} progressStep={progressStep} isFadingOut={isFadingOut} lastSale={lastSale} />}
       {showConfirmModal && confirmData && <ConfirmSaleModal data={confirmData} onConfirm={handleProcessSale} onCancel={() => setShowConfirmModal(false)} loading={loading} />}
       {customQtyModal && <CustomQuantityModal product={customQtyModal.product} initial={customQtyModal.initial} reservedBaseQty={reservedBaseQtyForProduct(customQtyModal.product._id, customQtyModal.editingKey)} onConfirm={handleConfirmCustomQty} onCancel={() => setCustomQtyModal(null)} />}
       {showInvoice && lastSale && <PrintPreview sale={lastSale} shopInfo={shopInfo} onClose={() => setShowInvoice(false)} />}

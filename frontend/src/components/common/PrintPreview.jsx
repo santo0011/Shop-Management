@@ -36,11 +36,11 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
   const gstAmount = Number(sale?.gstAmount || sale?.tax || 0);
   const isIntrastate = cgst > 0 || sgst > 0;
 
-  // sale.totalAmount is already the floored Final Payable amount (rounding
-  // happens once, at sale creation) — reconstruct the pre-round Grand Total
-  // from the stored roundOff delta so every template below can show the
-  // full Subtotal → Tax → Discount → Grand Total → Round Off → Payable
-  // breakdown without re-deriving anything.
+  // sale.totalAmount is the stored Final Payable amount.
+  // For newer sales, the discount already includes any round-off adjustment,
+  // so the "grand total before round-off" is just payableAmount.
+  // For older sales that still have a stored roundOff field, we reconstruct
+  // the pre-round Grand Total for backward-compatible display.
   const payableAmount = Number(sale?.totalAmount ?? sale?.grandTotal ?? 0);
   const roundOff = Number(sale?.roundOff || 0);
   const rawGrandTotal = payableAmount - roundOff;

@@ -881,7 +881,13 @@
       "returnHistory": "ফেরতের ইতিহাস ({{count}})",
       "rtn": "ফেরত",
       "shop": "দোকান",
-      "title": "বিক্রয়ের বিস্তারিত"
+      "title": "বিক্রয়ের বিস্তারিত",
+      "billingSummary": "বিলিং সারসংক্ষেপ",
+      "itemDiscount": "পণ্য ছাড়",
+      "invoiceDiscount": "চালান ছাড়",
+      "taxableAmount": "করযোগ্য পরিমাণ",
+      "totalGst": "মোট জিএসটি",
+      "roundOffDiscount": "রাউন্ড অফ ছাড়"
     },
     "invoice": {
       "cashier": "বিক্রয়কারী",

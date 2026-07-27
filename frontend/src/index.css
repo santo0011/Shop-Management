@@ -2469,7 +2469,7 @@ select:-webkit-autofill {
   position: fixed;
   top: 0;
   right: 0;
-  width: 520px;
+  width: 660px;
   /* `100%` (not `100vw`) — for a fixed-position box, `vw` includes the
      scrollbar gutter while `%` resolves against the actual viewport, so
      `100vw` can render a few pixels wider than the visible screen and force
@@ -15731,4 +15731,298 @@ select:-webkit-autofill {
 .gst-report-table th.gst-cell-amount {
   text-align: right;
   font-family: var(--font-mono);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POS — Premium Generating Overlay / Success Animation
+   (All styles below this line are for the bill generation
+    success animation on the /pos page only.)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Processing state (steps 0-1) */
+.pos-premium-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: posOverlayIn 0.3s ease;
+}
+
+.pos-premium-fade-out {
+  animation: posOverlayOut 0.4s ease forwards;
+}
+
+@keyframes posOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes posOverlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.pos-premium-modal {
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 2rem 2.5rem;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+  animation: posModalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pos-premium-fade-out .pos-premium-modal {
+  animation: posModalOut 0.35s ease forwards;
+}
+
+@keyframes posModalIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes posModalOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(-10px); }
+}
+
+/* ─── Spinner ring (processing) ────────────────────────── */
+.pos-premium-spinner-ring {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1.25rem;
+}
+
+.pos-premium-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+.pos-premium-track {
+  stroke: var(--border-color);
+}
+
+.pos-premium-arc {
+  stroke: url(#posGradient);
+  stroke-dasharray: 163;
+  stroke-dashoffset: 120;
+  animation: posSpin 1s linear infinite;
+  transform-origin: center;
+  filter: drop-shadow(0 0 6px rgba(108, 99, 255, 0.3));
+  stroke-linecap: round;
+}
+
+@keyframes posSpin {
+  0% { stroke-dashoffset: 120; transform: rotate(0deg); }
+  50% { stroke-dashoffset: 40; }
+  100% { stroke-dashoffset: 120; transform: rotate(360deg); }
+}
+
+.pos-premium-spinner-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: posPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes posPulse {
+  0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+.pos-premium-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.3rem;
+  letter-spacing: -0.01em;
+}
+
+.pos-premium-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 1.25rem;
+}
+
+/* ─── Progress steps ───────────────────────────────────── */
+.pos-premium-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pos-premium-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.pos-premium-step-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  border: 2px solid var(--border-color);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.pos-premium-step.active .pos-premium-step-dot {
+  background: rgba(var(--primary-rgb), 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pos-premium-step.current .pos-premium-step-dot {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.15);
+}
+
+.pos-premium-step-dot-empty {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-color);
+}
+
+.pos-premium-step-spinner-sm {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: loading-spin 0.6s linear infinite;
+}
+
+.pos-premium-step-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.pos-premium-step.active .pos-premium-step-label { color: var(--text-secondary); }
+.pos-premium-step.current .pos-premium-step-label { color: var(--primary); }
+
+.pos-premium-step-line {
+  width: 20px;
+  height: 2px;
+  background: var(--border-color);
+  border-radius: 2px;
+  transition: background 0.3s ease;
+}
+
+.pos-premium-step-line.active { background: var(--primary); }
+
+/* ─── Success state (step 2) ───────────────────────────── */
+.pos-premium-success-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1rem;
+  position: relative;
+}
+
+.pos-premium-success-circle {
+  fill: none;
+  stroke: #2ecc71;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 170;
+  stroke-dashoffset: 170;
+  animation: posCheckCircleAnim 0.5s ease forwards 0.1s;
+}
+
+@keyframes posCheckCircleAnim {
+  to { stroke-dashoffset: 0; }
+}
+
+.pos-premium-check {
+  fill: none;
+  stroke: #2ecc71;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  animation: posCheckAnim 0.35s ease forwards 0.45s;
+}
+
+@keyframes posCheckAnim {
+  to { stroke-dashoffset: 0; }
+}
+
+.pos-premium-success-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 204, 113, 0.2), transparent 70%);
+  transform: translate(-50%, -50%) scale(0);
+  animation: posGlowAnim 0.6s ease forwards 0.3s;
+}
+
+@keyframes posGlowAnim {
+  to { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+}
+
+.pos-premium-success-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #2ecc71;
+  margin: 0 0 0.2rem;
+  letter-spacing: -0.01em;
+  animation: posFadeUp 0.4s ease forwards;
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@keyframes posFadeUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pos-premium-success-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+  animation: posFadeUp 0.4s ease forwards 0.15s;
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.pos-premium-invoice-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.4rem 1rem;
+  background: rgba(var(--primary-rgb), 0.08);
+  border: 1px solid rgba(var(--primary-rgb), 0.15);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary);
+  animation: posFadeUp 0.4s ease forwards 0.3s;
+  opacity: 0;
+  transform: translateY(8px);
 }

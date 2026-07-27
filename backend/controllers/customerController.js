@@ -1,6 +1,7 @@
 const Customer = require('../models/Customer');
 const Sale = require('../models/Sale');
 const CustomerPayment = require('../models/CustomerPayment');
+const { allocatePayment, recalculateCustomerDue } = require('../services/paymentAllocation');
 
 const getCustomers = async (req, res) => {
   try {
@@ -259,9 +260,15 @@ const receivePayment = async (req, res) => {
       source: 'due_collection',
     });
 
-    customer.dueAmount -= amount;
+    // Allocate payment across unpaid invoices in FIFO order
+    // so per-invoice paidAmount/dueAmount stay in sync.
+    await allocatePayment(customer._id, req.user.shop, amount);
+
+    // Recalculate customer-level dueAmount from all invoice dueAmounts
+    // so every page (Dashboard, Due Reports, Customer Profile, etc.)
+    // always sees the correct total.
     customer.totalPaid += amount;
-    await customer.save();
+    await recalculateCustomerDue(customer, req.user.shop);
 
     res.json({ payment, customer });
   } catch (error) {

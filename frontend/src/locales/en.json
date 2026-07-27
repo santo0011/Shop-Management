@@ -886,7 +886,13 @@
       "returnHistory": "Return History ({{count}})",
       "rtn": "Rtn",
       "shop": "Shop",
-      "title": "Sale Details"
+      "title": "Sale Details",
+      "billingSummary": "Billing Summary",
+      "itemDiscount": "Item Discount",
+      "invoiceDiscount": "Invoice Discount",
+      "taxableAmount": "Taxable Amount",
+      "totalGst": "Total GST",
+      "roundOffDiscount": "Discount"
     },
     "invoice": {
       "cashier": "Cashier",

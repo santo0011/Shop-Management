@@ -83,6 +83,18 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
   const pmtIcon = PAYMENT_METHOD_ICONS[sale?.paymentMethod] || '💵';
   const pmtLabel = sale?.paymentMethod ? t(`sale.${sale.paymentMethod}`) : '-';
 
+  // ─── GST Logic ──────────────────────────────────────────────
+  const businessState = shopInfo?.settings?.businessState || shopInfo?.state || '';
+  const customerState = sale?.customer?.state || '';
+  // Walk-in (no customer state) — always treat as Intra-State (CGST + SGST).
+  // Only Inter-State (IGST) when a registered customer from a different state.
+  const isIntrastate = !customerState || (businessState && customerState && businessState.toLowerCase().trim() === customerState.toLowerCase().trim());
+  const gstRate = sale?.gstRate || 0;
+
+  // Total discount - stored as a single combined value (item discounts + extra + round-off)
+  // The backend now saves the frontend's combined discount directly
+  const totalDiscount = sale?.discount || 0;
+
   return (
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
@@ -94,117 +106,253 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
         <div className="drawer-body">
           {sale && (
             <>
-              {/* Invoice Hero */}
+              {/* Invoice Hero + Info in one unified card */}
               <div style={{
-                textAlign: 'center', marginBottom: '1.25rem', padding: '1.25rem',
-                background: 'linear-gradient(135deg, rgba(108,99,255,0.05), rgba(0,217,166,0.05))',
+                marginBottom: '1.25rem',
                 borderRadius: 'var(--border-radius-lg)',
-                border: '1px solid rgba(108,99,255,0.1)',
+                border: '1px solid var(--border-color)',
+                overflow: 'hidden',
+                background: 'var(--bg-card)',
               }}>
+                {/* Invoice Number + Date */}
                 <div style={{
-                  width: 52, height: 52, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #6C63FF, #00D9A6)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', margin: '0 auto 0.6rem',
-                  boxShadow: '0 4px 20px rgba(108,99,255,0.3)',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '0.7rem 1rem',
+                  background: 'linear-gradient(135deg, rgba(108,99,255,0.06), rgba(0,217,166,0.03))',
+                  borderBottom: '1px solid var(--border-color)',
                 }}>
-                  <BiReceipt size={28} />
-                </div>
-                <h4 style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                  {sale.invoiceNo || t('common.notAvailable')}
-                </h4>
-                <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {formatDate(sale.createdAt)}
-                </span>
-              </div>
-
-              {/* Shop & Customer Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: '1.25rem' }}>
-                {shopInfo && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(108,99,255,0.1)', color: 'var(--primary)' }}><BiStore size={18} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.shop')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.name || '-'}</span>
-                      {shopInfo?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {shopInfo.phone}</span>}
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #6C63FF, #00D9A6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, boxShadow: '0 3px 10px rgba(108,99,255,0.25)',
+                  }}>
+                    <BiReceipt size={18} style={{ color: '#fff' }} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {sale.invoiceNo || t('common.notAvailable')}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      <BiTime size={11} style={{ verticalAlign: 'middle', marginRight: 2 }} />{formatDate(sale.createdAt)}
                     </div>
                   </div>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(0,217,166,0.1)', color: '#00D9A6' }}><BiUser size={18} /></div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('sale.customer')}</span>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
-                    {sale.customer?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {sale.customer.phone}</span>}
-                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(255,181,69,0.1)', color: '#F39C12' }}><BiCreditCard size={18} /></div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.payment')}</span>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {pmtLabel}</span>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'rgba(46,204,113,0.08)', padding: '2px 10px', borderRadius: 6 }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>{t('common.paid')}:</span>
-                        <strong style={{ color: '#2ecc71', fontSize: '0.78rem' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
-                      </span>
-                      {sale.dueAmount > 0 && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'rgba(255,107,107,0.08)', padding: '2px 10px', borderRadius: 6 }}>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 500 }}>{t('common.due')}:</span>
-                          <strong style={{ color: '#FF6B6B', fontSize: '0.78rem' }}>₹{Number(sale.dueAmount || 0).toFixed(2)}</strong>
+
+                {/* 3 Cards Row */}
+                <div style={{ display: 'flex', gap: 8, padding: '0.6rem 0.75rem', flexWrap: 'wrap' }}>
+                  {shopInfo && (
+                    <div style={{
+                      flex: 1, minWidth: 130,
+                      background: 'var(--bg-card)',
+                      borderRadius: 'var(--border-radius-md)',
+                      border: '1px solid var(--border-color)',
+                      padding: '0.5rem 0.7rem',
+                      borderLeft: '3px solid var(--primary)',
+                    }}>
+                      <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                        <BiStore size={11} style={{ color: 'var(--primary)' }} /> {t('salesPage.drawer.shop')}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{shopInfo?.name || '-'}</div>
+                      {shopInfo?.phone && <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>📞 {shopInfo.phone}</div>}
+                    </div>
+                  )}
+
+                  <div style={{
+                    flex: 1, minWidth: 130,
+                    background: 'var(--bg-card)',
+                    borderRadius: 'var(--border-radius-md)',
+                    border: '1px solid var(--border-color)',
+                    padding: '0.5rem 0.7rem',
+                    borderLeft: '3px solid #00D9A6',
+                  }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <BiUser size={11} style={{ color: '#00D9A6' }} /> {t('sale.customer')}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{sale.customer?.name || t('salesPage.invoice.walkIn')}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 1 }}>
+                      {sale.customer?.phone && <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>📞 {sale.customer.phone}</span>}
+                      {sale.customer?.state && (
+                        <span style={{ fontSize: '0.6rem', color: '#6C63FF', background: 'rgba(108,99,255,0.08)', padding: '0 5px', borderRadius: 3, fontWeight: 600 }}>
+                          {sale.customer.state}
                         </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    flex: 1, minWidth: 130,
+                    background: 'var(--bg-card)',
+                    borderRadius: 'var(--border-radius-md)',
+                    border: '1px solid var(--border-color)',
+                    padding: '0.5rem 0.7rem',
+                    borderLeft: '3px solid #F39C12',
+                  }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <BiCreditCard size={11} style={{ color: '#F39C12' }} /> {t('salesPage.drawer.payment')}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>{pmtIcon}</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{pmtLabel}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
+                      {sale.dueAmount > 0 && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#FF6B6B' }}>Due: ₹{Number(sale.dueAmount || 0).toFixed(2)}</span>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Items */}
+              {/* Items Table - Enhanced */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
                   <BiCart size={16} /><span>{t('salesPage.drawer.itemsCount', { count: sale.items?.length || 0 })}</span>
                 </div>
-                <div style={{ borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', padding: '0.45rem 0.7rem', background: 'var(--bg-primary)', fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-color)' }}>
-                    <span style={{ flex: 2 }}>{t('salesPage.invoice.item')}</span>
-                    <span style={{ flex: 0.5, textAlign: 'center' }}>{t('salesPage.invoice.qty')}</span>
-                    <span style={{ flex: 0.6, textAlign: 'center' }}>{t('salesPage.drawer.rtn')}</span>
-                    <span style={{ flex: 0.7, textAlign: 'right' }}>{t('common.price')}</span>
-                    <span style={{ flex: 0.7, textAlign: 'right' }}>{t('common.total')}</span>
+                <div style={{ borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', padding: '0.35rem 0.5rem', background: 'var(--bg-primary)', fontSize: '0.58rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.2px', borderBottom: '1px solid var(--border-color)' }}>
+                    <span style={{ flex: 1.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('salesPage.invoice.item')}</span>
+                    <span style={{ flex: 0.35, textAlign: 'center' }}>{t('salesPage.invoice.qty')}</span>
+                    <span style={{ flex: 0.3, textAlign: 'center' }}>{t('salesPage.drawer.rtn')}</span>
+                    <span style={{ flex: 0.5, textAlign: 'right' }}>{t('sale.discount')}</span>
+                    {isIntrastate ? (
+                      <>
+                        <span style={{ flex: 0.6, textAlign: 'center' }}>CGST {gstRate > 0 ? `(${(gstRate/2)}%)` : ''}</span>
+                        <span style={{ flex: 0.6, textAlign: 'center' }}>SGST {gstRate > 0 ? `(${(gstRate/2)}%)` : ''}</span>
+                      </>
+                    ) : (
+                      <span style={{ flex: 0.6, textAlign: 'center' }}>IGST {gstRate > 0 ? `(${gstRate}%)` : ''}</span>
+                    )}
+                    <span style={{ flex: 0.5, textAlign: 'right' }}>{t('common.total')}</span>
                   </div>
-                  {sale.items?.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', padding: '0.45rem 0.7rem', fontSize: '0.78rem', borderBottom: idx < sale.items.length - 1 ? '1px solid var(--border-light)' : 'none', background: 'var(--bg-card)' }}>
-                      <span style={{ flex: 2, fontWeight: 600, wordBreak: 'break-word' }}>
-                        {item.product?.name || item.name || t('salesPage.invoice.item')}
-                        {item.discount > 0 && <span style={{ display: 'block', color: '#e74c3c', fontSize: '0.6rem', fontWeight: 600 }}>-{item.discount}% {t('salesPage.invoice.off')}</span>}
-                      </span>
-                      <span style={{ flex: 0.5, textAlign: 'center', color: 'var(--text-secondary)' }}>{item.quantity}</span>
-                      <span style={{ flex: 0.6, textAlign: 'center', color: (item.returnedQty || 0) > 0 ? '#6C63FF' : 'var(--text-muted)', fontWeight: (item.returnedQty || 0) > 0 ? 700 : 400 }}>
-                        {item.returnedQty || '-'}
-                      </span>
-                      <span style={{ flex: 0.7, textAlign: 'right', color: 'var(--text-secondary)' }}>₹{Number(item.price).toFixed(2)}</span>
-                      <span style={{ flex: 0.7, textAlign: 'right', fontWeight: 700 }}>₹{Number(item.total).toFixed(2)}</span>
-                    </div>
-                  ))}
+                  {sale.items?.map((item, idx) => {
+                    const itemGstRate = item.gstRate || gstRate;
+                    const itemCgst = item.cgst || 0;
+                    const itemSgst = item.sgst || 0;
+                    const itemIgst = item.igst || 0;
+                    const itemGstAmt = item.gstAmount || 0;
+                    // Calculate actual discount amount from the difference between base total and taxable amount
+                    // This works regardless of whether discount was applied as percentage or price reduction
+                    const baseTotal = (item.price * item.quantity);
+                    const itemTaxable = item.taxableAmount || baseTotal;
+                    const itemDiscountAmt = Math.max(0, baseTotal - itemTaxable);
+                    return (
+                      <div key={idx} style={{ display: 'flex', padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderBottom: idx < sale.items.length - 1 ? '1px solid var(--border-light)' : 'none', background: 'var(--bg-card)' }}>
+                        <span style={{ flex: 1.6, fontWeight: 600, wordBreak: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.product?.name || item.name || t('salesPage.invoice.item')}
+                        </span>
+                        <span style={{ flex: 0.35, textAlign: 'center', color: 'var(--text-secondary)' }}>{item.quantity}</span>
+                        <span style={{ flex: 0.3, textAlign: 'center', color: (item.returnedQty || 0) > 0 ? '#6C63FF' : 'var(--text-muted)', fontWeight: (item.returnedQty || 0) > 0 ? 700 : 400 }}>
+                          {item.returnedQty || '-'}
+                        </span>
+                        <span style={{ flex: 0.5, textAlign: 'right', color: itemDiscountAmt > 0 ? '#e74c3c' : 'var(--text-muted)', fontWeight: itemDiscountAmt > 0 ? 600 : 400 }}>
+                          ₹{itemDiscountAmt.toFixed(2)}
+                        </span>
+                        {isIntrastate ? (
+                          <>
+                            <span style={{ flex: 0.6, textAlign: 'center', color: itemCgst > 0 ? '#17A2B8' : 'var(--text-muted)', fontWeight: itemCgst > 0 ? 600 : 400, fontSize: '0.65rem' }}>
+                              {itemCgst > 0 ? `₹${itemCgst.toFixed(2)}` : '-'}
+                            </span>
+                            <span style={{ flex: 0.6, textAlign: 'center', color: itemSgst > 0 ? '#17A2B8' : 'var(--text-muted)', fontWeight: itemSgst > 0 ? 600 : 400, fontSize: '0.65rem' }}>
+                              {itemSgst > 0 ? `₹${itemSgst.toFixed(2)}` : '-'}
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ flex: 0.6, textAlign: 'center', color: itemIgst > 0 ? '#6C63FF' : 'var(--text-muted)', fontWeight: itemIgst > 0 ? 600 : 400, fontSize: '0.65rem' }}>
+                            {itemIgst > 0 ? `₹${itemIgst.toFixed(2)}` : '-'}
+                          </span>
+                        )}
+                        <span style={{ flex: 0.5, textAlign: 'right', fontWeight: 700 }}>₹{Number(item.total).toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Totals */}
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                    <span>{t('sale.subtotal')}</span>
-                    <span>₹{Number(sale.subtotal || sale.totalAmount || 0).toFixed(2)}</span>
+              {/* Billing Summary Card */}
+              <div style={{
+                marginBottom: '1rem',
+                borderRadius: 'var(--border-radius-lg)',
+                border: '1px solid rgba(108,99,255,0.2)',
+                overflow: 'hidden',
+                background: 'var(--bg-card)',
+                boxShadow: '0 2px 12px rgba(108,99,255,0.08)',
+              }}>
+                {/* Header */}
+                <div style={{
+                  padding: '0.6rem 1rem',
+                  background: 'linear-gradient(135deg, rgba(108,99,255,0.08), rgba(0,217,166,0.05))',
+                  borderBottom: '1px solid rgba(108,99,255,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}>
+                  <BiReceipt size={16} style={{ color: 'var(--primary)' }} />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {t('salesPage.drawer.billingSummary')}
+                  </span>
+                </div>
+
+                {/* Summary Rows */}
+                <div style={{ padding: '0.5rem 1rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {/* Subtotal */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{t('sale.subtotal')}</span>
+                    <span style={{ fontWeight: 600 }}>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
                   </div>
-                  {sale.discountOnTotal > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#e74c3c' }}>
-                      <span>{t('sale.discount')}</span>
-                      <span>-₹{Number(sale.discountOnTotal || 0).toFixed(2)}</span>
+
+                  {/* Discount - always show (combined: item discounts + extra + round-off) */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: totalDiscount > 0 ? '#e74c3c' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                    <span>{t('sale.discount')}</span>
+                    <span style={{ fontWeight: totalDiscount > 0 ? 600 : 400 }}>₹{Number(totalDiscount).toFixed(2)}</span>
+                  </div>
+
+                  {/* Taxable Amount */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-light)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{t('salesPage.drawer.taxableAmount')}</span>
+                    <span style={{ fontWeight: 600 }}>₹{Number(sale.taxableAmount || 0).toFixed(2)}</span>
+                  </div>
+
+                  {/* CGST (if intra-state) */}
+                  {isIntrastate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.cgst > 0 ? '#17A2B8' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                      <span>CGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${(gstRate / 2)}%` : ''})</span></span>
+                      <span style={{ fontWeight: sale.cgst > 0 ? 600 : 400 }}>₹{Number(sale.cgst || 0).toFixed(2)}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.55rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'rgba(108,99,255,0.06)', border: '1px solid rgba(108,99,255,0.15)', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+
+                  {/* SGST (if intra-state) */}
+                  {isIntrastate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.sgst > 0 ? '#17A2B8' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                      <span>SGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${(gstRate / 2)}%` : ''})</span></span>
+                      <span style={{ fontWeight: sale.sgst > 0 ? 600 : 400 }}>₹{Number(sale.sgst || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {/* IGST (if inter-state) */}
+                  {!isIntrastate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.igst > 0 ? '#6C63FF' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                      <span>IGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${gstRate}%` : ''})</span></span>
+                      <span style={{ fontWeight: sale.igst > 0 ? 600 : 400 }}>₹{Number(sale.igst || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {/* Total GST - always show */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-light)' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{t('salesPage.drawer.totalGst')}</span>
+                    <span style={{ fontWeight: 700, color: sale.gstAmount > 0 ? '#6C63FF' : 'var(--text-muted)' }}>₹{Number(sale.gstAmount || 0).toFixed(2)}</span>
+                  </div>
+
+                  {/* Grand Total */}
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', padding: '0.55rem 0',
+                    fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700,
+                    borderTop: '2px solid rgba(108,99,255,0.2)',
+                    marginTop: 2,
+                  }}>
                     <span>{t('salesPage.invoice.grandTotal')}</span>
-                    <span style={{ fontSize: '1.05rem', color: 'var(--primary)' }}>₹{Number(sale.grandTotal || sale.totalAmount || 0).toFixed(2)}</span>
+                    <span style={{ fontSize: '1.05rem', color: 'var(--primary)' }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -238,17 +386,22 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
 
   useEffect(() => {
     if (sale) {
-      setReturnItems(sale.items?.map((item) => ({
-        productId: item.product?._id || item.productId,
-        productName: item.product?.name || item.name || '',
-        soldQty: item.quantity,
-        returnedQty: item.returnedQty || 0,
-        maxReturnable: item.quantity - (item.returnedQty || 0),
-        returnQty: 0,
-        refundAmount: 0,
-        price: item.price || 0,
-        itemReason: '',
-      })) || []);
+      setReturnItems(sale.items?.map((item) => {
+        // Use the stored final per-unit price from the sale
+        // item.total already accounts for price, discount, and GST adjustments
+        const finalUnitPrice = item.quantity > 0 ? (item.total || 0) / item.quantity : 0;
+        return {
+          productId: item.product?._id || item.productId,
+          productName: item.product?.name || item.name || '',
+          soldQty: item.quantity,
+          returnedQty: item.returnedQty || 0,
+          maxReturnable: item.quantity - (item.returnedQty || 0),
+          returnQty: 0,
+          refundAmount: 0,
+          price: finalUnitPrice,
+          itemReason: '',
+        };
+      }) || []);
       setReason('');
       setRefundMethod('cash');
       setShowConfirmReturnAll(false);

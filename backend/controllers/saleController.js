@@ -5,6 +5,7 @@ const Customer = require('../models/Customer');
 const CustomerPayment = require('../models/CustomerPayment');
 const Shop = require('../models/Shop');
 const { calculateItemTotals } = require('../utils/gstCalculation');
+const { allocatePayment, recalculateCustomerDue } = require('../services/paymentAllocation');
 
 // ─── Shared filter builder ──────────────────────────────────────
 const buildSalesQuery = async (req) => {
@@ -153,65 +154,20 @@ const createSale = async (req, res) => {
     const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
     req.body.invoiceNo = `${shopPrefix}-${dateStr}-${(count + 1).toString().padStart(4, '0')}`;
 
-    // Get business state from shop settings
-    const shop = await Shop.findById(req.user.shop);
-    const businessState = shop?.settings?.businessState || 'West Bengal';
+    // ─── CRITICAL: USE FRONTEND-CALCULATED VALUES ─────────────────
+    // The Confirm Sale modal (POS) is the single source of truth for all
+    // monetary calculations. The backend must NOT recalculate GST, subtotal,
+    // discount, or totalAmount — doing so produces inconsistent values
+    // between the invoice, sales details, and database.
+    //
+    // The frontend sends these pre-computed values:
+    //   subtotal, discount, gstRate, gstAmount, cgst, sgst, igst,
+    //   taxableAmount, totalAmount, paidAmount, dueAmount
+    //
+    // All of these are accepted as-is from the request body.
 
-    // Get customer state if customer is selected
-    let customerState = '';
-    if (req.body.customer) {
-      const customer = await Customer.findById(req.body.customer);
-      customerState = customer?.state || '';
-    }
-
-    // Calculate GST for each item
-    const calculatedItems = (req.body.items || []).map(item => {
-      const gstRate = Number(item.gstRate) || Number(item.tax) || 0;
-      const lineGst = calculateItemTotals(
-        item.quantity,
-        item.price,
-        item.discount || 0,
-        gstRate,
-        businessState,
-        customerState
-      );
-      return {
-        ...item,
-        gstRate,
-        cgst: lineGst.cgst,
-        sgst: lineGst.sgst,
-        igst: lineGst.igst,
-        taxableAmount: lineGst.taxableAmount,
-        gstAmount: lineGst.gstAmount,
-        total: lineGst.total,
-      };
-    });
-
-    const subtotal = calculatedItems.reduce((sum, item) => sum + (item.taxableAmount + (item.taxableAmount * item.discount / (100 - item.discount || 1))), 0);
-    const discountTotal = calculatedItems.reduce((sum, item) => sum + (item.taxableAmount * item.discount / (100 - item.discount || 1)), 0);
-    const taxableAmount = calculatedItems.reduce((sum, item) => sum + item.taxableAmount, 0);
-    const gstAmount = calculatedItems.reduce((sum, item) => sum + item.gstAmount, 0);
-    const cgst = calculatedItems.reduce((sum, item) => sum + item.cgst, 0);
-    const sgst = calculatedItems.reduce((sum, item) => sum + item.sgst, 0);
-    const igst = calculatedItems.reduce((sum, item) => sum + item.igst, 0);
-    const totalAmount = calculatedItems.reduce((sum, item) => sum + item.total, 0);
-
-    req.body.subtotal = subtotal;
-    req.body.discount = discountTotal;
-    req.body.gstRate = (req.body.items[0]?.gstRate || req.body.items[0]?.tax || 0);
-    req.body.cgst = cgst;
-    req.body.sgst = sgst;
-    req.body.igst = igst;
-    req.body.taxableAmount = taxableAmount;
-    req.body.gstAmount = gstAmount;
-    req.body.items = calculatedItems;
-
-    // Round off logic
-    const rawGrandTotal = Math.max(0, subtotal - discountTotal + gstAmount);
-    req.body.totalAmount = Math.floor(rawGrandTotal);
-    req.body.roundOff = req.body.totalAmount - rawGrandTotal;
-
-    const totalAmt = req.body.totalAmount;
+    // Validate and cap paidAmount / dueAmount against totalAmount
+    const totalAmt = Number(req.body.totalAmount) || 0;
     const requestedPaid = Math.max(0, Number(req.body.paidAmount) || 0);
     req.body.paidAmount = Math.min(requestedPaid, totalAmt);
     req.body.dueAmount = Math.max(0, totalAmt - req.body.paidAmount);
@@ -241,6 +197,7 @@ const createSale = async (req, res) => {
     }
 
     if (sale.customer) {
+      // Update customer totals
       await Customer.findByIdAndUpdate(sale.customer, {
         $inc: {
           totalPurchases: sale.totalAmount,
@@ -248,6 +205,22 @@ const createSale = async (req, res) => {
           dueAmount: sale.dueAmount,
         },
       });
+
+      // If there's a previous-due payment (sent as prevDuePayment from POS),
+      // allocate it across the customer's older unpaid invoices (FIFO).
+      const prevDuePayment = Math.max(0, Number(req.body.prevDuePayment) || 0);
+      if (prevDuePayment > 0) {
+        await allocatePayment(sale.customer, req.user.shop, prevDuePayment, {
+          excludeSaleId: sale._id,
+        });
+      }
+
+      // Recalculate customer-level dueAmount from all invoice dueAmounts
+      // to keep it in sync after FIFO allocation.
+      const customer = await Customer.findById(sale.customer);
+      if (customer) {
+        await recalculateCustomerDue(customer, req.user.shop);
+      }
     }
 
     if (sale.customer && sale.paidAmount > 0) {
@@ -538,7 +511,10 @@ const processReturn = async (req, res) => {
 
       await Product.findByIdAndUpdate(ret.productId, { $inc: { stock: +ret.quantity } });
 
-      const refundAmt = ret.refundAmount || (saleItem.price * ret.quantity);
+      // Use the stored final per-unit price from the sale item's total
+      // item.total already accounts for price, discount, and GST
+      const finalUnitPrice = saleItem.quantity > 0 ? (saleItem.total || 0) / saleItem.quantity : 0;
+      const refundAmt = ret.refundAmount || (finalUnitPrice * ret.quantity);
       totalRefund += refundAmt;
 
       returnItems.push({
@@ -586,6 +562,12 @@ const processReturn = async (req, res) => {
           dueAmount: sale.dueAmount - prevDueAmount,
         },
       });
+      // Recalculate customer-level dueAmount from all invoice dueAmounts
+      // to keep it in sync after the return adjustment.
+      const customer = await Customer.findById(sale.customer);
+      if (customer) {
+        await recalculateCustomerDue(customer, req.user.shop);
+      }
     }
 
     const updatedSale = await Sale.findById(sale._id)
