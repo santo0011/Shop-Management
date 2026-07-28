@@ -44,7 +44,7 @@ const getReportsAnalytics = async (req, res) => {
       Sale.aggregate([
         { $match: match },
         { $addFields: { refundAmount: { $sum: '$returns.totalRefund' } } },
-        { $group: { _id: null, totalSales: { $sum: '$totalAmount' }, totalRefunds: { $sum: '$refundAmount' }, count: { $sum: 1 } } },
+        { $group: { _id: null, totalSales: { $sum: '$totalAmount' }, totalRefunds: { $sum: '$refundAmount' }, count: { $sum: 1 }, totalDue: { $sum: '$dueAmount' } } },
       ]),
       Sale.aggregate([
         { $match: match },
@@ -80,14 +80,19 @@ const getReportsAnalytics = async (req, res) => {
         { $unwind: '$items' },
         { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'product' } },
         { $unwind: '$product' },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$saleDate' } }, cost: { $sum: { $multiply: ['$items.quantity', '$product.purchasePrice'] } } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$saleDate' } }, cost: { $sum: { $multiply: [{ $subtract: ['$items.quantity', { $ifNull: ['$items.returnedQty', 0] }] }, '$product.purchasePrice'] } } } },
       ]),
     ]);
 
     const totalSales = totalsAgg[0]?.totalSales || 0;
     const totalOrders = totalsAgg[0]?.count || 0;
-    const totalRefunds = totalsAgg[0]?.totalRefunds || 0;
-    const totalRevenue = Math.max(0, totalSales - totalRefunds);
+    // totalAmount is ALREADY reduced by refunds on the sale documents.
+    // Subtracting totalRefunds again would double-count the reduction.
+    // totalSales is the correct revenue figure (post-refund).
+    // This matches the Sales page's aggregateSalesStats calculation.
+    const totalRevenue = totalSales;
+    // totalDue from the date-scoped aggregation (matches Sales page behavior)
+    const totalDue = totalsAgg[0]?.totalDue || 0;
 
     const costByDate = Object.fromEntries(dailyCostAgg.map(d => [d._id, d.cost]));
     const totalCost = dailyCostAgg.reduce((sum, d) => sum + d.cost, 0);
@@ -100,22 +105,8 @@ const getReportsAnalytics = async (req, res) => {
       profit: d.sales - (costByDate[d._id] || 0),
     }));
 
-    // Lightweight aggregations for totalDue (customer + supplier)
-    const [customerDueAgg, supplierDueAgg] = await Promise.all([
-      Customer.aggregate([
-        { $match: { shop: shopId } },
-        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
-      ]),
-      Supplier.aggregate([
-        { $match: { shop: shopId } },
-        { $group: { _id: null, total: { $sum: '$dueAmount' } } },
-      ]),
-    ]);
-
     // Count distinct customers within date range (lightweight)
     const distinctCustomers = await Sale.distinct('customer', { ...match, customer: { $ne: null } });
-
-    const totalDue = (customerDueAgg[0]?.total || 0) + (supplierDueAgg[0]?.total || 0);
 
     res.json({
       range: { startDate: start.toISOString(), endDate: end.toISOString() },

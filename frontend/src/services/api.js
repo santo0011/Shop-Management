@@ -95,6 +95,15 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Handle subscription expired - redirect to /subscription
+    if (error.response?.status === 403 && (error.response?.data?.code === 'SUBSCRIPTION_EXPIRED' || error.response?.data?.subscriptionExpired)) {
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/subscription' && currentPath !== '/login') {
+        window.location.href = '/subscription';
+      }
+      return Promise.reject(error);
+    }
+
     // Skip forced-logout handling for the login request itself: a login
     // attempt against a deactivated account never had a session to begin
     // with, so it's just a form error — Login.jsx already shows it inline.

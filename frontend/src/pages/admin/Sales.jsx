@@ -12,7 +12,7 @@ import {
   BiStore, BiMoney, BiTrendingUp, BiWallet,
   BiHash, BiPhone, BiNote,
   BiTime, BiUserCircle, BiCart, BiUndo,
-  BiFile, BiGridSmall, BiLayout, BiDownload,
+  BiEdit, BiFile, BiGridSmall, BiLayout, BiDownload,
   BiQr, BiIdCard,
 } from 'react-icons/bi';
 import PrintPreview from '../../components/common/PrintPreview';
@@ -775,6 +775,46 @@ const TableSkeletonRows = () => (
   </>
 );
 
+// ─── Edit Timer Component ────────────────────────────────────
+const EDIT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+const EditTimer = ({ createdAt, updatedAt, returnStatus, t }) => {
+  // If any return exists, editing is permanently locked
+  if (returnStatus && returnStatus !== 'none') {
+    return <span style={{ color: '#9e9e9e', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{t('salesPage.editTimer.locked')}</span>;
+  }
+
+  // Use the latest edit time (updatedAt) if available, otherwise use createdAt
+  const effectiveTime = updatedAt || createdAt;
+  const [remaining, setRemaining] = useState(() => {
+    const elapsed = Date.now() - new Date(effectiveTime).getTime();
+    return Math.max(0, EDIT_TIMEOUT_MS - elapsed);
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - new Date(effectiveTime).getTime();
+      const rem = Math.max(0, EDIT_TIMEOUT_MS - elapsed);
+      setRemaining(rem);
+    }, 1000); // update every second for live countdown
+    return () => clearInterval(interval);
+  }, [effectiveTime]);
+
+  if (remaining <= 0) {
+    return <span style={{ color: '#FF6B6B', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{t('salesPage.editTimer.expired')}</span>;
+  }
+
+  const totalSeconds = Math.ceil(remaining / 1000);
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return (
+    <span style={{ color: '#FF6B6B', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+      ⏱ {t('salesPage.editTimer.timeLeft', { time: timeStr })}
+    </span>
+  );
+};
+
 // ─── Main Sales Component ────────────────────────────────────
 const Sales = () => {
   const { t } = useTranslation();
@@ -787,6 +827,7 @@ const Sales = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [tick, setTick] = useState(0);
   const getDefaultDateRange = () => {
     const end = new Date();
     const start = new Date();
@@ -852,6 +893,14 @@ const Sales = () => {
     }
   }, [startDate, endDate, paymentStatus, debouncedSearch]);
 
+  // ─── Edit timer tick ────────────────────────────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     fetchSales({ page: 1, isSearch: false });
   }, [fetchSales, debouncedSearch, startDate, endDate, paymentStatus]);
@@ -874,6 +923,22 @@ const Sales = () => {
   };
 
   const handleView = (sale) => { setViewingSale(sale); setDrawerOpen(true); };
+  const handleEdit = (sale) => {
+    // Navigate to POS with edit mode
+    const effectiveTime = sale.updatedAt || sale.createdAt;
+    const isExpired = Date.now() - new Date(effectiveTime).getTime() >= EDIT_TIMEOUT_MS;
+    if (isExpired) {
+      showToast.error(t('salesPage.editSale.editTimeExpired'));
+      return;
+    }
+    if (sale.returnStatus !== 'none') {
+      showToast.error(t('salesPage.editSale.cannotEditReturned'));
+      return;
+    }
+    // Store sale ID in sessionStorage and navigate to POS
+    sessionStorage.setItem('editSaleId', sale._id);
+    window.location.href = '/pos?edit=' + sale._id;
+  };
   const handleReturn = (sale) => { setReturningSale(sale); setReturnDrawerOpen(true); };
   const handleReturnProcessed = (updatedSale) => {
     setSales(prev => prev.map(s => s._id === updatedSale._id ? updatedSale : s));
@@ -963,6 +1028,7 @@ const Sales = () => {
                 <th>{t('salesPage.table.totalAmount')}</th>
                 <th>{t('salesPage.table.paymentStatus')}</th>
                 <th>{t('salesPage.table.returnStatus')}</th>
+                <th style={{ width: '90px', fontSize: '0.7rem' }}>{t('salesPage.editTimer.remainingTime')}</th>
                 <th style={{ width: '110px' }}>{t('salesPage.table.actions')}</th>
               </tr>
             </thead>
@@ -970,9 +1036,9 @@ const Sales = () => {
               {refreshing ? (
                 <TableSkeletonRows />
               ) : searching ? (
-                <tr><td colSpan={7}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : sales.length === 0 ? (
-                <tr><td colSpan={7}><div className="sales-empty-state"><span className="sales-empty-icon">🧾</span><p>{t('salesPage.noSalesFound')}</p></div></td></tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><span className="sales-empty-icon">🧾</span><p>{t('salesPage.noSalesFound')}</p></div></td></tr>
               ) : sales.map((sale, idx) => {
                 const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
                 const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
@@ -1000,9 +1066,15 @@ const Sales = () => {
                     <td>
                       <div className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>{rs.label}</div>
                     </td>
-                    <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <EditTimer createdAt={sale.createdAt} updatedAt={sale.updatedAt} returnStatus={sale.returnStatus} t={t} />
+                    </td>
+                    <td className="sales-actions-cell" style={{ width: '140px', whiteSpace: 'nowrap' }}>
                       <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow /></button>
                       <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter /></button>
+                      {(() => { const effectiveTime = sale.updatedAt || sale.createdAt; return Date.now() - new Date(effectiveTime).getTime() < EDIT_TIMEOUT_MS && sale.returnStatus === 'none'; })() && (
+                        <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.edit')} title={t('salesPage.actions.edit')} onClick={() => handleEdit(sale)} style={{ background: 'rgba(108, 99, 255, 0.08)', color: '#6C63FF' }}><BiEdit /></button>
+                      )}
                       <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo /></button>
                     </td>
                   </tr>

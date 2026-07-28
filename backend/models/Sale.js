@@ -209,6 +209,14 @@ const saleSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  editCount: {
+    type: Number,
+    default: 0,
+  },
   returns: [returnEntrySchema],
 }, {
   timestamps: true,

@@ -45,6 +45,7 @@ const StatusBadge = ({ status, size = 'sm' }) => {
     expired: { bg: COLORS.dangerLight, color: '#cc3b3b', dot: '#FF6B6B', label: t('subscriptionPage.expired', 'Expired') },
     cancelled: { bg: COLORS.greyLight, color: '#6b6b8d', dot: '#9a9ab8', label: t('subscriptionPage.cancelled', 'Cancelled') },
     trial: { bg: '#e3f2fd', color: '#1565c0', dot: '#1565c0', label: t('subscriptionPage.trial', 'Trial') },
+    inactive: { bg: COLORS.greyLight, color: '#6b6b8d', dot: '#9a9ab8', label: t('subscriptionPage.inactive', 'Inactive') },
   };
   const s = map[status] || map.expired;
   const isSmall = size === 'sm';
@@ -350,37 +351,103 @@ const SubscriptionPage = () => {
   const isExpired = statusData?.isExpired;
   const subStatus = statusData?.subscriptionStatus;
 
-  // ── Expired Full-Screen ──
-  if (isExpired) {
+  // ── Expired/Inactive Full-Screen ──
+  const showLockedScreen = isExpired || 
+    subStatus === 'expired' || 
+    subStatus === 'inactive' || 
+    subStatus === 'queued' || 
+    subStatus === 'cancelled';
+
+  if (showLockedScreen) {
+    const statusLabel = subStatus === 'expired' 
+      ? t('subscriptionPage.expired', 'Expired')
+      : subStatus === 'inactive'
+      ? t('subscriptionPage.inactive', 'Inactive')
+      : subStatus === 'queued'
+      ? t('subscriptionPage.queued', 'Queued')
+      : subStatus === 'cancelled'
+      ? t('subscriptionPage.cancelled', 'Cancelled')
+      : t('subscriptionPage.expired', 'Expired');
+
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         minHeight: '80vh', textAlign: 'center', padding: '2rem',
       }}>
         <div style={{
-          width: 110, height: 110, borderRadius: '50%',
+          width: 120, height: 120, borderRadius: '50%',
           background: 'linear-gradient(135deg, #ff6b6b22, #ee5a2422)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '3.2rem', marginBottom: '1.5rem',
+          fontSize: '3.5rem', marginBottom: '1.5rem',
           border: '3px solid #ff6b6b44',
         }}>⏰</div>
-        <h2 style={{ color: '#c62828', marginBottom: '0.75rem', fontWeight: 800, fontSize: '1.6rem' }}>{t('subscriptionPage.subscriptionExpired', 'Subscription Expired')}</h2>
-        <p style={{ color: COLORS.textSecondary, maxWidth: 380, marginBottom: '2rem', fontSize: '1rem', lineHeight: 1.6 }}>
-          {t('subscriptionPage.subscriptionExpiredDesc', 'Your subscription has expired. Please contact the Super Admin to renew your subscription.')}
+        <h2 style={{ color: '#c62828', marginBottom: '0.5rem', fontWeight: 800, fontSize: '1.8rem' }}>
+          {t('subscriptionPage.subscriptionExpired', 'Subscription Expired')}
+        </h2>
+        <p style={{ color: COLORS.textSecondary, maxWidth: 400, marginBottom: '0.25rem', fontSize: '1rem', lineHeight: 1.6 }}>
+          {t('subscriptionPage.subscriptionExpiredDesc', 'Your subscription has expired. Please renew your subscription to continue using the software.')}
         </p>
-        <a
-          href="mailto:support@example.com?subject=Subscription%20Renewal%20Request"
-          style={{
-            padding: '0.8rem 2.25rem', borderRadius: 10, border: 'none',
-            background: `linear-gradient(135deg, ${COLORS.primary}, #3a0ca3)`,
-            color: 'white', fontWeight: 700, fontSize: '0.95rem',
-            cursor: 'pointer', textDecoration: 'none',
-            boxShadow: '0 4px 15px rgba(108,99,255,0.3)',
-            display: 'inline-block',
-          }}
-        >
-          {t('subscriptionPage.contactSuperAdmin', 'Contact Super Admin')}
-        </a>
+
+        {/* Status Badge */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <StatusBadge status={subStatus || 'expired'} />
+        </div>
+
+        {/* Current Plan Info */}
+        {currentSub && (
+          <div style={{
+            background: COLORS.card, borderRadius: 12, padding: '1rem 1.5rem',
+            border: `1px solid ${COLORS.border}`,
+            marginBottom: '1.5rem', textAlign: 'center',
+            minWidth: 280,
+          }}>
+            <div style={{ fontSize: '0.75rem', color: COLORS.textSecondary, marginBottom: '0.3rem' }}>
+              {t('subscriptionPage.currentPlan', 'Current Plan')}
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: COLORS.text, marginBottom: '0.5rem' }}>
+              {currentSub.plan?.name || t('subscriptionPage.na', 'N/A')}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', fontSize: '0.82rem', color: COLORS.textSecondary }}>
+              <div>
+                <div style={{ fontWeight: 600, color: COLORS.text }}>{new Date(currentSub.endDate).toLocaleDateString()}</div>
+                <div style={{ fontSize: '0.7rem' }}>{t('subscriptionPage.expiryDate', 'Expiry Date')}</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, color: '#c62828' }}>{t('subscriptionPage.expired', 'Expired')}</div>
+                <div style={{ fontSize: '0.7rem' }}>{t('subscriptionPage.daysLeft', 'Days Left')}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <a
+            href="mailto:support@example.com?subject=Subscription%20Renewal%20Request"
+            style={{
+              padding: '0.8rem 2rem', borderRadius: 10, border: 'none',
+              background: `linear-gradient(135deg, ${COLORS.primary}, #3a0ca3)`,
+              color: 'white', fontWeight: 700, fontSize: '0.9rem',
+              cursor: 'pointer', textDecoration: 'none',
+              boxShadow: '0 4px 15px rgba(108,99,255,0.3)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {t('subscriptionPage.renewSubscription', 'Renew Subscription')}
+          </a>
+          <a
+            href="mailto:support@example.com?subject=Support%20Request"
+            style={{
+              padding: '0.8rem 2rem', borderRadius: 10,
+              border: `1px solid ${COLORS.border}`,
+              background: COLORS.card, color: COLORS.text, fontWeight: 600, fontSize: '0.9rem',
+              cursor: 'pointer', textDecoration: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {t('subscriptionPage.contactSupport', 'Contact Support')}
+          </a>
+        </div>
       </div>
     );
   }

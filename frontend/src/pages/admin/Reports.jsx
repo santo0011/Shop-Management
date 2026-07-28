@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import Chart from 'react-apexcharts';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
@@ -79,7 +79,7 @@ const getStatusStyles = (t) => ({
 });
 
 const EMPTY_ANALYTICS = {
-  summary: { totalOrders: 0, totalSales: 0, totalRevenue: 0, totalProfit: 0, totalCustomers: 0, lowStockProducts: 0 },
+  summary: { totalOrders: 0, totalSales: 0, totalRevenue: 0, totalProfit: 0, totalCustomers: 0, lowStockProducts: 0, totalDue: 0 },
   daily: [], topProducts: [], paymentMethods: [], recentTransactions: [], lowStockProducts: [],
 };
 
@@ -398,7 +398,6 @@ const Reports = () => {
   const [error, setError] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [persistentData, setPersistentData] = useState(null);
-  const initialLoadDone = useRef(false);
 
   const range = useMemo(
     () => computeRange(filters.preset, filters.customStart, filters.customEnd),
@@ -429,44 +428,41 @@ const Reports = () => {
     gridColor: theme === 'dark' ? '#2a2a4e' : '#e8e8f0',
   };
 
-  const fetchAnalytics = useCallback(async (showFullLoader) => {
-    if (!range) return;
+  // Fetch analytics data — accepts range and paymentMethod directly to avoid stale closures
+  const fetchAnalytics = useCallback(async (showFullLoader, rangeVal, paymentMethodVal) => {
+    const r = rangeVal || range;
+    const pm = paymentMethodVal !== undefined ? paymentMethodVal : filters.paymentMethod;
+    if (!r) return;
     if (showFullLoader) setLoading(true); else setRefreshing(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
-      if (filters.paymentMethod !== 'all') params.append('paymentMethod', filters.paymentMethod);
+      const params = new URLSearchParams({ startDate: r.startDate, endDate: r.endDate });
+      if (pm !== 'all') params.append('paymentMethod', pm);
       const { data } = await api.get(`/reports/analytics?${params.toString()}`, { _skipLoading: true });
-      setAnalytics((prev) => ({
-        ...prev,
-        summary: data.summary || prev.summary,
-        daily: data.daily || [],
-        topProducts: data.topProducts || [],
-        paymentMethods: data.paymentMethods || [],
-        recentTransactions: data.recentTransactions || [],
-        lowStockProducts: data.lowStockProducts || prev.lowStockProducts,
-      }));
+      if (data && data.summary) {
+        setAnalytics((prev) => ({
+          ...prev,
+          summary: data.summary,
+          daily: data.daily || [],
+          topProducts: data.topProducts || [],
+          paymentMethods: data.paymentMethods || [],
+          recentTransactions: data.recentTransactions || [],
+          lowStockProducts: data.lowStockProducts || prev.lowStockProducts,
+        }));
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || t('reportsPage.failedToLoadData'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [range, filters.paymentMethod, t]);
+  }, [t, range, filters.paymentMethod]); // Include range and paymentMethod in deps
 
-  // Initial load — single fetch, no duplicate
+  // Fetch analytics on mount and when range/paymentMethod changes
   useEffect(() => {
-    if (!initialLoadDone.current) {
-      initialLoadDone.current = true;
-      fetchAnalytics(true);
+    if (range) {
+      fetchAnalytics(true, range, filters.paymentMethod);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Subsequent loads when filters change (only after initial load)
-  useEffect(() => {
-    if (!initialLoadDone.current) return;
-    fetchAnalytics(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, filters.paymentMethod]);
 
@@ -506,7 +502,8 @@ const Reports = () => {
   // Merge low stock and totals from persistent cache + analytics
   const summaryCards = useMemo(() => {
     const lowStockCount = persistentData?.lowStockProducts?.length ?? analytics.lowStockProducts?.length ?? 0;
-    const totalDue = (persistentData?.totalCustomerDue ?? 0) + (persistentData?.totalSupplierDue ?? 0);
+    // Use totalDue from analytics (date-scoped) which matches the Sales page's aggregateSalesStats
+    const totalDue = analytics.summary.totalDue ?? 0;
     return [
       { icon: BiCart, label: t('dashboard.totalSales'), value: money(analytics.summary.totalSales), color: 'primary', rawValue: analytics.summary.totalSales, isCurrency: true },
       { icon: BiDollar, label: t('reportsPage.totalRevenue'), value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
@@ -620,7 +617,7 @@ const Reports = () => {
           <div style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--danger)' }}><BiError /></div>
           <h5 className="mb-2" style={{ fontWeight: 700 }}>{t('reportsPage.failedToLoad')}</h5>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{error}</p>
-          <button className="btn-premium btn-premium-primary" onClick={() => fetchAnalytics(true)}><BiRefresh /> {t('common.retry')}</button>
+          <button className="btn-premium btn-premium-primary" onClick={() => fetchAnalytics(true, range, filters.paymentMethod)}><BiRefresh /> {t('common.retry')}</button>
         </div>
       </div>
     );
@@ -638,7 +635,7 @@ const Reports = () => {
         </div>
         <div className="d-flex gap-2">
           {/* {loading && <div className="" style={{ color: 'var(--primary)', alignSelf: 'center' }} />} */}
-          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false)} disabled={refreshing}>
+          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false, range, filters.paymentMethod)} disabled={refreshing}>
             {refreshing ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('common.refresh')}
           </button>
         </div>

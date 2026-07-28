@@ -246,14 +246,42 @@ const getSubscriptionStatus = async (req, res) => {
     }
 
     const now = new Date();
-    const isExpired = shop.subscriptionStatus === 'expired' ||
-      (shop.subscriptionStatus === 'active' && shop.subscription?.endDate < now) ||
-      (shop.subscriptionStatus === 'trial' && shop.trialEndsAt < now);
+    const hasNoSubscription = !shop.subscription;
 
-    if (isExpired && shop.subscriptionStatus !== 'expired') {
-      shop.subscriptionStatus = 'expired';
-      await shop.save();
+    // Determine the effective subscription status based on actual conditions
+    let effectiveStatus;
+    
+    if (shop.subscriptionStatus === 'active') {
+      // Check if the subscription document's endDate has passed
+      if (!hasNoSubscription && shop.subscription.endDate < now) {
+        effectiveStatus = 'expired';
+        shop.subscriptionStatus = 'expired';
+        await shop.save();
+      } else {
+        effectiveStatus = 'active';
+      }
+    } else if (shop.subscriptionStatus === 'trial') {
+      // "trial" WITHOUT a subscription document = NOT a real trial → inactive
+      if (hasNoSubscription) {
+        effectiveStatus = 'inactive';
+        shop.subscriptionStatus = 'inactive';
+        await shop.save();
+      } else if (shop.trialEndsAt < now) {
+        // Trial with subscription but end date passed
+        effectiveStatus = 'expired';
+        shop.subscriptionStatus = 'expired';
+        await shop.save();
+      } else {
+        effectiveStatus = 'trial';
+      }
+    } else {
+      // expired, inactive, queued, cancelled
+      effectiveStatus = shop.subscriptionStatus || 'inactive';
     }
+
+    // A shop is "locked" if effective status is NOT active and NOT trial (with subscription)
+    const locked = effectiveStatus !== 'active' && 
+      !(effectiveStatus === 'trial' && !hasNoSubscription);
 
     // Find queued subscription
     const queuedSubscription = await Subscription.findOne({
@@ -261,17 +289,17 @@ const getSubscriptionStatus = async (req, res) => {
       status: 'queued',
     }).populate('plan', 'name nameBn duration price features featuresBn');
 
-    const daysRemaining = shop.subscription
+    const daysRemaining = shop.subscription && effectiveStatus === 'active'
       ? Math.ceil((shop.subscription.endDate - now) / (1000 * 60 * 60 * 24))
       : 0;
 
     res.json({
-      subscriptionStatus: shop.subscriptionStatus,
+      subscriptionStatus: effectiveStatus,
       currentSubscription: shop.subscription,
       queuedSubscription: queuedSubscription || null,
       trialEndsAt: shop.trialEndsAt,
       daysRemaining: Math.max(0, daysRemaining),
-      isExpired,
+      isExpired: locked,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

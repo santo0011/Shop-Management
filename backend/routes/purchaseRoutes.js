@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { getPurchases, getPurchase, createPurchase, updatePurchasePayment, updatePurchaseInvoiceImage, processPurchaseReturn } = require('../controllers/purchaseController');
-const { protect } = require('../middlewares/auth');
+const { protect, checkSubscription } = require('../middlewares/auth');
 
-router.get('/', protect, getPurchases);
-router.get('/:id', protect, getPurchase);
-router.post('/', protect, createPurchase);
-router.put('/:id/payment', protect, updatePurchasePayment);
-router.put('/:id/invoice-image', protect, updatePurchaseInvoiceImage);
-router.post('/:id/return', protect, processPurchaseReturn);
+router.get('/', protect, checkSubscription, getPurchases);
+router.get('/:id', protect, checkSubscription, getPurchase);
+router.post('/', protect, checkSubscription, createPurchase);
+router.put('/:id/payment', protect, checkSubscription, updatePurchasePayment);
+router.put('/:id/invoice-image', protect, checkSubscription, updatePurchaseInvoiceImage);
+router.post('/:id/return', protect, checkSubscription, processPurchaseReturn);
 
 module.exports = router;

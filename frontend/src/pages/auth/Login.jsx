@@ -49,7 +49,26 @@ const Login = () => {
       if (data.role === 'super_admin') {
         navigate('/super-admin');
       } else {
-        navigate('/');
+        // After login, check subscription status
+        try {
+          const subRes = await api.get('/subscription/status', { _skipLoading: true });
+          const { isExpired, subscriptionStatus } = subRes.data;
+          // Locked if expired, inactive, queued, or cancelled
+          const isLocked = !subscriptionStatus || 
+            subscriptionStatus === 'expired' || 
+            subscriptionStatus === 'inactive' ||
+            subscriptionStatus === 'queued' ||
+            subscriptionStatus === 'cancelled' ||
+            isExpired;
+          
+          if (isLocked) {
+            navigate('/subscription', { replace: true });
+          } else {
+            navigate('/', { replace: true });
+          }
+        } catch {
+          navigate('/', { replace: true });
+        }
       }
     } catch (err) {
       const message = err.response?.data?.code === 'ACCOUNT_DEACTIVATED'

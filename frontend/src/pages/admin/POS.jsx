@@ -339,6 +339,14 @@ const POS = () => {
   const fadeTimerRef = useRef(null);
   // ─── Round-Off Discount State ──────────────────────────────
   const [selectedRoundOff, setSelectedRoundOff] = useState(null);
+  // ─── Edit Mode State ────────────────────────────────────────
+  const [editSaleId, setEditSaleId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('edit') || null;
+  });
+  const [editSaleData, setEditSaleData] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const initialLoadDoneRef = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -382,7 +390,103 @@ const POS = () => {
   const mobileProductLimit = Number(shopInfo?.settings?.posDisplayLimit?.mobile) || 10;
   const activeProductLimit = isMobileViewport ? mobileProductLimit : desktopProductLimit;
 
+  // ─── Edit Mode: Load existing sale first ─────────────────────
   useEffect(() => {
+    if (!editSaleId) return;
+    (async () => {
+      try {
+        // Load shop info first so PrintPreview uses correct template
+        if (!shopInfo) {
+          try {
+            const shopResp = await api.get('/shops/my', { _skipLoading: true });
+            setShopInfo(shopResp.data.shop || shopResp.data);
+          } catch (e) { /* ignore */ }
+        }
+        const { data } = await api.get(`/sales/${editSaleId}`, { _skipLoading: true });
+        const sale = data.sale || data;
+        setEditSaleData(sale);
+
+        // Check if sale has any returns — if so, block editing
+        if (sale.returnStatus && sale.returnStatus !== 'none') {
+          showToast.error(t('salesPage.editSale.cannotEditReturned'));
+          window.location.href = '/sales';
+          return;
+        }
+
+        setIsEditing(true);
+
+
+        // 1. Populate cart from sale items — restore ORIGINAL values exactly
+        // CRITICAL: item.total in DB = taxableAmount + gstAmount (GST-inclusive).
+        // The POS subtotal = sum of (price × quantity) — it does NOT include GST.
+        // Using the saved item.total would double-count GST in the POS summary.
+        // Always use price × quantity for the cart total, matching how a fresh
+        // POS sale calculates it. GST is then added on top by the POS logic.
+        const cartItems = (sale.items || []).map(item => {
+          const product = item.product || {};
+          const baseTotal = (item.price || 0) * (item.quantity || 0);
+          return {
+            key: product._id || item.product?.toString(),
+            product: {
+              _id: product._id || item.product,
+              name: product.name || item.productName || 'Unknown',
+              nameBn: product.nameBn || '',
+              unit: item.unit || 'pc',
+              sellingPrice: item.price || 0,
+              stock: 999999,
+              allowCustomQuantity: !!item.enteredQuantity,
+            },
+            quantity: item.quantity,
+            price: item.price || 0,
+            discount: item.discount || 0,
+            total: baseTotal,
+            ...(item.enteredQuantity ? {
+              isCustomQty: true,
+              enteredQuantity: item.enteredQuantity,
+              enteredUnit: item.enteredUnit || item.unit,
+              extraCharge: item.extraCharge || 0,
+            } : {}),
+          };
+        });
+        setCart(cartItems);
+
+        // 2. Populate customer
+        if (sale.customer && sale.customer._id) {
+          setCustomer(sale.customer._id);
+          setSelectedCustomerData(sale.customer);
+          setCustomerSearch('');
+        }
+
+        // 3. Populate payment
+        setPaymentMethod(sale.paymentMethod || 'cash');
+        setPaidAmount(sale.paidAmount || '');
+
+        // 4. Reset discount — do NOT restore previous discount
+        // The discount field must always be empty when editing a sale.
+        // The cashier must enter any new discount manually.
+        setDiscountMode('percent');
+        setDiscountValue('');
+
+        // 5. Populate notes
+        if (sale.notes) {
+          setCustomerNote(sale.notes);
+        }
+
+      } catch (err) {
+        console.error('Failed to load sale for editing', err);
+        showToast.error(t('salesPage.editSale.editFailed'));
+      } finally {
+        if (!initialLoadDoneRef.current) {
+          setInitialLoad(false);
+          initialLoadDoneRef.current = true;
+        }
+      }
+    })();
+  }, [editSaleId]);
+
+  // ─── Initial load for normal (non-edit) mode ──────────────────
+  useEffect(() => {
+    if (editSaleId) return; // edit mode handles its own loading
     (async () => {
       try {
         await Promise.all([
@@ -391,7 +495,12 @@ const POS = () => {
           api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)),
           api.get('/categories', { _skipLoading: true }).then(({ data }) => setCategories(Array.isArray(data) ? data : data.categories || [])),
         ]);
-      } catch (err) { console.error(err); } finally { setInitialLoad(false); }
+      } catch (err) { console.error(err); } finally {
+        if (!initialLoadDoneRef.current) {
+          setInitialLoad(false);
+          initialLoadDoneRef.current = true;
+        }
+      }
     })();
   }, []);
 
@@ -467,9 +576,6 @@ const POS = () => {
   const gstRate = shopInfo?.settings?.defaultGstRate ?? 18;
   const businessState = shopInfo?.settings?.businessState || 'West Bengal';
   const customerState = selectedCustomerData?.state || '';
-  // Walk-in customer (no customer selected) — always use Intra-State (CGST + SGST).
-  // Only use Inter-State (IGST) when a registered customer from a different state
-  // is explicitly selected.
   const hasSelectedCustomer = !!selectedCustomerData;
   const isIntrastate = !hasSelectedCustomer || (businessState && customerState && businessState.toLowerCase().trim() === customerState.toLowerCase().trim());
   const receiptFooter = shopInfo?.settings?.receiptFooter || t('posPage.receipt.defaultFooter');
@@ -479,8 +585,6 @@ const POS = () => {
   const manualDiscount = itemDiscount + extraDiscount;
   const taxableAmount = subtotal - manualDiscount;
   const gstAmount = taxableAmount > 0 ? Math.round(taxableAmount * (gstRate / 100) * 100) / 100 : 0;
-  // Walk-in: always show CGST+SGST (isIntrastate=true), no IGST.
-  // Registered customer: CGST+SGST if same state, IGST if different state.
   const cgst = isIntrastate ? gstAmount / 2 : 0;
   const sgst = isIntrastate ? gstAmount / 2 : 0;
   const igst = !isIntrastate ? gstAmount : 0;
@@ -488,14 +592,12 @@ const POS = () => {
 
   // ─── Round-Off Discount ──────────────────────────────────────
   const roundOffOptions = getRoundOffOptions(preRoundOffTotal);
-  // Only apply round-off discount when user explicitly selects a card
   const selectedRoundOffOption = selectedRoundOff !== null
     ? roundOffOptions.find(o => o.key === selectedRoundOff)
     : null;
   const roundOffDiscount = selectedRoundOffOption ? selectedRoundOffOption.discount : 0;
   const payableAmount = selectedRoundOffOption ? selectedRoundOffOption.payable : preRoundOffTotal;
 
-  // ─── Combined Discount (Manual + Round-Off) ──────────────────
   const totalDiscount = manualDiscount + roundOffDiscount;
   const grandTotal = preRoundOffTotal - roundOffDiscount;
 
@@ -508,21 +610,14 @@ const POS = () => {
   const paidTowardPreviousDue = includePreviousDue && hasPreviousDue ? Math.min(rawPaid, previousDueAmount) : 0;
   const remainingAfterPrevDue = rawPaid - paidTowardPreviousDue;
   const paidTowardCurrentInvoice = Math.min(remainingAfterPrevDue, payableAmount);
-  // Current invoice due — only the new sale's unpaid amount (never previous due)
   const currentInvoiceDue = Math.max(0, payableAmount - paidTowardCurrentInvoice);
-  // Remaining previous due after any payment toward it
   const remainingPreviousDue = includePreviousDue && hasPreviousDue
     ? Math.max(0, previousDueAmount - paidTowardPreviousDue)
     : 0;
-  // Total due customer must pay = current invoice due + any unpaid previous due
   const dueAmount = currentInvoiceDue + remainingPreviousDue;
   const change = Math.max(0, rawPaid - totalPayable);
   const confirmedPaidAmount = paidTowardCurrentInvoice;
   const confirmedPrevDuePayment = paidTowardPreviousDue;
-
-  // The current bill's standalone due (without previous due) — used for
-  // the saved Sale document's dueAmount so the invoice only reflects the
-  // current sale's unpaid balance.
   const currentBillDueOnly = Math.max(0, payableAmount - paidTowardCurrentInvoice);
 
   useEffect(() => { try { localStorage.setItem('pos_last_payment', paymentMethod); } catch {} }, [paymentMethod]);
@@ -550,25 +645,16 @@ const POS = () => {
     startProgressAnimation();
     try {
       const targetCustomerId = customer;
-      // Use confirmData (the single source of truth shown in the modal)
-      // rather than live state values, ensuring the saved Sale document
-      // matches exactly what the user saw and confirmed.
       const cData = confirmData;
       const gstRate = cData.gstRate || 0;
       const isIntra = cData.isIntrastate;
-      // Calculate per-item GST breakdown so the Sales Details drawer
-      // displays correct per-item CGST/SGST/IGST/discount values.
-      // First compute each item's base total and per-item discount
       const itemBaseTotals = cart.map(item => item.quantity * item.price);
       const cartSubtotal = itemBaseTotals.reduce((s, v) => s + v, 0);
-      // Distribute the total discount (header extra + round-off) proportionally
-      // across items so per-item discount reflects the full discount applied.
       const headerDiscountPortion = Math.max(0, cData.discount - cart.reduce((sum, item) => sum + ((item.price * (item.discount || 0) / 100) * item.quantity), 0));
       const itemsWithGst = cart.map((item, idx) => {
         const baseTotal = itemBaseTotals[idx];
         const itemDiscountPct = item.discount || 0;
         const itemPerUnitDiscountAmt = baseTotal * itemDiscountPct / 100;
-        // Distribute header discount proportionally by item's share of subtotal
         const itemHeaderDiscountShare = cartSubtotal > 0 ? (baseTotal / cartSubtotal) * headerDiscountPortion : 0;
         const totalItemDiscount = itemPerUnitDiscountAmt + itemHeaderDiscountShare;
         const itemTaxable = Math.max(0, baseTotal - totalItemDiscount);
@@ -597,13 +683,7 @@ const POS = () => {
           } : {}),
         };
       });
-      // Round-Off is merged into Discount before saving.
-      // The discount field stored in the database = manual discount + round-off.
-      // No separate roundOff field is ever saved — it only existed during
-      // the POS calculation UI. Every downstream module (Invoice, Sales Details,
-      // Returns, Reports) reads only the stored discount.
       const finalDiscount = cData.discount;
-      // taxableAmount = subtotal - finalDiscount (final discount includes round-off)
       const correctTaxableAmount = cData.subtotal - finalDiscount;
       const payload = {
         customer: customer || null,
@@ -624,11 +704,17 @@ const POS = () => {
         posType: 'pos',
         notes: customerNote,
       };
-      const { data } = await api.post('/sales', payload, { _skipLoading: true });
+      let data;
+      if (isEditing && editSaleId) {
+        const resp = await api.put(`/sales/${editSaleId}`, payload, { _skipLoading: true });
+        data = resp.data.sale || resp.data;
+      } else {
+        const resp = await api.post('/sales', payload, { _skipLoading: true });
+        data = resp.data;
+      }
       advanceProgressToStep2();
       const saleDetail = await api.get(`/sales/${data._id || data.sale}`, { _skipLoading: true });
       const saleData = saleDetail.data.sale || saleDetail.data;
-      // Use stored database values for the invoice preview — never recalculate
       setLastSale({
         ...saleData,
         invoiceNo: data.invoiceNo || saleData.invoiceNo,
@@ -644,10 +730,6 @@ const POS = () => {
         paymentMethod: selectedPayment,
         notes: customerNote,
       });
-      // Previous-due payment is now handled by the backend's createSale
-      // via the prevDuePayment field in the payload — it allocates the
-      // amount across older unpaid invoices in FIFO order. No separate
-      // API call needed, which would double-count the payment.
       setIsFadingOut(true);
       fadeTimerRef.current = setTimeout(() => {
         setLoading(false); setProgressStep(0); setIsFadingOut(false); setShowInvoice(true);
@@ -786,7 +868,6 @@ const POS = () => {
             </div>
           </div>
 
-          {/* ─── Round-Off Discount Cards ─────────────────────────── */}
           {cart.length > 0 && roundOffOptions.length > 0 && (
             <div className="pos-roundoff-section">
               <label className="pos-payment-label">{t('posPage.roundOff.title')}</label>
@@ -856,7 +937,7 @@ const POS = () => {
 
           <div className="pos-action-buttons">
             <div className="pos-action-row">{lastSale && (<button className="pos-action-btn pos-reprint-btn" onClick={handleReprint}><BiPrinter size={16} /> {t('posPage.actions.reprint')}</button>)}</div>
-            <button className="pos-checkout-btn" onClick={handleOpenConfirm} disabled={cart.length === 0}><BiReceipt size={18} />{t('posPage.search.shortcutBill')}</button>
+            <button className="pos-checkout-btn" onClick={handleOpenConfirm} disabled={cart.length === 0}><BiReceipt size={18} />{isEditing ? t('salesPage.editSale.updateSale') : t('posPage.search.shortcutBill')}</button>
             <button className="pos-clear-btn" onClick={clearCart} disabled={cart.length === 0}><BiTrash size={14} /> {t('posPage.actions.clearCart')}</button>
           </div>
         </div>

@@ -67,14 +67,22 @@ const aggregateSalesStats = async (query) => {
       { $unwind: '$items' },
       { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'product' } },
       { $unwind: '$product' },
-      { $group: { _id: null, cost: { $sum: { $multiply: ['$items.quantity', '$product.purchasePrice'] } } } },
+      {
+        $group: {
+          _id: null,
+          cost: { $sum: { $multiply: [{ $subtract: ['$items.quantity', { $ifNull: ['$items.returnedQty', 0] }] }, '$product.purchasePrice'] } },
+        },
+      },
     ]),
   ]);
 
   const totalSales = totalsAgg[0]?.totalSales || 0;
   const totalOrders = totalsAgg[0]?.count || 0;
   const totalRefunds = totalsAgg[0]?.totalRefunds || 0;
-  const totalRevenue = Math.max(0, totalSales - totalRefunds);
+  // totalAmount is ALREADY reduced by refunds on the sale documents.
+  // Subtracting totalRefunds again would double-count the reduction.
+  // totalSales is the correct revenue figure (post-refund).
+  const totalRevenue = totalSales;
   const totalDue = totalsAgg[0]?.totalDue || 0;
   const totalCost = costAgg[0]?.cost || 0;
   const totalProfit = totalRevenue - totalCost;
@@ -479,6 +487,157 @@ const deleteSale = async (req, res) => {
   }
 };
 
+const updateSale = async (req, res) => {
+  try {
+    const sale = await Sale.findOne({ _id: req.params.id, shop: req.user.shop });
+    if (!sale) return res.status(404).json({ message: 'Sale not found' });
+
+    // ─── Restrictions ────────────────────────────────────────────
+    // Cannot edit if ANY return exists (partial or full)
+    if (sale.returnStatus !== 'none') {
+      return res.status(400).json({ message: 'Cannot edit an invoice that has any returns.' });
+    }
+
+    // Cannot edit if more than 30 minutes have passed
+    const elapsed = Date.now() - new Date(sale.createdAt).getTime();
+    if (elapsed > 30 * 60 * 1000) {
+      return res.status(400).json({ message: 'Editing time expired (30 minutes). Use Return instead.' });
+    }
+
+    if (!req.body.items || req.body.items.length === 0) {
+      return res.status(400).json({ message: 'Sale must contain at least one item' });
+    }
+    if (!req.body.paymentMethod) {
+      return res.status(400).json({ message: 'Missing required fields: paymentMethod' });
+    }
+
+    for (const item of req.body.items) {
+      const qty = Number(item.quantity);
+      if (!(qty > 0)) {
+        return res.status(400).json({ message: 'Item quantity must be greater than zero.' });
+      }
+      const product = await Product.findOne({ _id: item.product, shop: req.user.shop });
+      if (!product) {
+        return res.status(400).json({ message: 'One or more products in this sale were not found.' });
+      }
+    }
+
+    // ─── Step 1: Restore stock from original invoice ─────────────
+    for (const origItem of sale.items) {
+      await Product.findByIdAndUpdate(origItem.product, { $inc: { stock: +origItem.quantity } });
+    }
+
+    // ─── Step 2: Validate stock for new items ────────────────────
+    for (const item of req.body.items) {
+      const product = await Product.findOne({ _id: item.product, shop: req.user.shop });
+      if (product.trackStock !== false && item.quantity > product.stock) {
+        // Restore stock back since we already deducted
+        for (const origItem of sale.items) {
+          await Product.findByIdAndUpdate(origItem.product, { $inc: { stock: -origItem.quantity } });
+        }
+        return res.status(400).json({
+          message: `Insufficient stock for "${product.name}". Available: ${product.stock} ${product.unit}, requested: ${item.quantity}.`,
+        });
+      }
+    }
+
+    // ─── Step 3: Apply new stock deduction ───────────────────────
+    for (const item of req.body.items) {
+      await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } });
+    }
+
+    // ─── Step 4: Update sale fields ──────────────────────────────
+    const totalAmt = Number(req.body.totalAmount) || 0;
+    const requestedPaid = Math.max(0, Number(req.body.paidAmount) || 0);
+    const newPaidAmount = Math.min(requestedPaid, totalAmt);
+    const newDueAmount = Math.max(0, totalAmt - newPaidAmount);
+
+    let newPaymentStatus = 'paid';
+    if (newDueAmount === 0) {
+      newPaymentStatus = 'paid';
+    } else if (newPaidAmount > 0) {
+      newPaymentStatus = 'partial';
+    } else {
+      newPaymentStatus = 'unpaid';
+    }
+
+    const prevTotalAmount = sale.totalAmount || 0;
+    const prevPaidAmount = sale.paidAmount || 0;
+    const prevDueAmount = sale.dueAmount || 0;
+
+    sale.items = req.body.items;
+    sale.subtotal = Number(req.body.subtotal) || 0;
+    sale.discount = Number(req.body.discount) || 0;
+    sale.gstRate = Number(req.body.gstRate) || 0;
+    sale.cgst = Number(req.body.cgst) || 0;
+    sale.sgst = Number(req.body.sgst) || 0;
+    sale.igst = Number(req.body.igst) || 0;
+    sale.taxableAmount = Number(req.body.taxableAmount) || 0;
+    sale.gstAmount = Number(req.body.gstAmount) || 0;
+    sale.totalAmount = totalAmt;
+    sale.paidAmount = newPaidAmount;
+    sale.dueAmount = newDueAmount;
+    sale.paymentStatus = newPaymentStatus;
+    sale.paymentMethod = req.body.paymentMethod;
+    sale.notes = req.body.notes || '';
+    sale.updatedBy = req.user._id;
+    sale.editCount = (sale.editCount || 0) + 1;
+
+    await sale.save();
+
+    // ─── Step 5: Update customer totals ──────────────────────────
+    if (sale.customer) {
+      await Customer.findByIdAndUpdate(sale.customer, {
+        $inc: {
+          totalPurchases: sale.totalAmount - prevTotalAmount,
+          totalPaid: sale.paidAmount - prevPaidAmount,
+          dueAmount: sale.dueAmount - prevDueAmount,
+        },
+      });
+
+      const customer = await Customer.findById(sale.customer);
+      if (customer) {
+        await recalculateCustomerDue(customer, req.user.shop);
+      }
+    }
+
+    // ─── Step 6: Handle payment record ───────────────────────────
+    // If paid amount changed, update or create payment record
+    if (sale.customer && sale.paidAmount > 0) {
+      const existingPayment = await CustomerPayment.findOne({
+        customer: sale.customer,
+        sale: sale._id,
+        source: { $in: ['sale', 'pos'] },
+      });
+      if (existingPayment) {
+        existingPayment.amount = sale.paidAmount;
+        existingPayment.paymentMethod = sale.paymentMethod;
+        await existingPayment.save();
+      } else {
+        await CustomerPayment.create({
+          customer: sale.customer,
+          shop: req.user.shop,
+          amount: sale.paidAmount,
+          paymentMethod: sale.paymentMethod,
+          notes: `Payment at edit for invoice ${sale.invoiceNo}`,
+          collectedBy: req.user._id,
+          sale: sale._id,
+          source: sale.posType === 'regular' ? 'sale' : 'pos',
+        });
+      }
+    }
+
+    const updatedSale = await Sale.findById(sale._id)
+      .populate('customer', 'name phone state')
+      .populate('items.product', 'name nameBn unit')
+      .populate('returns.processedBy', 'name');
+
+    res.json({ sale: updatedSale });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const processReturn = async (req, res) => {
   try {
     const sale = await Sale.findOne({ _id: req.params.id, shop: req.user.shop });
@@ -545,16 +704,38 @@ const processReturn = async (req, res) => {
     const prevTotalAmount = sale.totalAmount || 0;
     const prevPaidAmount = sale.paidAmount || 0;
     const prevDueAmount = sale.dueAmount || 0;
+    const prevSubtotal = sale.subtotal || 0;
+    const prevDiscount = sale.discount || 0;
+    const prevTaxableAmount = sale.taxableAmount || 0;
+    const prevGstAmount = sale.gstAmount || 0;
+    const prevCgst = sale.cgst || 0;
+    const prevSgst = sale.sgst || 0;
+    const prevIgst = sale.igst || 0;
 
     // Step 1: Reduce totalAmount by the refund
     sale.totalAmount = Math.floor(Math.max(0, (sale.totalAmount || 0) - totalRefund));
 
-    // Step 2: Reduce due first (always prefer reducing due over refunding cash)
+    // Step 2: Recalculate all header fields proportionally based on the
+    // ratio of remaining value to original value. This ensures subtotal,
+    // discount, taxableAmount, and all GST fields stay consistent with
+    // the remaining (non-returned) items.
+    const reductionRatio = prevTotalAmount > 0
+      ? sale.totalAmount / prevTotalAmount
+      : 0;
+    sale.subtotal = Math.round(prevSubtotal * reductionRatio * 100) / 100;
+    sale.discount = Math.round(prevDiscount * reductionRatio * 100) / 100;
+    sale.taxableAmount = Math.round(prevTaxableAmount * reductionRatio * 100) / 100;
+    sale.gstAmount = Math.round(prevGstAmount * reductionRatio * 100) / 100;
+    sale.cgst = Math.round(prevCgst * reductionRatio * 100) / 100;
+    sale.sgst = Math.round(prevSgst * reductionRatio * 100) / 100;
+    sale.igst = Math.round(prevIgst * reductionRatio * 100) / 100;
+
+    // Step 3: Reduce due first (always prefer reducing due over refunding cash)
     const newTotal = sale.totalAmount;
     const currentPaid = sale.paidAmount || 0;
     sale.dueAmount = Math.max(0, newTotal - currentPaid);
 
-    // Step 3: Only refund cash if paid amount exceeds the new total
+    // Step 4: Only refund cash if paid amount exceeds the new total
     // (i.e. customer overpaid relative to the reduced invoice)
     const excessPaid = Math.max(0, currentPaid - newTotal);
     sale.paidAmount = currentPaid - excessPaid;
@@ -605,4 +786,4 @@ const processReturn = async (req, res) => {
   }
 };
 
-module.exports = { getSales, getSale, createSale, updateSalePayment, getTopSellingProducts, getTopSellingCategories, getProductSoldCounts, getRecentSales, getSalesStats, deleteSale, processReturn };
+module.exports = { getSales, getSale, createSale, updateSale, updateSalePayment, getTopSellingProducts, getTopSellingCategories, getProductSoldCounts, getRecentSales, getSalesStats, deleteSale, processReturn };

@@ -70,7 +70,23 @@ const authorize = (...roles) => {
   };
 };
 
+/**
+ * Subscription Protection Middleware
+ * 
+ * Business Rules:
+ * - Super Admin is NEVER restricted
+ * - active OR (trial with a subscription document) → Full Access
+ * - expired, inactive, queued, cancelled, or trial WITHOUT subscription → Lock Software
+ * - If no subscription document exists at all → Lock Software
+ * 
+ * Locked users can only access:
+ * - /api/subscription/*
+ * - /api/auth/*
+ * - /api/shops/* (profile/settings)
+ * - /api/notifications/*
+ */
 const checkSubscription = async (req, res, next) => {
+  // Super Admin is NEVER restricted
   if (req.user.role === 'super_admin') {
     return next();
   }
@@ -82,51 +98,68 @@ const checkSubscription = async (req, res, next) => {
   }
 
   const now = new Date();
-  const isExpired = shop.subscriptionStatus === 'expired' || 
-    (shop.subscriptionStatus === 'active' && shop.subscription && await checkIfExpired(shop.subscription)) ||
-    (shop.subscriptionStatus === 'trial' && shop.trialEndsAt < now);
-  
-  if (isExpired) {
-    // Auto-update status if needed
-    if (shop.subscriptionStatus !== 'expired') {
+  const status = shop.subscriptionStatus;
+
+  // Determine effective subscription status
+  let effectiveStatus = status;
+
+  // Case 1: No subscription document exists at all → treat as INACTIVE
+  // (a shop with no subscription assigned by Super Admin is NOT active)
+  const hasNoSubscription = !shop.subscription;
+
+  // Case 2: "trial" status but no subscription was ever assigned → NOT a real trial
+  // The Shop model defaults to 'trial' with a 14-day trialEndsAt, but if no subscription
+  // document was created, the shop should not get trial access.
+  if (status === 'trial' && hasNoSubscription) {
+    effectiveStatus = 'inactive';
+    shop.subscriptionStatus = 'inactive';
+    await shop.save();
+  }
+
+  // Case 3: "trial" status with subscription reference but end date passed → expired
+  if (status === 'trial' && !hasNoSubscription && shop.trialEndsAt < now) {
+    effectiveStatus = 'expired';
+    shop.subscriptionStatus = 'expired';
+    await shop.save();
+  }
+
+  // Case 4: "active" status but subscription end date passed → expired
+  if (status === 'active' && !hasNoSubscription) {
+    const Subscription = require('../models/Subscription');
+    const sub = await Subscription.findById(shop.subscription);
+    if (sub && sub.endDate < now) {
+      effectiveStatus = 'expired';
       shop.subscriptionStatus = 'expired';
       await shop.save();
     }
-    
-    // Allow access only to limited endpoints
-    const allowedPaths = [
-      '/api/subscription',
-      '/api/auth',
-      '/api/shop',
-      '/api/notifications',
-    ];
-    
-    const isAllowed = allowedPaths.some(path => req.originalUrl.startsWith(path));
-    
-    // For GET requests to dashboard, allow subscription status info
-    const isDashboardStatus = req.originalUrl.startsWith('/api/dashboard') && req.method === 'GET';
-    
-    if (!isAllowed && !isDashboardStatus) {
-      return res.status(403).json({ 
-        success: false,
-        code: 'SUBSCRIPTION_EXPIRED',
-        message: 'Your subscription has expired. Please contact the Super Admin to renew your subscription.',
-        subscriptionExpired: true 
-      });
-    }
+  }
+
+  // active and trial (with actual subscription) = Full Access
+  if (effectiveStatus === 'active' || (effectiveStatus === 'trial' && !hasNoSubscription)) {
+    return next();
+  }
+
+  // All other states = Lock Software
+  // Only allow: /api/subscription, /api/auth, /api/shops, /api/notifications
+  const allowedPaths = [
+    '/api/subscription',
+    '/api/auth',
+    '/api/shops',
+    '/api/notifications',
+  ];
+  
+  const isAllowed = allowedPaths.some(path => req.originalUrl.startsWith(path));
+  
+  if (!isAllowed) {
+    return res.status(403).json({ 
+      success: false,
+      code: 'SUBSCRIPTION_EXPIRED',
+      message: 'Your subscription is inactive. Please contact the Super Admin to activate your subscription.',
+      subscriptionExpired: true 
+    });
   }
   
   next();
-};
-
-// Helper to check if subscription is expired
-const checkIfExpired = async (subscriptionId) => {
-  try {
-    const sub = await require('../models/Subscription').findById(subscriptionId);
-    return sub && sub.endDate < new Date();
-  } catch {
-    return false;
-  }
 };
 
 module.exports = { protect, authorize, checkSubscription };
