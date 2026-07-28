@@ -90,6 +90,8 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
   const gstRate = sale?.gstRate || 0;
 
   const totalDiscount = sale?.discount || 0;
+  const saleSubtotal = sale?.subtotal || 0;
+  const discountPct = saleSubtotal > 0 ? ((totalDiscount / saleSubtotal) * 100).toFixed(2) : '0.00';
 
   return (
     <>
@@ -292,7 +294,7 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
                     <span style={{ fontWeight: 600 }}>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: totalDiscount > 0 ? '#e74c3c' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
-                    <span>{t('sale.discount')}</span>
+                    <span>{t('sale.discount')} ({discountPct}%)</span>
                     <span style={{ fontWeight: totalDiscount > 0 ? 600 : 400 }}>₹{Number(totalDiscount).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-light)' }}>

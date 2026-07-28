@@ -43,6 +43,9 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
   const storedTotalAmount = Number(sale?.totalAmount ?? sale?.grandTotal ?? 0);
   const storedGstRate = Number(sale?.gstRate ?? shopInfo?.settings?.defaultGstRate ?? 0);
   
+  // Discount percentage = (Discount Amount / Subtotal) × 100
+  const discountPct = storedSubtotal > 0 ? ((storedDiscount / storedSubtotal) * 100).toFixed(2) : '0.00';
+  
   // Grand Total = Taxable Amount + GST
   // Since round-off is now merged into discount, storedTotalAmount = taxable + gst.
   const grandTotal = storedTotalAmount;
@@ -286,7 +289,7 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
   const renderBillingSummary = () => (
     <div className="receipt-totals">
       <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(storedSubtotal || 0).toFixed(2)}</span></div>
-      {storedDiscount > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(storedDiscount).toFixed(2)}</span></div>}
+      {storedDiscount > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')} ({discountPct}%)</span><span>-₹{Number(storedDiscount).toFixed(2)}</span></div>}
       <div className="receipt-total-row"><span>{t('salesPage.drawer.taxableAmount')}</span><span>₹{Number(storedTaxable || 0).toFixed(2)}</span></div>
       {isIntrastate ? (
         <>
