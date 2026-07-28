@@ -362,8 +362,17 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
 
   useEffect(() => {
     if (sale) {
+      // Calculate the effective refund ratio to match what backend will compute
+      // item.total = GST-inclusive price without round-off
+      // sale.totalAmount = what customer actually paid (includes round-off)
+      const rawItemTotal = (sale.items || []).reduce((sum, i) => sum + (i.total || 0), 0);
+      const effectiveTotal = sale.totalAmount || rawItemTotal;
+      const refundRatio = rawItemTotal > 0 ? effectiveTotal / rawItemTotal : 1;
+
       setReturnItems(sale.items?.map((item) => {
         const finalUnitPrice = item.quantity > 0 ? (item.total || 0) / item.quantity : 0;
+        // Apply refund ratio so frontend display matches backend calculation
+        const effectiveUnitPrice = finalUnitPrice * refundRatio;
         return {
           productId: item.product?._id || item.productId,
           productName: item.product?.name || item.name || '',
@@ -372,7 +381,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
           maxReturnable: item.quantity - (item.returnedQty || 0),
           returnQty: 0,
           refundAmount: 0,
-          price: finalUnitPrice,
+          price: effectiveUnitPrice,
           itemReason: '',
         };
       }) || []);

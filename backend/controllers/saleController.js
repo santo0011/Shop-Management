@@ -489,6 +489,18 @@ const processReturn = async (req, res) => {
       return res.status(400).json({ message: 'At least one item is required for return' });
     }
 
+    // ─── Calculate the effective refund ratio ──────────────────────
+    // The sale.totalAmount already includes all discounts (manual + round-off).
+    // The sum of item.totals only accounts for item-level discounts + GST.
+    // Any extra discount (round-off, extra manual) must be distributed
+    // proportionally across all items so the refund matches what the
+    // customer actually paid.
+    const rawItemTotal = sale.items.reduce((sum, i) => sum + (i.total || 0), 0);
+    const effectiveTotal = sale.totalAmount || rawItemTotal;
+    // refundRatio = what was actually paid / what the raw items would cost
+    // For no discount scenario this is 1.0, for round-off it's < 1.0
+    const refundRatio = rawItemTotal > 0 ? effectiveTotal / rawItemTotal : 1;
+
     let totalRefund = 0;
     const returnItems = [];
 
@@ -511,10 +523,14 @@ const processReturn = async (req, res) => {
 
       await Product.findByIdAndUpdate(ret.productId, { $inc: { stock: +ret.quantity } });
 
-      // Use the stored final per-unit price from the sale item's total
-      // item.total already accounts for price, discount, and GST
+      // Calculate refund using the effective ratio so round-off is included
+      // Full return: refund = item.total * refundRatio
+      // Partial return: refund = (item.total * refundRatio) * (returnedQty / soldQty)
+      // ALWAYS use the backend-calculated refund amount, ignore frontend's value
+      // to ensure round-off is properly distributed
       const finalUnitPrice = saleItem.quantity > 0 ? (saleItem.total || 0) / saleItem.quantity : 0;
-      const refundAmt = ret.refundAmount || (finalUnitPrice * ret.quantity);
+      const effectiveUnitPrice = finalUnitPrice * refundRatio;
+      const refundAmt = effectiveUnitPrice * ret.quantity;
       totalRefund += refundAmt;
 
       returnItems.push({

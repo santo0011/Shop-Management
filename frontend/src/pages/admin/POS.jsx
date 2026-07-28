@@ -105,12 +105,12 @@ const PremiumGeneratingOverlay = ({ t, progressStep, isFadingOut, lastSale }) =>
                 <polyline points="20,30 27,37 40,23" className="pos-premium-check" />
               </svg>
             </div>
-            <h4 className="pos-premium-success-title">{t('posPage.generating.successTitle') || 'Sale Completed Successfully'}</h4>
-            <p className="pos-premium-success-subtitle">{t('posPage.generating.successSubtitle') || 'Invoice has been generated'}</p>
+            <h4 className="pos-premium-success-title">{t('posPage.generating.successTitle')}</h4>
+            <p className="pos-premium-success-subtitle">{t('posPage.generating.successSubtitle')}</p>
             {lastSale?.invoiceNo && (
               <div className="pos-premium-invoice-badge">
                 <BiReceipt size={14} />
-                <span>{t('posPage.generating.invoiceNo') || 'Invoice'}: #{lastSale.invoiceNo}</span>
+                <span>{t('posPage.generating.invoiceNo')} #{lastSale.invoiceNo}</span>
               </div>
             )}
           </>
@@ -597,26 +597,29 @@ const POS = () => {
           } : {}),
         };
       });
+      // Round-Off is merged into Discount before saving.
+      // The discount field stored in the database = manual discount + round-off.
+      // No separate roundOff field is ever saved — it only existed during
+      // the POS calculation UI. Every downstream module (Invoice, Sales Details,
+      // Returns, Reports) reads only the stored discount.
+      const finalDiscount = cData.discount;
+      // taxableAmount = subtotal - finalDiscount (final discount includes round-off)
+      const correctTaxableAmount = cData.subtotal - finalDiscount;
       const payload = {
         customer: customer || null,
         items: itemsWithGst,
         subtotal: cData.subtotal,
-        discount: cData.discount,
+        discount: finalDiscount,
         gstRate,
         gstAmount: cData.gstAmount,
         cgst: cData.cgst,
         sgst: cData.sgst,
         igst: cData.igst,
-        taxableAmount: cData.subtotal - (cData.discount - cData.roundOffDiscount),
+        taxableAmount: correctTaxableAmount,
         totalAmount: cData.payableAmount,
         paidAmount: confirmedPaidAmount,
-        // dueAmount should reflect ONLY the current bill's unpaid balance,
-        // never the previous due — that stays on the Customer record.
         dueAmount: currentBillDueOnly,
-        // Send previous-due payment separately so the backend can allocate
-        // it across older unpaid invoices in FIFO order.
         prevDuePayment: confirmedPrevDuePayment,
-        roundOffDiscount: cData.roundOffDiscount,
         paymentMethod: selectedPayment,
         posType: 'pos',
         notes: customerNote,

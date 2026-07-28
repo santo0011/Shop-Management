@@ -32,9 +32,20 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
   const igst = Number(sale?.igst || 0);
   const isIntrastate = cgst > 0 || sgst > 0;
 
-  const payableAmount = Number(sale?.totalAmount ?? sale?.grandTotal ?? 0);
-  const roundOff = Number(sale?.roundOff || 0);
-  const rawGrandTotal = payableAmount - roundOff;
+  // Use stored database values directly — never recalculate
+  const storedDiscount = Number(sale?.discount || 0);
+  const storedTaxable = Number(sale?.taxableAmount || 0);
+  const storedCgst = Number(sale?.cgst || 0);
+  const storedSgst = Number(sale?.sgst || 0);
+  const storedIgst = Number(sale?.igst || 0);
+  const storedGstAmount = Number(sale?.gstAmount || 0);
+  const storedSubtotal = Number(sale?.subtotal || 0);
+  const storedTotalAmount = Number(sale?.totalAmount ?? sale?.grandTotal ?? 0);
+  const storedGstRate = Number(sale?.gstRate ?? shopInfo?.settings?.defaultGstRate ?? 0);
+  
+  // Grand Total = Taxable Amount + GST
+  // Since round-off is now merged into discount, storedTotalAmount = taxable + gst.
+  const grandTotal = storedTotalAmount;
 
   const PAYMENT_METHOD_LABELS = {
     cash: t('sale.cash'), card: t('sale.card'), upi: t('sale.upi'),
@@ -274,20 +285,18 @@ const PrintPreview = ({ sale, shopInfo, onClose }) => {
   // ─── Shared billing summary (used by all templates) ──────────────────────
   const renderBillingSummary = () => (
     <div className="receipt-totals">
-      <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(sale?.subtotal || 0).toFixed(2)}</span></div>
-      {Number(sale?.discount || 0) > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(sale?.discount || 0).toFixed(2)}</span></div>}
-      <div className="receipt-total-row"><span>{t('salesPage.drawer.taxableAmount')}</span><span>₹{Number(rawGrandTotal || 0).toFixed(2)}</span></div>
+      <div className="receipt-total-row"><span>{t('sale.subtotal')}</span><span>₹{Number(storedSubtotal || 0).toFixed(2)}</span></div>
+      {storedDiscount > 0 && <div className="receipt-total-row receipt-discount"><span>{t('sale.discount')}</span><span>-₹{Number(storedDiscount).toFixed(2)}</span></div>}
+      <div className="receipt-total-row"><span>{t('salesPage.drawer.taxableAmount')}</span><span>₹{Number(storedTaxable || 0).toFixed(2)}</span></div>
       {isIntrastate ? (
         <>
-          {cgst > 0 && <div className="receipt-total-row"><span>CGST ({gstRate/2}%)</span><span>₹{cgst.toFixed(2)}</span></div>}
-          {sgst > 0 && <div className="receipt-total-row"><span>SGST ({gstRate/2}%)</span><span>₹{sgst.toFixed(2)}</span></div>}
+          {storedCgst > 0 && <div className="receipt-total-row"><span>CGST ({storedGstRate/2}%)</span><span>₹{storedCgst.toFixed(2)}</span></div>}
+          {storedSgst > 0 && <div className="receipt-total-row"><span>SGST ({storedGstRate/2}%)</span><span>₹{storedSgst.toFixed(2)}</span></div>}
         </>
       ) : (
-        igst > 0 && <div className="receipt-total-row"><span>IGST ({gstRate}%)</span><span>₹{igst.toFixed(2)}</span></div>
+        storedIgst > 0 && <div className="receipt-total-row"><span>IGST ({storedGstRate}%)</span><span>₹{storedIgst.toFixed(2)}</span></div>
       )}
-      <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.grandTotal')}</span><span className="receipt-grand-total">₹{Number((rawGrandTotal || 0) + cgst + sgst + igst).toFixed(2)}</span></div>
-      {roundOff !== 0 && <div className="receipt-total-row"><span>{t('posPage.totals.roundOff')}</span><span>-₹{Number(Math.abs(roundOff) || 0).toFixed(2)}</span></div>}
-      <div className="receipt-total-row"><span>{t('posPage.totals.payable')}</span><span>₹{Number(payableAmount || 0).toFixed(2)}</span></div>
+      <div className="receipt-total-row"><span className="receipt-grand-total">{t('posPage.totals.grandTotal')}</span><span className="receipt-grand-total">₹{Number(grandTotal || 0).toFixed(2)}</span></div>
       <div className="receipt-total-row"><span>{t('common.paid')}</span><span>₹{Number(sale?.paidAmount || 0).toFixed(2)}</span></div>
       {Number(sale?.dueAmount || 0) > 0 && <div className="receipt-total-row receipt-due"><span>{t('common.due')}</span><span>₹{Number(sale?.dueAmount || 0).toFixed(2)}</span></div>}
       <div className="receipt-total-row"><span>{t('posPage.receipt.payment')}</span><span className="receipt-payment-method">{paymentMethodLabel(sale?.paymentMethod)}</span></div>

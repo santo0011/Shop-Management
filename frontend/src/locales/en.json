@@ -502,7 +502,10 @@
     },
     "generating": {
       "title": "Generating Invoice",
-      "subtitle": "Please wait a moment..."
+      "subtitle": "Please wait a moment...",
+      "successTitle": "Sale Completed Successfully",
+      "successSubtitle": "Invoice has been generated",
+      "invoiceNo": "Invoice:"
     },
     "customer": {
       "add": "Add",
