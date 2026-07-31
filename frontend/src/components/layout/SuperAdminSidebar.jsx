@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { SUPER_ADMIN_LOGO } from '../../config/superAdminLogo';
 import {
   BiGridAlt,
   BiStore,
@@ -143,15 +144,15 @@ const SuperAdminSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) =
       />
       <div className={`sa-sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sa-sidebar-logo">
-          <div className="sa-logo-icon">SA</div>
-          <span className="sa-logo-text">{t('nav.superAdmin')}</span>
+          <div className="sa-logo-wrapper">
+            <img src={SUPER_ADMIN_LOGO} alt="Super Admin" className="sa-logo-img" />
+          </div>
           {mobileOpen && (
-            <button className="sa-close-btn ms-auto" onClick={() => onMobileClose && onMobileClose()}>
+            <button className="sa-close-btn sa-close-btn--mobile" onClick={() => onMobileClose && onMobileClose()}>
               <BiX />
             </button>
           )}
         </div>
-
         <div className="sa-sidebar-nav">
           {NAV_DATA.map((section) => {
             if (section.isSingle) {

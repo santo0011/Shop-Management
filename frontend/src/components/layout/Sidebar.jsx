@@ -7,6 +7,7 @@ import {
   BiReceipt, BiDollar, BiLineChart, BiCog, BiCalculator,
   BiCreditCard, BiStore, BiX
 } from 'react-icons/bi';
+import { SUPER_ADMIN_LOGO } from '../../config/superAdminLogo';
 
 const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
   const { t } = useTranslation();
@@ -68,11 +69,12 @@ const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
       <div className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'open' : ''}`}>
         {/* Logo */}
         <div className="sidebar-logo">
-          <div className="logo-icon">GS</div>
-          <span className="logo-text">{t('app.shortName')}</span>
+          <div className="sidebar-logo-wrapper">
+            <img src={SUPER_ADMIN_LOGO} alt="Shop" className="sidebar-logo-img" />
+          </div>
           {mobileOpen && (
             <button
-              className="btn-close-premium ms-auto d-lg-none"
+              className="sidebar-close-btn"
               onClick={onMobileClose}
             >
               <BiX />

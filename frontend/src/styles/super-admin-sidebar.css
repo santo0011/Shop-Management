@@ -48,40 +48,36 @@
   width: 80px;
 }
 
-.sa-sidebar-logo {
-  flex-shrink: 0;
-  padding: 1rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid var(--sa-sidebar-border);
-  min-height: 64px;
+.sa-sidebar.collapsed .sa-sidebar-logo {
+  padding: 0.5rem;
 }
 
-.sa-logo-icon {
-  width: 36px;
-  height: 36px;
-  background: var(--gradient-primary);
-  border-radius: var(--border-radius-md);
+.sa-sidebar-logo {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--sa-sidebar-border);
+  position: relative;
+}
+
+.sa-logo-wrapper {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 800;
+  min-width: 0;
+}
+
+.sa-logo-img {
+  display: block;
+  max-width: 80%;
+  height: auto;
+}
+
+.sa-close-btn--mobile {
   flex-shrink: 0;
-  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
-}
-
-.sa-logo-text {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--sa-sidebar-logo-text);
-  white-space: nowrap;
-}
-
-.sa-sidebar.collapsed .sa-logo-text {
-  display: none;
+  margin-left: 0.75rem;
 }
 
 .sa-close-btn {
@@ -108,7 +104,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0.25rem 0 0.5rem;
+  padding: 0.75rem 0 0.5rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
