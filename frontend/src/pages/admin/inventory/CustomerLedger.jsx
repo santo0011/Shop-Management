@@ -4,7 +4,7 @@ import { BiFilter, BiX, BiPrinter, BiDownload, BiDollar, BiCart, BiCreditCard, B
 import api from '../../../services/api';
 
 // ─── Helpers ───────────────────────────────────────────────────
-const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
+const formatCurrency = (val) => `₹${Number(val || 0).toFixed(2)}`;
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const formatDateTime = (d) =>

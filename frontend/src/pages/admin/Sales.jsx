@@ -12,11 +12,12 @@ import {
   BiStore, BiMoney, BiTrendingUp, BiWallet,
   BiHash, BiPhone, BiNote,
   BiTime, BiUserCircle, BiCart, BiUndo,
-  BiFile, BiGridSmall, BiLayout, BiDownload,
+  BiEdit, BiFile, BiGridSmall, BiLayout, BiDownload,
   BiQr, BiIdCard,
 } from 'react-icons/bi';
 import PrintPreview from '../../components/common/PrintPreview';
-
+import Pagination from '../../components/common/Pagination';
+  
 // ─── Format helpers ─────────────────────────────────────────
 const formatDate = (dateStr) => {
   const d = new Date(dateStr);
@@ -49,12 +50,8 @@ const getStatusStyles = (t) => ({
 const getReturnStyles = (t) => ({
   none: { bg: 'rgba(158, 158, 158, 0.1)', color: '#9e9e9e', label: t('salesPage.returnStatusLabels.none') },
   partial: { bg: 'rgba(255, 181, 69, 0.12)', color: '#F39C12', label: t('salesPage.returnStatusLabels.partial') },
-  full: { bg: 'rgba(108, 99, 255, 0.12)', color: '#6C63FF', label: t('salesPage.returnStatusLabels.full') },
+  full: { bg: 'rgba(108, 99, 255, 0.1)', color: '#6C63FF', label: t('salesPage.returnStatusLabels.full') },
 });
-
-const PAYMENT_ICONS = {
-  cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦',
-};
 
 const getStatusOptions = (t) => [
   { key: '', label: t('salesPage.status.all') },
@@ -63,7 +60,6 @@ const getStatusOptions = (t) => [
   { key: 'unpaid', label: t('common.due') },
 ];
 
-// ─── Date Quick Filters ───────────────────────────────────────
 const getDatePresets = (t) => [
   { key: 'today', label: t('common.today') },
   { key: '7d', label: t('common.last7Days') },
@@ -72,220 +68,276 @@ const getDatePresets = (t) => [
   { key: 'custom', label: t('common.customRange') },
 ];
 
-// Local calendar date (no timezone shift) — matches what <input type="date"> produces
-const toDateInputValue = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+const PAYMENT_METHOD_ICONS = { cash: '💵', card: '💳', upi: '📱', mobile_banking: '🏦' };
+
+const toDateInputValue = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
-// ─── Invoice QR Component ────────────────────────────────────
-const SalesInvoiceQR = ({ invoiceNo, size = 60 }) => {
-  const chars = (invoiceNo || 'INV').split('');
-  const cellSize = Math.max(2, Math.floor(size / (chars.length + 4)));
-  const padding = cellSize * 2;
-  const totalSize = padding * 2 + chars.length * cellSize;
-  return (
-    <svg width={totalSize} height={totalSize} viewBox={`0 0 ${totalSize} ${totalSize}`} style={{ display: 'block' }}>
-      <rect width={totalSize} height={totalSize} fill="white" rx="2" />
-      <rect x={padding} y={padding} width={cellSize * 7} height={cellSize * 7} fill="black" rx="1" />
-      <rect x={padding + cellSize} y={padding + cellSize} width={cellSize * 5} height={cellSize * 5} fill="white" />
-      <rect x={padding + cellSize * 2} y={padding + cellSize * 2} width={cellSize * 3} height={cellSize * 3} fill="black" />
-      {chars.map((ch, i) => (
-        <rect key={i} x={padding + (i % chars.length) * cellSize} y={padding + Math.floor(i / chars.length) * cellSize + cellSize * 8} width={cellSize} height={cellSize} fill={ch.charCodeAt(0) % 2 === 0 ? 'black' : 'white'} opacity={0.8} />
-      ))}
-    </svg>
-  );
-};
-
-// ─── View Drawer (uses standard drawer classes with smooth animation) ─────────
+// ─── Sale View Drawer ────────────────────────────────────────
 const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice }) => {
   const { t } = useTranslation();
-  const statusStyles = getStatusStyles(t);
-  const returnStyles = getReturnStyles(t);
+  const pmtIcon = PAYMENT_METHOD_ICONS[sale?.paymentMethod] || '💵';
+  const pmtLabel = sale?.paymentMethod ? t(`sale.${sale.paymentMethod}`) : '-';
 
-  const st = sale ? (statusStyles[sale.paymentStatus] || statusStyles.paid) : null;
-  const rs = sale ? (returnStyles[sale.returnStatus] || returnStyles.none) : null;
-  const pmtIcon = sale ? (PAYMENT_ICONS[sale.paymentMethod] || '💵') : null;
-  const allReturns = sale?.returns || [];
-  const totalRefunded = allReturns.reduce((sum, r) => sum + (r.totalRefund || 0), 0);
+  // ─── GST Logic ──────────────────────────────────────────────
+  const businessState = shopInfo?.settings?.businessState || shopInfo?.state || '';
+  const customerState = sale?.customer?.state || '';
+  const isIntrastate = !customerState || (businessState && customerState && businessState.toLowerCase().trim() === customerState.toLowerCase().trim());
+  const gstRate = sale?.gstRate || 0;
+
+  const totalDiscount = sale?.discount || 0;
+  const saleSubtotal = sale?.subtotal || 0;
+  const discountPct = saleSubtotal > 0 ? ((totalDiscount / saleSubtotal) * 100).toFixed(2) : '0.00';
 
   return (
     <>
       <div className={`drawer-overlay ${open ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${open ? 'open' : ''}`}>
         <div className="drawer-header">
-          <h5><BiReceipt size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />{t('salesPage.drawer.title')}</h5>
+          <h5><BiShow size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />{t('salesPage.drawer.title')}</h5>
           <button className="btn-close-premium" onClick={onClose}><BiX /></button>
         </div>
         <div className="drawer-body">
           {sale && (
             <>
-              {/* Invoice Hero */}
+              {/* Invoice Hero + Info in one unified card */}
               <div style={{
-                textAlign: 'center', marginBottom: '1.25rem', padding: '1.25rem',
-                background: 'linear-gradient(135deg, rgba(108,99,255,0.05), rgba(0,217,166,0.05))',
+                marginBottom: '1.25rem',
                 borderRadius: 'var(--border-radius-lg)',
-                border: '1px solid rgba(108,99,255,0.1)',
+                border: '1px solid var(--border-color)',
+                overflow: 'hidden',
+                background: 'var(--bg-card)',
               }}>
+                {/* Invoice Number + Date */}
                 <div style={{
-                  width: 52, height: 52, borderRadius: '50%',
-                  background: 'var(--gradient-primary)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', margin: '0 auto 0.6rem',
-                  boxShadow: '0 4px 15px rgba(108,99,255,0.3)',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '0.7rem 1rem',
+                  background: 'linear-gradient(135deg, rgba(108,99,255,0.06), rgba(0,217,166,0.03))',
+                  borderBottom: '1px solid var(--border-color)',
                 }}>
-                  <BiReceipt size={28} />
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #6C63FF, #00D9A6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, boxShadow: '0 3px 10px rgba(108,99,255,0.25)',
+                  }}>
+                    <BiReceipt size={18} style={{ color: '#fff' }} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {sale.invoiceNo || t('common.notAvailable')}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      <BiTime size={11} style={{ verticalAlign: 'middle', marginRight: 2 }} />{formatDate(sale.createdAt)}
+                    </div>
+                  </div>
                 </div>
-                <h4 style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                  {sale.invoiceNo || t('common.notAvailable')}
-                </h4>
-                <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                  {formatDate(sale.createdAt)}
-                </span>
-                <div style={{ display: 'inline-block', padding: '3px 14px', borderRadius: 20, background: st.bg, color: st.color, fontSize: '0.72rem', fontWeight: 700 }}>
-                  {st.label}
-                </div>
-                <div style={{ display: 'inline-block', padding: '3px 14px', borderRadius: 20, background: rs.bg, color: rs.color, fontSize: '0.72rem', fontWeight: 700, marginTop: 6 }}>
-                  {rs.label}
+
+                {/* 3 Cards Row */}
+                <div style={{ display: 'flex', gap: 8, padding: '0.6rem 0.75rem', flexWrap: 'wrap' }}>
+                  {shopInfo && (
+                    <div style={{
+                      flex: 1, minWidth: 130,
+                      background: 'var(--bg-card)',
+                      borderRadius: 'var(--border-radius-md)',
+                      border: '1px solid var(--border-color)',
+                      padding: '0.5rem 0.7rem',
+                      borderLeft: '3px solid var(--primary)',
+                    }}>
+                      <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                        <BiStore size={11} style={{ color: 'var(--primary)' }} /> {t('salesPage.drawer.shop')}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{shopInfo?.name || '-'}</div>
+                      {shopInfo?.phone && <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>📞 {shopInfo.phone}</div>}
+                    </div>
+                  )}
+
+                  <div style={{
+                    flex: 1, minWidth: 130,
+                    background: 'var(--bg-card)',
+                    borderRadius: 'var(--border-radius-md)',
+                    border: '1px solid var(--border-color)',
+                    padding: '0.5rem 0.7rem',
+                    borderLeft: '3px solid #00D9A6',
+                  }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <BiUser size={11} style={{ color: '#00D9A6' }} /> {t('sale.customer')}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{sale.customer?.name || t('salesPage.invoice.walkIn')}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 1 }}>
+                      {sale.customer?.phone && <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>📞 {sale.customer.phone}</span>}
+                      {sale.customer?.state && (
+                        <span style={{ fontSize: '0.6rem', color: '#6C63FF', background: 'rgba(108,99,255,0.08)', padding: '0 5px', borderRadius: 3, fontWeight: 600 }}>
+                          {sale.customer.state}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    flex: 1, minWidth: 130,
+                    background: 'var(--bg-card)',
+                    borderRadius: 'var(--border-radius-md)',
+                    border: '1px solid var(--border-color)',
+                    padding: '0.5rem 0.7rem',
+                    borderLeft: '3px solid #F39C12',
+                  }}>
+                    <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <BiCreditCard size={11} style={{ color: '#F39C12' }} /> {t('salesPage.drawer.payment')}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>{pmtIcon}</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{pmtLabel}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
+                      {sale.dueAmount > 0 && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#FF6B6B' }}>Due: ₹{Number(sale.dueAmount || 0).toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Info Cards */}
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(108,99,255,0.1)', color: '#6C63FF' }}><BiUser size={18} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('sale.customer')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{sale.customer?.name || t('dashboard.walkInCustomer')}</span>
-                      {sale.customer?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {sale.customer.phone}</span>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(0,217,166,0.1)', color: '#00D9A6' }}><BiStore size={18} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.shop')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{shopInfo?.name || shopInfo?.shopName || t('salesPage.invoice.shopNamePlaceholder')}</span>
-                      {shopInfo?.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}><BiPhone size={12} /> {shopInfo.phone}</span>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--border-radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(255,181,69,0.1)', color: '#F39C12' }}><BiCreditCard size={18} /></div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.drawer.payment')}</span>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{pmtIcon} {sale.paymentMethod ? sale.paymentMethod.toUpperCase() : t('sale.cash').toUpperCase()}</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                        {t('common.paid')}: <strong style={{ color: '#2ecc71' }}>₹{Number(sale.paidAmount || 0).toFixed(2)}</strong>
-                        {sale.dueAmount > 0 && <> | {t('common.due')}: <strong style={{ color: '#FF6B6B' }}>₹{Number(sale.dueAmount).toFixed(2)}</strong></>}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Items */}
+              {/* Items Table - Enhanced */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
                   <BiCart size={16} /><span>{t('salesPage.drawer.itemsCount', { count: sale.items?.length || 0 })}</span>
                 </div>
-                <div style={{ borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', padding: '0.45rem 0.7rem', background: 'var(--bg-primary)', fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-color)' }}>
-                    <span style={{ flex: 2 }}>{t('salesPage.invoice.item')}</span>
-                    <span style={{ flex: 0.5, textAlign: 'center' }}>{t('salesPage.invoice.qty')}</span>
-                    <span style={{ flex: 0.6, textAlign: 'center' }}>{t('salesPage.drawer.rtn')}</span>
-                    <span style={{ flex: 0.7, textAlign: 'right' }}>{t('common.price')}</span>
-                    <span style={{ flex: 0.7, textAlign: 'right' }}>{t('common.total')}</span>
+                <div style={{ borderRadius: 'var(--border-radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', padding: '0.35rem 0.5rem', background: 'var(--bg-primary)', fontSize: '0.58rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.2px', borderBottom: '1px solid var(--border-color)' }}>
+                    <span style={{ flex: 1.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('salesPage.invoice.item')}</span>
+                    <span style={{ flex: 0.35, textAlign: 'center' }}>{t('salesPage.invoice.qty')}</span>
+                    <span style={{ flex: 0.3, textAlign: 'center' }}>{t('salesPage.drawer.rtn')}</span>
+                    <span style={{ flex: 0.5, textAlign: 'right' }}>{t('sale.discount')}</span>
+                    {isIntrastate ? (
+                      <>
+                        <span style={{ flex: 0.6, textAlign: 'center' }}>CGST {gstRate > 0 ? `(${(gstRate/2)}%)` : ''}</span>
+                        <span style={{ flex: 0.6, textAlign: 'center' }}>SGST {gstRate > 0 ? `(${(gstRate/2)}%)` : ''}</span>
+                      </>
+                    ) : (
+                      <span style={{ flex: 0.6, textAlign: 'center' }}>IGST {gstRate > 0 ? `(${gstRate}%)` : ''}</span>
+                    )}
+                    <span style={{ flex: 0.5, textAlign: 'right' }}>{t('common.total')}</span>
                   </div>
-                  {sale.items?.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', padding: '0.45rem 0.7rem', fontSize: '0.78rem', borderBottom: idx < sale.items.length - 1 ? '1px solid var(--border-light)' : 'none', background: 'var(--bg-card)' }}>
-                      <span style={{ flex: 2, fontWeight: 600, wordBreak: 'break-word' }}>
-                        {item.product?.name || item.name || t('salesPage.invoice.item')}
-                        {item.discount > 0 && <span style={{ display: 'block', color: '#e74c3c', fontSize: '0.6rem', fontWeight: 600 }}>-{item.discount}% {t('salesPage.invoice.off')}</span>}
-                      </span>
-                      <span style={{ flex: 0.5, textAlign: 'center', color: 'var(--text-secondary)' }}>{item.quantity}</span>
-                      <span style={{ flex: 0.6, textAlign: 'center', color: (item.returnedQty || 0) > 0 ? '#6C63FF' : 'var(--text-muted)', fontWeight: (item.returnedQty || 0) > 0 ? 700 : 400 }}>
-                        {item.returnedQty || '-'}
-                      </span>
-                      <span style={{ flex: 0.7, textAlign: 'right', color: 'var(--text-secondary)' }}>₹{Number(item.price).toFixed(2)}</span>
-                      <span style={{ flex: 0.7, textAlign: 'right', fontWeight: 700 }}>₹{Number(item.total).toFixed(2)}</span>
-                    </div>
-                  ))}
+                  {sale.items?.map((item, idx) => {
+                    const itemGstRate = item.gstRate || gstRate;
+                    const itemCgst = item.cgst || 0;
+                    const itemSgst = item.sgst || 0;
+                    const itemIgst = item.igst || 0;
+                    const itemGstAmt = item.gstAmount || 0;
+                    const baseTotal = (item.price * item.quantity);
+                    const itemTaxable = item.taxableAmount || baseTotal;
+                    const itemDiscountAmt = Math.max(0, baseTotal - itemTaxable);
+                    return (
+                      <div key={idx} style={{ display: 'flex', padding: '0.35rem 0.5rem', fontSize: '0.72rem', borderBottom: idx < sale.items.length - 1 ? '1px solid var(--border-light)' : 'none', background: 'var(--bg-card)' }}>
+                        <span style={{ flex: 1.6, fontWeight: 600, wordBreak: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.product?.name || item.name || t('salesPage.invoice.item')}
+                        </span>
+                        <span style={{ flex: 0.35, textAlign: 'center', color: 'var(--text-secondary)' }}>{item.quantity}</span>
+                        <span style={{ flex: 0.3, textAlign: 'center', color: (item.returnedQty || 0) > 0 ? '#6C63FF' : 'var(--text-muted)', fontWeight: (item.returnedQty || 0) > 0 ? 700 : 400 }}>
+                          {item.returnedQty || '-'}
+                        </span>
+                        <span style={{ flex: 0.5, textAlign: 'right', color: itemDiscountAmt > 0 ? '#e74c3c' : 'var(--text-muted)', fontWeight: itemDiscountAmt > 0 ? 600 : 400 }}>
+                          ₹{itemDiscountAmt.toFixed(2)}
+                        </span>
+                        {isIntrastate ? (
+                          <>
+                            <span style={{ flex: 0.6, textAlign: 'center', color: itemCgst > 0 ? '#17A2B8' : 'var(--text-muted)', fontWeight: itemCgst > 0 ? 600 : 400, fontSize: '0.65rem' }}>
+                              {itemCgst > 0 ? `₹${itemCgst.toFixed(2)}` : '-'}
+                            </span>
+                            <span style={{ flex: 0.6, textAlign: 'center', color: itemSgst > 0 ? '#17A2B8' : 'var(--text-muted)', fontWeight: itemSgst > 0 ? 600 : 400, fontSize: '0.65rem' }}>
+                              {itemSgst > 0 ? `₹${itemSgst.toFixed(2)}` : '-'}
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ flex: 0.6, textAlign: 'center', color: itemIgst > 0 ? '#6C63FF' : 'var(--text-muted)', fontWeight: itemIgst > 0 ? 600 : 400, fontSize: '0.65rem' }}>
+                            {itemIgst > 0 ? `₹${itemIgst.toFixed(2)}` : '-'}
+                          </span>
+                        )}
+                        <span style={{ flex: 0.5, textAlign: 'right', fontWeight: 700 }}>₹{Number(item.total).toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Totals */}
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                    <span>{t('sale.subtotal')}</span><span>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
+              {/* Billing Summary Card */}
+              <div style={{
+                marginBottom: '1rem',
+                borderRadius: 'var(--border-radius-lg)',
+                border: '1px solid rgba(108,99,255,0.2)',
+                overflow: 'hidden',
+                background: 'var(--bg-card)',
+                boxShadow: '0 2px 12px rgba(108,99,255,0.08)',
+              }}>
+                <div style={{
+                  padding: '0.6rem 1rem',
+                  background: 'linear-gradient(135deg, rgba(108,99,255,0.08), rgba(0,217,166,0.05))',
+                  borderBottom: '1px solid rgba(108,99,255,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}>
+                  <BiReceipt size={16} style={{ color: 'var(--primary)' }} />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {t('salesPage.drawer.billingSummary')}
+                  </span>
+                </div>
+                <div style={{ padding: '0.5rem 1rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{t('sale.subtotal')}</span>
+                    <span style={{ fontWeight: 600 }}>₹{Number(sale.subtotal || 0).toFixed(2)}</span>
                   </div>
-                  {Number(sale.discount || 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#e74c3c' }}>
-                      <span>{t('sale.discount')}</span><span>-₹{Number(sale.discount).toFixed(2)}</span>
-                    </div>
-                  )}
-                  {Number(sale.tax || 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                      <span>{t('sale.tax')}</span><span>₹{Number(sale.tax).toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))', fontSize: '0.9rem', color: '#fff', fontWeight: 700, boxShadow: '0 2px 10px rgba(108,99,255,0.2)' }}>
-                    <span>{t('salesPage.invoice.grandTotal')}</span><span style={{ fontSize: '1.05rem', fontWeight: 800 }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: totalDiscount > 0 ? '#e74c3c' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                    <span>{t('sale.discount')} ({discountPct}%)</span>
+                    <span style={{ fontWeight: totalDiscount > 0 ? 600 : 400 }}>₹{Number(totalDiscount).toFixed(2)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#2ecc71', fontWeight: 600 }}>
-                    <span>{t('common.paid')}</span><span>₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-light)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{t('salesPage.drawer.taxableAmount')}</span>
+                    <span style={{ fontWeight: 600 }}>₹{Number(sale.taxableAmount || 0).toFixed(2)}</span>
                   </div>
-                  {Number(sale.dueAmount || 0) > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#FF6B6B', fontWeight: 600 }}>
-                      <span>{t('common.due')}</span><span>₹{Number(sale.dueAmount).toFixed(2)}</span>
+                  {isIntrastate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.cgst > 0 ? '#17A2B8' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                      <span>CGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${(gstRate / 2)}%` : ''})</span></span>
+                      <span style={{ fontWeight: sale.cgst > 0 ? 600 : 400 }}>₹{Number(sale.cgst || 0).toFixed(2)}</span>
                     </div>
                   )}
-                  {totalRefunded > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.85rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', fontSize: '0.8rem', color: '#6C63FF', fontWeight: 600 }}>
-                      <span>{t('salesPage.totalRefund')}</span><span>₹{Number(totalRefunded).toFixed(2)}</span>
+                  {isIntrastate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.sgst > 0 ? '#17A2B8' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                      <span>SGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${(gstRate / 2)}%` : ''})</span></span>
+                      <span style={{ fontWeight: sale.sgst > 0 ? 600 : 400 }}>₹{Number(sale.sgst || 0).toFixed(2)}</span>
                     </div>
                   )}
+                  {!isIntrastate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: sale.igst > 0 ? '#6C63FF' : 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+                      <span>IGST <span style={{ fontSize: '0.7rem', fontWeight: 500 }}>({gstRate > 0 ? `${gstRate}%` : ''})</span></span>
+                      <span style={{ fontWeight: sale.igst > 0 ? 600 : 400 }}>₹{Number(sale.igst || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.8rem', color: 'var(--text-primary)', borderTop: '1px solid var(--border-light)' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{t('salesPage.drawer.totalGst')}</span>
+                    <span style={{ fontWeight: 700, color: sale.gstAmount > 0 ? '#6C63FF' : 'var(--text-muted)' }}>₹{Number(sale.gstAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', padding: '0.55rem 0',
+                    fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700,
+                    borderTop: '2px solid rgba(108,99,255,0.2)',
+                    marginTop: 2,
+                  }}>
+                    <span>{t('salesPage.invoice.grandTotal')}</span>
+                    <span style={{ fontSize: '1.05rem', color: 'var(--primary)' }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Return History */}
-              {allReturns.length > 0 && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                    <BiUndo size={16} /><span>{t('salesPage.drawer.returnHistory', { count: allReturns.length })}</span>
-                  </div>
-                  {allReturns.map((ret, rIdx) => (
-                    <div key={rIdx} style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'rgba(108,99,255,0.04)', border: '1px solid rgba(108,99,255,0.1)', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(108,99,255,0.1)' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}><BiTime size={12} /> {formatDate(ret.returnDate)}</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 4 }}>{ret.refundMethod?.toUpperCase()}</span>
-                      </div>
-                      {ret.items.map((ritem, riIdx) => (
-                        <div key={riIdx} style={{ padding: '4px 0', borderBottom: riIdx < ret.items.length - 1 ? '1px solid var(--border-light)' : 'none' }}>
-                          <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{ritem.productName || t('salesPage.invoice.item')}</span>
-                          <div style={{ display: 'flex', gap: 12, fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 1 }}>
-                            <span>{t('salesPage.invoice.qty')}: {ritem.quantity}</span>
-                            <span>{t('salesPage.refund')}: ₹{Number(ritem.refundAmount).toFixed(2)}</span>
-                          </div>
-                          {ritem.reason && <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 2 }}>{ritem.reason}</span>}
-                        </div>
-                      ))}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(108,99,255,0.1)' }}>
-                        {t('salesPage.totalRefund')}: <strong style={{ color: 'var(--primary)', marginLeft: 4 }}>₹{Number(ret.totalRefund).toFixed(2)}</strong>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {sale.notes && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                    <BiNote size={16} /><span>{t('common.notes')}</span>
-                  </div>
-                  <p style={{ padding: '0.65rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'rgba(255,181,69,0.06)', border: '1px solid rgba(255,181,69,0.12)', fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{sale.notes}</p>
+              {shopInfo?.address && (
+                <div style={{ textAlign: 'center', padding: '0.6rem 0', borderTop: '1px dashed var(--border-color)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  {formatAddress(shopInfo.address)}
                 </div>
               )}
             </>
@@ -293,82 +345,90 @@ const SaleViewDrawer = ({ open, onClose, sale, shopInfo, onPrint, onCopyInvoice 
         </div>
         <div className="drawer-footer">
           <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.close')}</button>
-          {sale && (
-            <>
-              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onCopyInvoice?.(sale.invoiceNo)} title={t('salesPage.copyInvoiceNumber')}><BiCopy size={16} /></button>
-              <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint?.(sale)}><BiPrinter size={16} /> {t('salesPage.reprint')}</button>
-            </>
-          )}
+          <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={() => onPrint(sale)}><BiPrinter size={15} /> {t('common.print')}</button>
         </div>
       </div>
     </>
   );
 };
 
-// ─── Return Drawer (uses standard drawer classes with smooth animation) ──────
+// ─── Return Drawer ────────────────────────────────────────────
 const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
   const { t } = useTranslation();
   const [returnItems, setReturnItems] = useState([]);
-  const [refundMethod, setRefundMethod] = useState('cash');
   const [reason, setReason] = useState('');
+  const [refundMethod, setRefundMethod] = useState('cash');
   const [processing, setProcessing] = useState(false);
   const [showConfirmReturnAll, setShowConfirmReturnAll] = useState(false);
+  const [returnHistory, setReturnHistory] = useState([]);
 
   useEffect(() => {
-    if (sale && open) {
-      setReturnItems((sale.items || []).map(item => ({
-        productId: item.product?._id || item.product,
-        productName: item.product?.name || item.name || t('salesPage.invoice.item'),
-        soldQty: item.quantity || 0,
-        returnedQty: item.returnedQty || 0,
-        maxReturnable: Math.max(0, (item.quantity || 0) - (item.returnedQty || 0)),
-        price: item.price || 0,
-        returnQty: 0,
-        refundAmount: 0,
-        itemReason: '',
-      })));
-      setRefundMethod('cash');
+    if (sale) {
+      // Calculate the effective refund ratio to match what backend will compute
+      // item.total = GST-inclusive price without round-off
+      // sale.totalAmount = what customer actually paid (includes round-off)
+      const rawItemTotal = (sale.items || []).reduce((sum, i) => sum + (i.total || 0), 0);
+      const effectiveTotal = sale.totalAmount || rawItemTotal;
+      const refundRatio = rawItemTotal > 0 ? effectiveTotal / rawItemTotal : 1;
+
+      setReturnItems(sale.items?.map((item) => {
+        const finalUnitPrice = item.quantity > 0 ? (item.total || 0) / item.quantity : 0;
+        // Apply refund ratio so frontend display matches backend calculation
+        const effectiveUnitPrice = finalUnitPrice * refundRatio;
+        return {
+          productId: item.product?._id || item.productId,
+          productName: item.product?.name || item.name || '',
+          soldQty: item.quantity,
+          returnedQty: item.returnedQty || 0,
+          maxReturnable: item.quantity - (item.returnedQty || 0),
+          returnQty: 0,
+          refundAmount: 0,
+          price: effectiveUnitPrice,
+          itemReason: '',
+        };
+      }) || []);
+      setReturnHistory(sale.returns || []);
       setReason('');
+      setRefundMethod('cash');
       setShowConfirmReturnAll(false);
     }
-  }, [sale, open]);
+  }, [sale]);
+
+  const totalRefund = returnItems.reduce((sum, i) => sum + (i.refundAmount || 0), 0);
+  const hasItems = returnItems.some(i => i.returnQty > 0);
+  const allFullyReturned = returnItems.every(i => i.maxReturnable <= 0);
+
+  const currentDue = sale?.dueAmount || 0;
+  const currentPaid = sale?.paidAmount || 0;
+  const willReduceDue = totalRefund > 0 && currentDue > 0 && totalRefund <= currentDue;
+  const willReduceBoth = totalRefund > 0 && currentDue > 0 && totalRefund > currentDue;
+  const cashRefundAmount = willReduceBoth ? totalRefund - currentDue : (currentDue === 0 ? totalRefund : 0);
+  const dueReductionAmount = Math.min(totalRefund, currentDue);
 
   const handleQtyChange = (idx, val) => {
-    const newItems = [...returnItems];
-    const qty = Math.max(0, Math.min(val, newItems[idx].maxReturnable));
-    newItems[idx].returnQty = qty;
-    newItems[idx].refundAmount = qty * newItems[idx].price;
-    setReturnItems(newItems);
+    const next = [...returnItems];
+    const clamped = Math.max(0, Math.min(val, next[idx].maxReturnable));
+    next[idx].returnQty = clamped;
+    next[idx].refundAmount = clamped * next[idx].price;
+    setReturnItems(next);
   };
 
-  const totalRefund = returnItems.reduce((s, i) => s + (i.refundAmount || 0), 0);
-  const hasItems = returnItems.some(i => i.returnQty > 0);
-
-  // Check if all returnable items are already at max
-  const returnableItems = returnItems.filter(i => i.maxReturnable > 0);
-  const allSelected = returnableItems.length > 0 && returnableItems.every(i => i.returnQty === i.maxReturnable);
-
-  const handleReturnAll = () => {
-    if (allSelected) {
-      // Clear all
-      setReturnItems(prev => prev.map(i => ({ ...i, returnQty: 0, refundAmount: 0 })));
-    } else {
-      // Show confirmation first
-      setShowConfirmReturnAll(true);
-    }
-  };
-
-  const executeReturnAll = () => {
-    setReturnItems(prev => prev.map(i => ({
+  const handleReturnAllClick = () => {
+    const next = returnItems.map(i => ({
       ...i,
       returnQty: i.maxReturnable,
       refundAmount: i.maxReturnable * i.price,
-    })));
+    }));
+    setReturnItems(next);
+    setShowConfirmReturnAll(true);
+  };
+
+  const executeReturnAll = () => {
     setShowConfirmReturnAll(false);
   };
 
   const handleSubmit = async () => {
-    if (!hasItems) { showToast.error(t('salesPage.returnDrawer.selectAtLeastOneItem')); return; }
+    if (!sale || !hasItems || processing) return;
     setProcessing(true);
     try {
       const { data } = await api.post(`/sales/${sale._id}/return`, {
@@ -386,8 +446,6 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
       showToast.error(err.response?.data?.message || t('salesPage.returnDrawer.returnFailed'));
     } finally { setProcessing(false); }
   };
-
-  const allFullyReturned = returnItems.every(i => i.maxReturnable <= 0);
 
   return (
     <>
@@ -424,112 +482,139 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 </span>
               </div>
 
-              {allFullyReturned ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <BiCheck size={48} style={{ color: 'var(--secondary)', marginBottom: 12 }} />
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{t('salesPage.returnDrawer.allReturnedTitle')}</h4>
-                  <p style={{ fontSize: '0.85rem', margin: 0 }}>{t('salesPage.returnDrawer.allReturnedDesc')}</p>
+              {/* Items to return */}
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><BiCart size={16} /><span>{t('salesPage.returnDrawer.selectItemsToReturn', { count: returnItems.length })}</span></span>
+                  <button onClick={handleReturnAllClick} disabled={processing || allFullyReturned} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--primary)', background: 'transparent', color: 'var(--primary)', fontWeight: 600, fontSize: '0.7rem', cursor: 'pointer', whiteSpace: 'nowrap', opacity: allFullyReturned ? 0.5 : 1 }}>
+                    <BiUndo size={13} style={{ verticalAlign: 'middle' }} /> {t('salesPage.returnDrawer.returnAllProducts')}
+                  </button>
                 </div>
-              ) : (
-                <>
-                  {/* Return All / Clear All Button */}
-                  {returnableItems.length > 0 && (
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <button
-                        onClick={handleReturnAll}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '7px 14px',
-                          border: 'none',
-                          borderRadius: 'var(--border-radius-sm)',
-                          background: allSelected ? 'rgba(255,107,107,0.1)' : 'rgba(108,99,255,0.1)',
-                          color: allSelected ? 'var(--danger)' : 'var(--primary)',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          fontFamily: 'var(--font-family)',
-                          cursor: 'pointer',
-                          transition: 'all var(--transition-fast)',
-                          width: '100%',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {allSelected ? <><BiTrash size={16} /> {t('salesPage.returnDrawer.clearAll')}</> : <><BiCheck size={16} /> {t('salesPage.returnDrawer.returnAllProducts')}</>}
-                      </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {returnItems.map((item, idx) => {
+                    const netUnitPrice = item.price;
+                    return item.maxReturnable <= 0 ? null : (
+                      <div key={idx} style={{
+                        padding: '0.6rem',
+                        borderRadius: 'var(--border-radius-md)',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                      }}>
+                        {/* Product header - compact */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(255,107,107,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <BiUndo size={12} style={{ color: '#FF6B6B' }} />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{item.productName}</div>
+                              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>₹{Number(netUnitPrice).toFixed(2)} × {item.soldQty}</div>
+                            </div>
+                          </div>
+                          {item.returnedQty > 0 && (
+                            <span style={{ fontSize: '0.55rem', fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'rgba(108,99,255,0.1)', color: '#6C63FF' }}>{item.returnedQty} ret</span>
+                          )}
+                        </div>
+
+                        {/* Qty stats + Price row in one line */}
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                          {[
+                            { label: 'Sold', value: item.soldQty, bg: 'var(--bg-input)', color: 'var(--text-primary)' },
+                            { label: 'Ret.', value: item.returnedQty, bg: 'var(--bg-input)', color: item.returnedQty > 0 ? '#6C63FF' : 'var(--text-muted)' },
+                            { label: 'Avail', value: item.maxReturnable, bg: 'rgba(46,204,113,0.08)', color: '#2ecc71' },
+                          ].map((s, si) => (
+                            <div key={si} style={{ flex: 1, textAlign: 'center', padding: '3px 2px', borderRadius: 4, background: s.bg }}>
+                              <div style={{ fontSize: '0.45rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{s.label}</div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: s.color }}>{s.value}</div>
+                            </div>
+                          ))}
+                          <div style={{ flex: 1, textAlign: 'center', padding: '3px 2px', borderRadius: 4, background: 'rgba(108,99,255,0.04)' }}>
+                            <div style={{ fontSize: '0.45rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>₹/Unit</div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6C63FF' }}>₹{Number(netUnitPrice).toFixed(2)}</div>
+                          </div>
+                        </div>
+
+                        {/* Qty control + Refund */}
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Return Qty</div>
+                            <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+                              <button onClick={() => handleQtyChange(idx, item.returnQty - 1)} disabled={item.returnQty <= 0} style={{ width: 26, height: 26, flexShrink: 0, border: 'none', background: item.returnQty > 0 ? 'var(--bg-input)' : 'transparent', color: item.returnQty > 0 ? 'var(--text-secondary)' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, cursor: item.returnQty > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
+                              <input type="number" value={item.returnQty} onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 0)} min="0" max={item.maxReturnable} style={{ flex: 1, border: 'none', outline: 'none', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', width: 30, padding: '2px 0', MozAppearance: 'textfield' }} />
+                              <button onClick={() => handleQtyChange(idx, item.returnQty + 1)} disabled={item.returnQty >= item.maxReturnable} style={{ width: 26, height: 26, flexShrink: 0, border: 'none', background: item.returnQty < item.maxReturnable ? 'var(--bg-input)' : 'transparent', color: item.returnQty < item.maxReturnable ? 'var(--text-secondary)' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, cursor: item.returnQty < item.maxReturnable ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                            </div>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.5rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Refund</div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 26, borderRadius: 'var(--border-radius-sm)', fontWeight: 700, fontSize: '0.78rem', background: 'rgba(108,99,255,0.06)', border: '1.5px solid rgba(108,99,255,0.2)', color: '#6C63FF' }}>
+                              ₹{(item.returnQty > 0 ? item.refundAmount : 0).toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Reason */}
+                        <input type="text" placeholder="Reason (optional)" value={item.itemReason} onChange={(e) => { const n = [...returnItems]; n[idx].itemReason = e.target.value; setReturnItems(n); }} style={{ width: '100%', padding: '3px 8px', fontSize: '0.65rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Refund Summary */}
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                  <BiWallet size={16} /><span>Summary</span>
+                </div>
+                <div style={{ padding: '0.7rem 0.85rem', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total Refund</span>
+                    <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{Number(totalRefund || 0).toFixed(2)}</span>
+                  </div>
+                  {dueReductionAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '4px 6px', borderRadius: 4, background: 'rgba(255,107,107,0.06)' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#FF6B6B' }}>Due Reduced</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FF6B6B' }}>-₹{Number(dueReductionAmount).toFixed(2)}</span>
                     </div>
                   )}
-
-                  {/* Items to return */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                      <BiPackage size={16} /><span>{t('salesPage.returnDrawer.selectItemsToReturn')}</span>
+                  {cashRefundAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '4px 6px', borderRadius: 4, background: 'rgba(46,204,113,0.06)' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#2ecc71' }}>Cash Refund</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2ecc71' }}>₹{Number(cashRefundAmount).toFixed(2)}</span>
                     </div>
-                    {returnItems.map((item, idx) => (
-                      <div key={idx} style={{ padding: '10px 12px', borderRadius: 'var(--border-radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', marginBottom: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.productName}</span>
-                          {item.maxReturnable <= 0 && <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#6C63FF', background: 'rgba(108,99,255,0.1)', padding: '2px 8px', borderRadius: 10 }}>{t('salesPage.returnStatusLabels.full')}</span>}
-                        </div>
-                        <div style={{ display: 'flex', gap: 12, fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
-                          <span>{t('salesPage.returnDrawer.sold')} <strong style={{ color: 'var(--text-primary)' }}>{item.soldQty}</strong></span>
-                          <span>{t('salesPage.returnDrawer.returned')} <strong style={{ color: 'var(--text-primary)' }}>{item.returnedQty}</strong></span>
-                          <span>{t('salesPage.returnDrawer.available')} <strong style={{ color: 'var(--text-primary)' }}>{item.maxReturnable}</strong></span>
-                        </div>
-                        {item.maxReturnable > 0 && (
-                          <>
-                            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.qtyToReturn')}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
-                                  <button onClick={() => handleQtyChange(idx, item.returnQty - 1)} disabled={item.returnQty <= 0} style={{ width: 30, height: 30, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>-</button>
-                                  <input type="number" value={item.returnQty} onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 0)} min="0" max={item.maxReturnable} style={{ flex: 1, border: 'none', outline: 'none', textAlign: 'center', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', width: 50, padding: '4px 0', MozAppearance: 'textfield' }} />
-                                  <button onClick={() => handleQtyChange(idx, item.returnQty + 1)} disabled={item.returnQty >= item.maxReturnable} style={{ width: 30, height: 30, border: 'none', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                                </div>
-                              </div>
-                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                <label style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundAmount')}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden', background: 'var(--bg-card)' }}>
-                                  <span style={{ padding: '0 6px 0 10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-input)', lineHeight: '30px', borderRight: '1px solid var(--border-color)' }}>₹</span>
-                                  <input type="number" value={item.refundAmount} onChange={(e) => { const n = [...returnItems]; n[idx].refundAmount = Math.max(0, Number(e.target.value)); setReturnItems(n); }} min="0" style={{ flex: 1, border: 'none', outline: 'none', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-family)', background: 'transparent', color: 'var(--text-primary)', minWidth: 0, MozAppearance: 'textfield' }} />
-                                </div>
-                              </div>
-                            </div>
-                            <div style={{ marginTop: 4 }}>
-                              <input type="text" placeholder={t('salesPage.returnDrawer.reasonPlaceholder')} value={item.itemReason} onChange={(e) => { const n = [...returnItems]; n[idx].itemReason = e.target.value; setReturnItems(n); }} style={{ width: '100%', padding: '6px 10px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                  )}
+                  <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 8, marginTop: 4 }}>
+                    <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none', marginBottom: 6 }}>
+                      <option value="cash">{t('sale.cash')}</option>
+                      <option value="card">{t('sale.card')}</option>
+                      <option value="upi">{t('sale.upi')}</option>
+                      <option value="mobile_banking">{t('sale.mobileBanking')}</option>
+                    </select>
+                    <input type="text" placeholder="Overall return reason" value={reason} onChange={(e) => setReason(e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: '0.75rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
+                </div>
+              </div>
 
-                  {/* Refund Details */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
-                      <BiWallet size={16} /><span>{t('salesPage.returnDrawer.refundDetails')}</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 'var(--border-radius-sm)', background: 'rgba(var(--primary-rgb), 0.06)', border: '1px solid rgba(var(--primary-rgb), 0.12)', fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                        <span>{t('salesPage.totalRefund')}</span>
-                        <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>₹{totalRefund.toFixed(2)}</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.refundMethod')}</label>
-                        <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}>
-                          <option value="cash">{t('sale.cash')}</option>
-                          <option value="card">{t('sale.card')}</option>
-                          <option value="upi">{t('sale.upi')}</option>
-                          <option value="mobile_banking">{t('sale.mobileBanking')}</option>
-                        </select>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{t('salesPage.returnDrawer.overallReasonLabel')}</label>
-                        <input type="text" placeholder={t('salesPage.returnDrawer.reasonExamplePlaceholder')} value={reason} onChange={(e) => setReason(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'var(--font-family)', border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }} />
-                      </div>
-                    </div>
+              {/* Return History */}
+              {returnHistory.length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                    <BiFile size={16} /><span>Return History ({returnHistory.length})</span>
                   </div>
-                </>
+                  {returnHistory.map((ret, ri) => (
+                    <div key={ri} style={{ padding: '0.5rem 0.7rem', borderRadius: 'var(--border-radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border-light)', marginBottom: 6, fontSize: '0.72rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600 }}>{formatDate(ret.returnDate)}</span>
+                        <span style={{ fontWeight: 700, color: '#e74c3c' }}>-₹{Number(ret.totalRefund || 0).toFixed(2)}</span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        {ret.items?.map((ritem, rii) => (
+                          <span key={rii}>{ritem.productName} x{ritem.quantity}{rii < ret.items.length - 1 ? ', ' : ''}</span>
+                        ))}
+                      </div>
+                      {ret.reason && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>{ret.reason}</div>}
+                    </div>
+                  ))}
+                </div>
               )}
             </>
           )}
@@ -538,7 +623,7 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
           <div className="drawer-footer">
             <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={onClose}>{t('common.cancel')}</button>
             <button className="btn-premium btn-premium-primary btn-premium-sm" onClick={handleSubmit} disabled={!hasItems || processing}>
-              {processing ? <><span className="spinner-border spinner-border-sm" /> {t('salesPage.returnDrawer.processing')}</> : <><BiUndo size={16} /> {t('salesPage.returnDrawer.processReturn', { amount: totalRefund.toFixed(2) })}</>}
+              {processing ? <><span className="spinner-border spinner-border-sm" /> Processing...</> : <><BiUndo size={16} /> Process Return (₹{Number(totalRefund || 0).toFixed(2)})</>}
             </button>
           </div>
         )}
@@ -587,10 +672,10 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 <BiUndo size={24} />
               </div>
               <h5 style={{ fontWeight: 700, fontSize: '1rem', margin: '0 0 0.5rem', color: 'var(--text-primary)' }}>
-                {t('salesPage.returnDrawer.confirmReturnAllTitle')}
+                Return All Products?
               </h5>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                {t('salesPage.returnDrawer.confirmReturnAllDesc')}
+                This will return all remaining returnable quantities for every item.
               </p>
             </div>
             <div
@@ -606,19 +691,127 @@ const ReturnDrawer = ({ open, onClose, sale, onReturnProcessed }) => {
                 className="btn-premium btn-premium-secondary btn-premium-sm"
                 onClick={() => setShowConfirmReturnAll(false)}
               >
-                {t('common.cancel')}
+                Cancel
               </button>
               <button
                 className="btn-premium btn-premium-primary btn-premium-sm"
                 onClick={executeReturnAll}
               >
-                <BiCheck size={16} /> {t('salesPage.returnDrawer.confirmReturnAllBtn')}
+                <BiCheck size={16} /> Confirm
               </button>
             </div>
           </div>
         </div>
       )}
     </>
+  );
+};
+
+// ─── Skeleton Loading ────────────────────────────────────────
+const SalesSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 36, width: 180,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+    <div className="row g-3 mb-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col-6 col-md-3">
+          <div className="premium-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ height: 10, width: '60%', marginBottom: 6, background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} />
+                <div style={{ height: 20, width: '80%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 6, animation: 'shimmer 1.5s infinite' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} style={{ height: 36, width: i === 1 ? 200 : 90, background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 8, animation: 'shimmer 1.5s infinite' }} />
+      ))}
+    </div>
+  </div>
+);
+
+const TableSkeletonRows = () => (
+  <>
+    {[1, 2, 3, 4, 5].map((r) => (
+      <tr key={r} style={{ opacity: 0.5 }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+          <td key={c} style={{ padding: '0.75rem 1rem' }}>
+            <div style={{ height: 10, width: c === 3 ? '50%' : c === 2 ? '70%' : '40%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>
+);
+
+// ─── Edit Timer Component ────────────────────────────────────
+const EDIT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+const EditTimer = ({ createdAt, updatedAt, returnStatus, t }) => {
+  // If any return exists, editing is permanently locked
+  if (returnStatus && returnStatus !== 'none') {
+    return <span style={{ color: '#9e9e9e', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{t('salesPage.editTimer.locked')}</span>;
+  }
+
+  // Use the latest edit time (updatedAt) if available, otherwise use createdAt
+  const effectiveTime = updatedAt || createdAt;
+  const [remaining, setRemaining] = useState(() => {
+    const elapsed = Date.now() - new Date(effectiveTime).getTime();
+    return Math.max(0, EDIT_TIMEOUT_MS - elapsed);
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - new Date(effectiveTime).getTime();
+      const rem = Math.max(0, EDIT_TIMEOUT_MS - elapsed);
+      setRemaining(rem);
+    }, 1000); // update every second for live countdown
+    return () => clearInterval(interval);
+  }, [effectiveTime]);
+
+  if (remaining <= 0) {
+    return <span style={{ color: '#FF6B6B', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{t('salesPage.editTimer.expired')}</span>;
+  }
+
+  const totalSeconds = Math.ceil(remaining / 1000);
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return (
+    <span style={{ color: '#FF6B6B', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+      ⏱ {t('salesPage.editTimer.timeLeft', { time: timeStr })}
+    </span>
   );
 };
 
@@ -630,10 +823,11 @@ const Sales = () => {
   const STATUS_OPTIONS = getStatusOptions(t);
   const DATE_PRESETS = getDatePresets(t);
   const [sales, setSales] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
-  // Default to last 30 days on initial load
+  const [tick, setTick] = useState(0);
   const getDefaultDateRange = () => {
     const end = new Date();
     const start = new Date();
@@ -660,6 +854,7 @@ const Sales = () => {
   const filtersRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   const isFirstLoad = useRef(true);
+  const dataVersionRef = useRef(0);
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -671,107 +866,103 @@ const Sales = () => {
     api.get('/shops/my', { _skipLoading: true }).then(({ data }) => setShopInfo(data.shop || data)).catch(() => {});
   }, []);
 
-  // Only the very first load shows the full-page loader; subsequent fetches
-  // caused by search/filter/pagination stay silent and use the table indicator.
-  // The summary cards are read straight off this same response's `stats`
-  // field — one request, one query on the backend, so the table and the
-  // cards can never disagree about what "the current filter" means, and
-  // there's no separate /sales/stats round-trip to keep in sync or forget.
-  const fetchSales = useCallback(async () => {
-    const silent = !isFirstLoad.current;
-    if (silent) setSearching(true); else setLoading(true);
+  const fetchSales = useCallback(async ({ page: p = 1, isSearch = false } = {}) => {
+    if (isFirstLoad.current) setInitialLoading(true);
+    else setRefreshing(true);
+    if (isSearch) setSearching(true);
     try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.append('search', debouncedSearch);
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-      if (paymentStatus) params.append('paymentStatus', paymentStatus);
-      params.append('page', page);
-      params.append('limit', 20);
+      const params = new URLSearchParams({
+        page: p, limit: 20, startDate, endDate,
+        ...(paymentStatus ? { paymentStatus } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+      });
       const { data } = await api.get(`/sales?${params.toString()}`, { _skipLoading: true });
       setSales(data.sales || []);
       setTotalPages(data.pages || 1);
       setTotal(data.total || 0);
       setStats(data.stats || null);
-    } catch (err) { console.error(err); }
-    finally {
-      if (silent) setSearching(false); else setLoading(false);
-      isFirstLoad.current = false;
+      setPage(p);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setInitialLoading(false);
+      setRefreshing(false);
+      setSearching(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
+      dataVersionRef.current += 1;
     }
-  }, [debouncedSearch, startDate, endDate, paymentStatus, page]);
+  }, [startDate, endDate, paymentStatus, debouncedSearch]);
 
-  useEffect(() => { fetchSales(); }, [fetchSales]);
-  useEffect(() => { setPage(1); }, [debouncedSearch, startDate, endDate, paymentStatus]);
-
-  // ESC key closes drawers
+  // ─── Edit timer tick ────────────────────────────────────────
   useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        if (drawerOpen) { setDrawerOpen(false); setViewingSale(null); }
-        if (returnDrawerOpen) { setReturnDrawerOpen(false); setReturningSale(null); }
-      }
-    };
-    if (drawerOpen || returnDrawerOpen) {
-      document.addEventListener('keydown', handleEsc);
-      return () => document.removeEventListener('keydown', handleEsc);
-    }
-  }, [drawerOpen, returnDrawerOpen]);
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const refreshAll = () => {
-    fetchSales();
-  };
+  useEffect(() => {
+    fetchSales({ page: 1, isSearch: false });
+  }, [fetchSales, debouncedSearch, startDate, endDate, paymentStatus]);
+
+  const refreshAll = useCallback(() => {
+    fetchSales({ page: page, isSearch: false });
+  }, [fetchSales, page]);
 
   const applyDatePreset = (key) => {
     setDatePreset(key);
-    if (key === 'custom') return; // just reveal the manual pickers below; leave existing dates as-is
-
+    if (key === 'custom') return;
     const now = new Date();
     let start = new Date(now);
     const end = new Date(now);
-
-    if (key === '7d') {
-      start.setDate(start.getDate() - 6);
-    } else if (key === '30d') {
-      start.setDate(start.getDate() - 29);
-    } else if (key === 'month') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-    // 'today' needs no adjustment — start and end are both "now"
-
+    if (key === '7d') start.setDate(start.getDate() - 6);
+    else if (key === '30d') start.setDate(start.getDate() - 29);
+    else if (key === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
     setStartDate(toDateInputValue(start));
     setEndDate(toDateInputValue(end));
   };
 
   const handleView = (sale) => { setViewingSale(sale); setDrawerOpen(true); };
-
+  const handleEdit = (sale) => {
+    // Navigate to POS with edit mode
+    const effectiveTime = sale.updatedAt || sale.createdAt;
+    const isExpired = Date.now() - new Date(effectiveTime).getTime() >= EDIT_TIMEOUT_MS;
+    if (isExpired) {
+      showToast.error(t('salesPage.editSale.editTimeExpired'));
+      return;
+    }
+    if (sale.returnStatus !== 'none') {
+      showToast.error(t('salesPage.editSale.cannotEditReturned'));
+      return;
+    }
+    // Store sale ID in sessionStorage and navigate to POS
+    sessionStorage.setItem('editSaleId', sale._id);
+    window.location.href = '/pos?edit=' + sale._id;
+  };
   const handleReturn = (sale) => { setReturningSale(sale); setReturnDrawerOpen(true); };
-
   const handleReturnProcessed = (updatedSale) => {
     setSales(prev => prev.map(s => s._id === updatedSale._id ? updatedSale : s));
     refreshAll();
   };
-
   const handleCopyInvoice = (invoiceNo) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(invoiceNo || '');
       showToast.success(t('salesPage.invoiceNumberCopied'));
     }
   };
-
   const handlePrintClick = (sale) => {
     setPrintingSale(sale);
     setShowPrintPreview(true);
   };
 
-  // All four read from `stats`, which comes from the same filtered response
-  // as `sales`/`total` (see fetchSales) — always the currently selected date
-  // range + payment status + search, same as the table below.
   const statCards = [
     { label: t('salesPage.stats.totalSales'), value: stats?.totalSales || 0, icon: BiDollar, color: 'primary', isCurrency: true },
     { label: t('salesPage.stats.totalRevenue'), value: stats?.totalRevenue || 0, icon: BiWallet, color: 'success', isCurrency: true },
     { label: t('salesPage.stats.totalProfit'), value: stats?.totalProfit || 0, icon: BiTrendingUp, color: 'warning', isCurrency: true },
     { label: t('salesPage.stats.totalOrders'), value: stats?.totalOrders || 0, icon: BiCart, color: 'danger', isCurrency: false },
   ];
+
+  if (initialLoading) return <SalesSkeletonLoader />;
 
   return (
     <div>
@@ -800,40 +991,24 @@ const Sales = () => {
             <BiSearch className="search-icon" />
             <input className="form-control sales-filter-input" placeholder={t('salesPage.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-
           <div className="sales-date-filters-scroll">
             <div className="sales-date-segmented" role="tablist" aria-label="Date filter">
               {DATE_PRESETS.map((p, idx) => (
                 <React.Fragment key={p.key}>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={datePreset === p.key}
-                    className={`sales-date-pill ${datePreset === p.key ? 'active' : ''}`}
-                    onClick={() => applyDatePreset(p.key)}
-                  >
-                    <BiCalendar />
-                    <span>{p.label}</span>
+                  <button type="button" role="tab" aria-selected={datePreset === p.key} className={`sales-date-pill ${datePreset === p.key ? 'active' : ''}`} onClick={() => applyDatePreset(p.key)}>
+                    <BiCalendar /><span>{p.label}</span>
                   </button>
                   {idx === 2 && <span className="sales-date-break" aria-hidden="true" />}
                 </React.Fragment>
               ))}
             </div>
           </div>
-
           {datePreset === 'custom' && (
             <>
-              <div className="sales-filter">
-                <BiCalendar size={14} className="sales-filter-icon-abs" />
-                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              </div>
-              <div className="sales-filter">
-                <BiCalendar size={14} className="sales-filter-icon-abs" />
-                <input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
+              <div className="sales-filter"><BiCalendar size={14} className="sales-filter-icon-abs" /><input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+              <div className="sales-filter"><BiCalendar size={14} className="sales-filter-icon-abs" /><input type="date" className="form-control sales-filter-input" style={{ paddingLeft: '30px' }} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
             </>
           )}
-
           <div className="sales-filter">
             <select className="form-control sales-filter-input" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
               {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -842,7 +1017,7 @@ const Sales = () => {
         </div>
       </div>
 
-      <div className={`sales-table-container table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
         <div className="sales-table-scroll">
           <table className="sales-table">
             <thead>
@@ -853,14 +1028,17 @@ const Sales = () => {
                 <th>{t('salesPage.table.totalAmount')}</th>
                 <th>{t('salesPage.table.paymentStatus')}</th>
                 <th>{t('salesPage.table.returnStatus')}</th>
+                <th style={{ width: '90px', fontSize: '0.7rem' }}>{t('salesPage.editTimer.remainingTime')}</th>
                 <th style={{ width: '110px' }}>{t('salesPage.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan={7}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
+              {refreshing ? (
+                <TableSkeletonRows />
+              ) : searching ? (
+                <tr><td colSpan={8}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : sales.length === 0 ? (
-                <tr><td colSpan={7}><div className="sales-empty-state"><span className="sales-empty-icon">🧾</span><p>{t('salesPage.noSalesFound')}</p></div></td></tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><span className="sales-empty-icon">🧾</span><p>{t('salesPage.noSalesFound')}</p></div></td></tr>
               ) : sales.map((sale, idx) => {
                 const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
                 const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
@@ -874,20 +1052,30 @@ const Sales = () => {
                       </div>
                     </td>
                     <td>
-                      <div className="sales-customer-cell">
-                        <span className="sales-customer-name">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
-                        {sale.customer?.phone && <span className="sales-customer-phone">{sale.customer.phone}</span>}
+                      <div className="sales-customer-badge">
+                        <BiUserCircle size={16} />
+                        <span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
                       </div>
                     </td>
                     <td><span className="sales-amount">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></td>
-                    <td><span className="sales-status-badge" style={{ background: st.bg, color: st.color }}>{st.label}</span></td>
-                    <td><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>{rs.label}</span></td>
                     <td>
-                      <div className="sales-actions">
-                        <button className="sales-action-btn sales-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow size={16} /></button>
-                        <button className="sales-action-btn sales-action-print" title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter size={16} /></button>
-                        <button className="sales-action-btn sales-action-return" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo size={16} /></button>
+                      <div className="sales-status-badge" style={{ background: st.bg, color: st.color }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color, display: 'inline-block' }} />{st.label}
                       </div>
+                    </td>
+                    <td>
+                      <div className="sales-return-badge" style={{ background: rs.bg, color: rs.color }}>{rs.label}</div>
+                    </td>
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <EditTimer createdAt={sale.createdAt} updatedAt={sale.updatedAt} returnStatus={sale.returnStatus} t={t} />
+                    </td>
+                    <td className="sales-actions-cell" style={{ width: '140px', whiteSpace: 'nowrap' }}>
+                      <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow /></button>
+                      <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter /></button>
+                      {(() => { const effectiveTime = sale.updatedAt || sale.createdAt; return Date.now() - new Date(effectiveTime).getTime() < EDIT_TIMEOUT_MS && sale.returnStatus === 'none'; })() && (
+                        <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.edit')} title={t('salesPage.actions.edit')} onClick={() => handleEdit(sale)} style={{ background: 'rgba(108, 99, 255, 0.08)', color: '#6C63FF' }}><BiEdit /></button>
+                      )}
+                      <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo /></button>
                     </td>
                   </tr>
                 );
@@ -897,125 +1085,45 @@ const Sales = () => {
         </div>
       </div>
 
-      {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
-      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
-        {loading ? (
-          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-          </div>
+      <div className="mobile-cards">
+        {refreshing ? (
+          <>{[1, 2, 3].map((i) => (<div key={i} className="expandable-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><div style={{ height: 14, width: '35%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} /><div style={{ height: 14, width: '25%', background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)', backgroundSize: '200% 100%', borderRadius: 4, animation: 'shimmer 1.5s infinite' }} /></div></div>))}</>
+        ) : searching ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div>
         ) : sales.length === 0 ? (
-          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🧾</div>
-            {t('salesPage.noSalesFound')}
-          </div>
+          <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}><div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.35 }}>🧾</div><h5 style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t('salesPage.noSalesFound')}</h5></div>
         ) : sales.map((sale) => {
           const st = STATUS_STYLES[sale.paymentStatus] || STATUS_STYLES.paid;
           const rs = RETURN_STYLES[sale.returnStatus] || RETURN_STYLES.none;
-          const hasReturn = sale.returnStatus && sale.returnStatus !== 'none';
+          const hasReturn = (sale.returnStatus && sale.returnStatus !== 'none');
           return (
-            <ExpandableCard
-              key={sale._id}
-              compact={
-                <>
-                  <div className="expandable-card__compact-row">
-                    <span className="expandable-card__name" style={{ fontSize: '0.75rem' }}>{sale.invoiceNo || t('common.notAvailable')}</span>
-                    <span className="expandable-card__price" style={{ fontSize: '0.85rem' }}>₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__meta">
-                    <span className="expandable-card__meta-item">
-                      <BiUser />
-                      <span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
-                    </span>
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      {hasReturn ? (
-                        <span className="sales-status-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span>
-                      ) : (
-                        <span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>
-                      )}
-                    </div>
-                  </div>
-                </>
-              }
-              expanded={
-                <div className="expandable-card__rows">
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('sale.invoice')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{sale.invoiceNo || t('common.notAvailable')}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('sale.customer')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('common.date')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">{formatDate(sale.createdAt)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.totalAmount')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.paidAmount')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value">₹{Number(sale.paidAmount || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.dueAmount')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value" style={sale.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{Number(sale.dueAmount || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.paymentStatus')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value"><span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span>
-                  </div>
-                  <div className="expandable-card__row">
-                    <span className="expandable-card__row-label">{t('salesPage.table.returnStatus')}</span>
-                    <span className="expandable-card__row-dots" />
-                    <span className="expandable-card__row-value"><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span></span>
-                  </div>
-                </div>
-              }
-              actions={
-                <>
-                  <button className="btn-action btn-action-view" data-tooltip={t('salesPage.actions.view')} onClick={() => handleView(sale)}>
-                    <BiShow />
-                  </button>
-                  <button className="btn-action btn-action-toggle" data-tooltip={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}>
-                    <BiPrinter />
-                  </button>
-                  <button className="btn-action btn-action-edit" data-tooltip={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}>
-                    <BiUndo />
-                  </button>
-                </>
-              }
+            <ExpandableCard key={sale._id}
+              compact={<>
+                <div className="expandable-card__compact-row"><span className="expandable-card__name"><BiHash size={12} style={{ marginRight: 2 }} /> {sale.invoiceNo || t('common.notAvailable')}</span><span className="expandable-card__price">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__meta"><span className="expandable-card__meta-item"><BiUser /><span>{sale.customer?.name || t('salesPage.invoice.walkIn')}</span></span><div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>{hasReturn ? (<span className="sales-status-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span>) : (<span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span>)}</div></div>
+              </>}
+              expanded={<div className="expandable-card__rows">
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('sale.invoice')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{sale.invoiceNo || t('common.notAvailable')}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('sale.customer')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{sale.customer?.name || t('salesPage.invoice.walkIn')}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('common.date')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">{formatDate(sale.createdAt)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.totalAmount')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">₹{Number(sale.totalAmount || sale.grandTotal || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.paidAmount')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value">₹{Number(sale.paidAmount || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.dueAmount')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value" style={sale.dueAmount > 0 ? { color: 'var(--danger)' } : undefined}>₹{Number(sale.dueAmount || 0).toFixed(2)}</span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.paymentStatus')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value"><span className="sales-status-badge" style={{ background: st.bg, color: st.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{st.label}</span></span></div>
+                <div className="expandable-card__row"><span className="expandable-card__row-label">{t('salesPage.table.returnStatus')}</span><span className="expandable-card__row-dots" /><span className="expandable-card__row-value"><span className="sales-return-badge" style={{ background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600 }}>{rs.label}</span></span></div>
+              </div>}
+              actions={<><button className="btn-action btn-action-view" title={t('salesPage.actions.view')} onClick={() => handleView(sale)}><BiShow /></button><button className="btn-action btn-action-toggle" title={t('salesPage.actions.print')} onClick={() => handlePrintClick(sale)}><BiPrinter /></button><button className="btn-action btn-action-edit" title={t('salesPage.actions.return')} onClick={() => handleReturn(sale)}><BiUndo /></button></>}
             />
           );
         })}
       </div>
 
-      {totalPages > 1 && (
-        <div className="sales-pagination">
-          <span className="sales-pagination-info">{t('salesPage.pagination.info', { page, totalPages, total })}</span>
-          <div className="sales-pagination-btns">
-            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><BiChevronLeft size={16} /> {t('salesPage.pagination.previous')}</button>
-            <button className="sales-btn sales-btn-secondary sales-btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>{t('salesPage.pagination.next')} <BiChevronRight size={16} /></button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} totalPages={totalPages} totalCount={total} pageSize={20} onPageChange={setPage} />
 
       <SaleViewDrawer open={drawerOpen} onClose={() => { setDrawerOpen(false); setViewingSale(null); }} sale={viewingSale} shopInfo={shopInfo} onPrint={handlePrintClick} onCopyInvoice={handleCopyInvoice} />
       <ReturnDrawer open={returnDrawerOpen} onClose={() => { setReturnDrawerOpen(false); setReturningSale(null); }} sale={returningSale} onReturnProcessed={handleReturnProcessed} />
       {showPrintPreview && printingSale && (
-        <PrintPreview
-          sale={printingSale}
-          shopInfo={shopInfo}
-          onClose={() => { setShowPrintPreview(false); setPrintingSale(null); }}
-        />
+        <PrintPreview sale={printingSale} shopInfo={shopInfo} onClose={() => { setShowPrintPreview(false); setPrintingSale(null); }} />
       )}
     </div>
   );

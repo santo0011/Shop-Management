@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import Chart from 'react-apexcharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import * as XLSX from 'xlsx';
 import api from '../../services/api';
 import StatCard from '../../components/common/StatCard';
@@ -35,7 +36,41 @@ const PAYMENT_METHOD_ICONS = { cash: '💵', card: '💳', upi: '📱', mobile_b
 const getPaymentMethodLabels = (t) => ({ cash: t('sale.cash'), card: t('sale.card'), upi: t('sale.upi'), mobile_banking: t('sale.mobileBanking'), due: t('common.due') });
 
 // ─── Top Products Chart Palette (one color per product bar) ──
+// Mirrors Dashboard.jsx's Top Selling Products chart exactly — same colors,
+// gradient bars, colored-dot Y-axis ticks, and tooltip — so the two pages
+// present the same chart for the same underlying data.
 const TOP_PRODUCTS_COLORS = ['#2a78d6', '#1baf7a', '#eb6834', '#7c5cd6', '#e34948'];
+
+const TopProductsYAxisTick = ({ x, y, payload, index, textColor }) => {
+  const color = TOP_PRODUCTS_COLORS[index % TOP_PRODUCTS_COLORS.length];
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <circle cx={-108} cy={0} r={4} fill={color} />
+      <text x={-98} y={0} dy={4} textAnchor="start" fontSize={11} fontWeight={600} fill={textColor}>
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
+const CustomTopProductsTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="dashboard-tooltip">
+      <div className="dashboard-tooltip-date" style={{ marginBottom: 4 }}>{label}</div>
+      {payload.map((entry, idx) => {
+        const color = TOP_PRODUCTS_COLORS[(entry.payload?._index ?? 0) % TOP_PRODUCTS_COLORS.length];
+        return (
+          <div key={idx} className="dashboard-tooltip-row" style={{ color }}>
+            <span className="dashboard-tooltip-dot" style={{ background: color }} />
+            <span>{entry.name}: </span>
+            <strong>{Number(entry.value).toLocaleString('en-IN')}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const getStatusStyles = (t) => ({
   paid: { bg: 'rgba(46, 204, 113, 0.12)', color: '#2ecc71', label: t('common.paid') },
@@ -44,7 +79,7 @@ const getStatusStyles = (t) => ({
 });
 
 const EMPTY_ANALYTICS = {
-  summary: { totalOrders: 0, totalSales: 0, totalRevenue: 0, totalProfit: 0, totalCustomers: 0, lowStockProducts: 0 },
+  summary: { totalOrders: 0, totalSales: 0, totalRevenue: 0, totalProfit: 0, totalCustomers: 0, lowStockProducts: 0, totalDue: 0 },
   daily: [], topProducts: [], paymentMethods: [], recentTransactions: [], lowStockProducts: [],
 };
 
@@ -144,6 +179,211 @@ const getPersistentData = async (forceRefresh) => {
 
 const clearPersistentCache = () => { cachedPersistentData = null; persistentCacheTime = 0; };
 
+// ─── Skeleton Loading ────────────────────────────────────────
+const ReportsSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '30%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '20%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 36, width: 100,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Summary Cards row */}
+    <div className="row g-3 mb-3">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="col-6 col-md-4">
+          <div className="premium-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 10, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 20, width: '80%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 6,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Filter Bar skeleton */}
+    <div className="premium-card mb-3" style={{ border: '1px solid var(--border-color)' }}>
+      <div className="premium-card-body" style={{ padding: '0.75rem 1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 90,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{
+            height: 32, width: 140,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 8,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+            <div style={{
+              height: 32, width: 60,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{
+              height: 32, width: 60,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{
+              height: 32, width: 60,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 8,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Charts row */}
+    <div className="row g-3 mb-3">
+      <div className="col-lg-6">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '50%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '90%', height: '80%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 12,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+      <div className="col-lg-6">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '45%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '90%', height: '80%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 12,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Table skeleton */}
+    <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+      <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+        <div style={{
+          height: 16, width: '30%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 4,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ padding: '1rem 1.25rem' }}>
+        {/* Table header */}
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} style={{
+              flex: 1, height: 12,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+        {/* Table rows */}
+        {[1, 2, 3, 4, 5].map((r) => (
+          <div key={r} style={{
+            display: 'flex', gap: '1rem', padding: '0.6rem 0',
+            borderTop: '1px solid var(--border-color)',
+          }}>
+            {[1, 2, 3, 4, 5].map((c) => (
+              <div key={c} style={{
+                flex: 1, height: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 const Reports = () => {
   const { t } = useTranslation();
   const PRESETS = getPresets(t);
@@ -158,7 +398,6 @@ const Reports = () => {
   const [error, setError] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [persistentData, setPersistentData] = useState(null);
-  const initialLoadDone = useRef(false);
 
   const range = useMemo(
     () => computeRange(filters.preset, filters.customStart, filters.customEnd),
@@ -189,44 +428,41 @@ const Reports = () => {
     gridColor: theme === 'dark' ? '#2a2a4e' : '#e8e8f0',
   };
 
-  const fetchAnalytics = useCallback(async (showFullLoader) => {
-    if (!range) return;
+  // Fetch analytics data — accepts range and paymentMethod directly to avoid stale closures
+  const fetchAnalytics = useCallback(async (showFullLoader, rangeVal, paymentMethodVal) => {
+    const r = rangeVal || range;
+    const pm = paymentMethodVal !== undefined ? paymentMethodVal : filters.paymentMethod;
+    if (!r) return;
     if (showFullLoader) setLoading(true); else setRefreshing(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
-      if (filters.paymentMethod !== 'all') params.append('paymentMethod', filters.paymentMethod);
+      const params = new URLSearchParams({ startDate: r.startDate, endDate: r.endDate });
+      if (pm !== 'all') params.append('paymentMethod', pm);
       const { data } = await api.get(`/reports/analytics?${params.toString()}`, { _skipLoading: true });
-      setAnalytics((prev) => ({
-        ...prev,
-        summary: data.summary || prev.summary,
-        daily: data.daily || [],
-        topProducts: data.topProducts || [],
-        paymentMethods: data.paymentMethods || [],
-        recentTransactions: data.recentTransactions || [],
-        lowStockProducts: data.lowStockProducts || prev.lowStockProducts,
-      }));
+      if (data && data.summary) {
+        setAnalytics((prev) => ({
+          ...prev,
+          summary: data.summary,
+          daily: data.daily || [],
+          topProducts: data.topProducts || [],
+          paymentMethods: data.paymentMethods || [],
+          recentTransactions: data.recentTransactions || [],
+          lowStockProducts: data.lowStockProducts || prev.lowStockProducts,
+        }));
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || t('reportsPage.failedToLoadData'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [range, filters.paymentMethod, t]);
+  }, [t, range, filters.paymentMethod]); // Include range and paymentMethod in deps
 
-  // Initial load — single fetch, no duplicate
+  // Fetch analytics on mount and when range/paymentMethod changes
   useEffect(() => {
-    if (!initialLoadDone.current) {
-      initialLoadDone.current = true;
-      fetchAnalytics(true);
+    if (range) {
+      fetchAnalytics(true, range, filters.paymentMethod);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Subsequent loads when filters change (only after initial load)
-  useEffect(() => {
-    if (!initialLoadDone.current) return;
-    fetchAnalytics(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, filters.paymentMethod]);
 
@@ -246,37 +482,34 @@ const Reports = () => {
   }), [analytics.daily, theme, chartColors]);
 
   const trendSeries = useMemo(() => [
-    { name: t('nav.sales'), data: analytics.daily.map(d => Number((d.sales || 0).toFixed(2))) },
-    { name: t('product.profit'), data: analytics.daily.map(d => Number((d.profit || 0).toFixed(2))) },
+    { name: t('nav.sales'), data: analytics.daily.map(d => Number(Number(d.sales || 0).toFixed(2))) },
+    { name: t('product.profit'), data: analytics.daily.map(d => Number(Number(d.profit || 0).toFixed(2))) },
   ], [analytics.daily, t]);
 
-  const topProductsChartOptions = useMemo(() => ({
-    chart: { type: 'bar', height: 320, toolbar: { show: false }, foreColor: chartColors.textSecondary },
-    plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: '55%', distributed: true } },
-    dataLabels: { enabled: true, style: { fontSize: '11px', fontWeight: 600, colors: [theme === 'dark' ? '#fff' : '#1a1a2e'] } },
-    legend: { show: false },
-    xaxis: { categories: analytics.topProducts.map(p => p.name), labels: { style: { fontSize: '11px' } } },
-    yaxis: { labels: { style: { fontSize: '11px' } } },
-    tooltip: { y: { formatter: (val) => t('reportsPage.soldCount', { count: val }) } },
-    grid: { borderColor: chartColors.gridColor },
-    theme: { mode: theme },
-    colors: TOP_PRODUCTS_COLORS,
-  }), [analytics.topProducts, theme, t, chartColors]);
+  const isDark = theme === 'dark';
 
-  const topProductsChartSeries = useMemo(() => [
-    { name: t('dashboard.quantitySold'), data: analytics.topProducts.map(p => p.quantity) },
-  ], [analytics.topProducts, t]);
+  // Same shape as Dashboard.jsx's topProductsData — top 5, truncated names,
+  // Quantity Sold as the bar value, Revenue carried along for the tooltip.
+  const topProductsChartData = useMemo(() => {
+    return analytics.topProducts.slice(0, 5).map((p, index) => ({
+      name: p.name?.length > 20 ? p.name.substring(0, 20) + '...' : p.name || t('common.unknown'),
+      'Quantity Sold': p.quantity || 0,
+      Revenue: p.revenue || 0,
+      _index: index,
+    }));
+  }, [analytics.topProducts, t]);
 
   // Merge low stock and totals from persistent cache + analytics
   const summaryCards = useMemo(() => {
     const lowStockCount = persistentData?.lowStockProducts?.length ?? analytics.lowStockProducts?.length ?? 0;
-    const totalDue = (persistentData?.totalCustomerDue ?? 0) + (persistentData?.totalSupplierDue ?? 0);
+    // Use totalDue from analytics (date-scoped) which matches the Sales page's aggregateSalesStats
+    const totalDue = analytics.summary.totalDue ?? 0;
     return [
       { icon: BiCart, label: t('dashboard.totalSales'), value: money(analytics.summary.totalSales), color: 'primary', rawValue: analytics.summary.totalSales, isCurrency: true },
       { icon: BiDollar, label: t('reportsPage.totalRevenue'), value: money(analytics.summary.totalRevenue), color: 'success', rawValue: analytics.summary.totalRevenue, isCurrency: true },
       { icon: BiTrendingUp, label: t('dashboard.totalProfit'), value: money(analytics.summary.totalProfit), color: 'info', rawValue: analytics.summary.totalProfit, isCurrency: true },
       { icon: BiReceipt, label: t('dashboard.totalOrders'), value: count(analytics.summary.totalOrders), color: 'warning', rawValue: analytics.summary.totalOrders, isCurrency: false },
-      { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), value: money(totalDue), color: 'warning', rawValue: totalDue, isCurrency: true },
+      { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), value: money(totalDue), color: 'danger', rawValue: totalDue, isCurrency: true },
       { icon: BiError, label: t('dashboard.lowStockProducts'), value: count(lowStockCount), color: 'danger', rawValue: lowStockCount, isCurrency: false },
     ];
   }, [analytics.summary, persistentData, t]);
@@ -300,7 +533,7 @@ const Reports = () => {
     if (!range) return;
     const rows = [
       [t('common.date'), t('dashboard.ordersLabel'), t('nav.sales'), t('product.profit')],
-      ...analytics.daily.map(d => [d.date, d.orders, d.sales.toFixed(2), d.profit.toFixed(2)]),
+      ...analytics.daily.map(d => [d.date, d.orders, Number(d.sales || 0).toFixed(2), Number(d.profit || 0).toFixed(2)]),
     ];
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     downloadBlob(csv, 'text/csv;charset=utf-8;', `sales-report-${fileTag()}.csv`);
@@ -373,6 +606,9 @@ const Reports = () => {
     }
   };
 
+  // Show full-page skeleton on initial load instead of inline spinners
+  if (loading) return <ReportsSkeletonLoader />;
+
   // Show inline spinners instead of blocking the entire page — like Sales page
   if (error) {
     return (
@@ -381,7 +617,7 @@ const Reports = () => {
           <div style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--danger)' }}><BiError /></div>
           <h5 className="mb-2" style={{ fontWeight: 700 }}>{t('reportsPage.failedToLoad')}</h5>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{error}</p>
-          <button className="btn-premium btn-premium-primary" onClick={() => fetchAnalytics(true)}><BiRefresh /> {t('common.retry')}</button>
+          <button className="btn-premium btn-premium-primary" onClick={() => fetchAnalytics(true, range, filters.paymentMethod)}><BiRefresh /> {t('common.retry')}</button>
         </div>
       </div>
     );
@@ -399,7 +635,7 @@ const Reports = () => {
         </div>
         <div className="d-flex gap-2">
           {/* {loading && <div className="" style={{ color: 'var(--primary)', alignSelf: 'center' }} />} */}
-          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false)} disabled={refreshing}>
+          <button className="btn-premium btn-premium-secondary btn-premium-sm" onClick={() => fetchAnalytics(false, range, filters.paymentMethod)} disabled={refreshing}>
             {refreshing ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('common.refresh')}
           </button>
         </div>
@@ -486,7 +722,7 @@ const Reports = () => {
               <span className="badge badge-primary">{PRESETS.find(p => p.key === filters.preset)?.label || t('common.custom')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
-              {refreshing || loading ? (
+              {refreshing ? (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                   <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                 </div>
@@ -511,12 +747,62 @@ const Reports = () => {
               <span className="badge badge-success">{t('report.byQuantity')}</span>
             </div>
             <div className="premium-card-body" style={{ padding: '1rem' }}>
-              {refreshing || loading ? (
+              {refreshing ? (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                   <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
                 </div>
-              ) : analytics.topProducts.length > 0 ? (
-                <Chart options={topProductsChartOptions} series={topProductsChartSeries} type="bar" height={320} />
+              ) : topProductsChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart
+                    data={topProductsChartData}
+                    layout="vertical"
+                    margin={{ top: 5, right: 38, left: 10, bottom: 5 }}
+                    barSize={20}
+                    barCategoryGap="28%"
+                  >
+                    <defs>
+                      {TOP_PRODUCTS_COLORS.map((color, index) => (
+                        <linearGradient key={index} id={`reportsTopProductBarGradient-${index}`} x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={color} stopOpacity={0.75} />
+                          <stop offset="100%" stopColor={color} stopOpacity={1} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridColor} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fill: chartColors.textSecondary, fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      tick={<TopProductsYAxisTick textColor={chartColors.textSecondary} />}
+                      tickLine={false}
+                      axisLine={false}
+                      width={120}
+                    />
+                    <Tooltip content={<CustomTopProductsTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
+                    <Bar
+                      dataKey="Quantity Sold"
+                      name={t('dashboard.quantitySold')}
+                      radius={[0, 8, 8, 0]}
+                      animationDuration={900}
+                      animationEasing="ease-out"
+                    >
+                      {topProductsChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={`url(#reportsTopProductBarGradient-${index})`} />
+                      ))}
+                      <LabelList
+                        dataKey="Quantity Sold"
+                        position="right"
+                        formatter={(val) => Number(val).toLocaleString('en-IN')}
+                        style={{ fill: chartColors.textSecondary, fontSize: 11, fontWeight: 700 }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               ) : (
                 <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
                   <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📦</div>
@@ -530,7 +816,7 @@ const Reports = () => {
 
       {/* Top 10 Best Selling Products */}
       <div className="desktop-table mb-3">
-        {loading ? (
+        {refreshing ? (
           <div className="premium-card">
             <div className="premium-card-body text-center py-4" style={{ color: 'var(--text-muted)' }}>
               <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
@@ -562,7 +848,7 @@ const Reports = () => {
           <BiStar size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
           {t('reportsPage.top10Products')}
         </h5>
-        {loading ? (
+        {refreshing ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
@@ -629,7 +915,7 @@ const Reports = () => {
 
       {/* Recent Sales */}
       <div className="desktop-table">
-        {loading ? (
+        {refreshing ? (
           <div className="premium-card">
             <div className="premium-card-body text-center py-4" style={{ color: 'var(--text-muted)' }}>
               <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
@@ -675,7 +961,7 @@ const Reports = () => {
           <BiReceipt size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
           {t('sale.recentSales')}
         </h5>
-        {loading ? (
+        {refreshing ? (
           <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>

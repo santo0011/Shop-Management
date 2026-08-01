@@ -86,13 +86,16 @@ const CustomLineTooltip = ({ active, payload, label }) => {
   return (
     <div className="dashboard-tooltip">
       <div className="dashboard-tooltip-date">{label}</div>
-      {payload.map((entry, idx) => (
-        <div key={idx} className="dashboard-tooltip-row" style={{ color: entry.color }}>
-          <span className="dashboard-tooltip-dot" style={{ background: entry.color }} />
-          <span>{entry.name}: </span>
-          <strong>{formatCurrency(entry.value)}</strong>
-        </div>
-      ))}
+      {payload.map((entry, idx) => {
+        const isCurrency = entry.dataKey !== 'Orders';
+        return (
+          <div key={idx} className="dashboard-tooltip-row" style={{ color: entry.color }}>
+            <span className="dashboard-tooltip-dot" style={{ background: entry.color }} />
+            <span>{entry.name}: </span>
+            <strong>{isCurrency ? formatCurrency(entry.value) : Number(entry.value).toLocaleString('en-IN')}</strong>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -188,6 +191,195 @@ const CustomPieTooltip = ({ active, payload, t, paymentMethodLabels }) => {
   );
 };
 
+// ─── Skeleton Loading ────────────────────────────────────────
+const DashboardSkeletonLoader = () => (
+  <div className="dashboard-modern">
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-4">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '35%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '25%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{
+        height: 36, width: 100,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Stat Cards */}
+    <div className="row g-3 mb-4">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="col-6 col-md-4">
+          <div className="premium-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  height: 10, width: '60%', marginBottom: 6,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 4,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+                <div style={{
+                  height: 20, width: '80%',
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 6,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Chart Row */}
+    <div className="row g-3 mb-4">
+      <div className="col-lg-8">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '30%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} style={{
+                  height: 26, width: 50,
+                  background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 6,
+                  animation: 'shimmer 1.5s infinite',
+                }} />
+              ))}
+            </div>
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '95%', height: '85%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 12,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+      <div className="col-lg-4">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)', height: '100%' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '50%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '85%', height: '85%', borderRadius: '50%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Bottom charts row */}
+    <div className="row g-3 mb-4">
+      <div className="col-lg-6">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '35%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '90%', height: '80%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 12,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+      <div className="col-lg-6">
+        <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{
+              height: 16, width: '35%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+          <div className="premium-card-body" style={{ padding: '1rem', height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '90%', height: '80%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 12,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Recent Payments table */}
+    <div className="premium-card" style={{ border: '1px solid var(--border-color)' }}>
+      <div className="premium-card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+        <div style={{
+          height: 16, width: '25%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 4,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ padding: '0.75rem 1.25rem' }}>
+        {[1, 2, 3, 4].map((r) => (
+          <div key={r} style={{
+            display: 'flex', gap: '1rem', padding: '0.75rem 0',
+            borderTop: '1px solid var(--border-color)',
+          }}>
+            {[1, 2, 3].map((c) => (
+              <div key={c} style={{
+                flex: 1, height: 10,
+                background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+                backgroundSize: '200% 100%', borderRadius: 4,
+                animation: 'shimmer 1.5s infinite',
+              }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 const Dashboard = () => {
   const { t } = useTranslation();
   const PAYMENT_METHOD_LABELS = getPaymentMethodLabels(t);
@@ -205,7 +397,23 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [salesPeriod, setSalesPeriod] = useState(7);
   const [theme, setTheme] = useState('light');
+  const [subStatus, setSubStatus] = useState(null);
   const initialLoadDone = useRef(false);
+
+  // Fetch subscription status for expiry warning
+  useEffect(() => {
+    const fetchSubStatus = async () => {
+      try {
+        const { data } = await api.get('/subscription/status', { _skipLoading: true });
+        setSubStatus(data);
+      } catch (err) {
+        // Silently fail
+      }
+    };
+    fetchSubStatus();
+    const interval = setInterval(fetchSubStatus, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Simple theme detection — read once on mount, no MutationObserver
   useEffect(() => {
@@ -330,6 +538,8 @@ const Dashboard = () => {
     }));
   }, [salesByCategory, t]);
 
+  if (loading) return <DashboardSkeletonLoader />;
+
   if (error) {
     return (
       <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
@@ -346,7 +556,7 @@ const Dashboard = () => {
   const statCards = [
     { icon: BiPackage, label: t('dashboard.totalProducts'), value: stats?.totalProducts || 0, color: 'primary' },
     { icon: BiCart, label: t('dashboard.totalSales'), value: stats?.monthlySalesCount || 0, color: 'success' },
-    { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), subtitle: t('dashboard.outstandingReceivables'), value: stats?.customerDue || 0, color: 'warning', prefix: '₹' },
+    { icon: BiCreditCard, label: t('dashboard.totalDueAmount'), subtitle: t('dashboard.outstandingReceivables'), value: stats?.customerDue || 0, color: 'danger', prefix: '₹' },
     { icon: BiCar, label: t('dashboard.totalSuppliers'), value: stats?.totalSuppliers || 0, color: 'warning' },
     { icon: BiDollar, label: t('dashboard.todaysRevenue'), value: stats?.todaySales || 0, color: 'primary', prefix: '₹' },
     { icon: BiError, label: t('dashboard.lowStockProducts'), value: stats?.lowStockProducts || 0, color: 'danger' },
@@ -376,6 +586,32 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Subscription Expiry Warning */}
+      {subStatus && !subStatus.isExpired && subStatus.daysRemaining > 0 && subStatus.daysRemaining <= 3 && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fff8e1, #ffecb3)',
+          border: '1px solid #ffc107', borderRadius: 14,
+          padding: '1rem 1.5rem', marginBottom: '1.5rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: '0.75rem',
+        }}>
+          <span style={{ color: '#e65100', fontWeight: 600 }}>
+            ⚠ Your subscription will expire in {subStatus.daysRemaining} day{subStatus.daysRemaining > 1 ? 's' : ''}. Please contact your Super Admin.
+          </span>
+          <a
+            href="/subscription"
+            style={{
+              padding: '0.5rem 1.25rem', borderRadius: 8, border: 'none',
+              background: '#ff8f00', color: 'white', fontWeight: 700,
+              cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'none',
+              display: 'inline-block',
+            }}
+          >
+            Renew Now
+          </a>
+        </div>
+      )}
 
       {/* Stat Cards - 3 per row desktop, 2 per row mobile */}
       <div className="row g-3 mb-4">

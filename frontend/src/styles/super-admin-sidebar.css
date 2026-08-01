@@ -1,0 +1,512 @@
+/* ==========================================================
+   SUPER ADMIN SIDEBAR — Modern SaaS ERP Design
+   ========================================================== */
+
+.sa-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.sa-sidebar-overlay.open {
+  opacity: 1;
+}
+
+.sa-sidebar,
+[data-theme="light"] .sa-sidebar,
+[data-theme="dark"] .sa-sidebar {
+  --sa-sidebar-bg: #0d0d20;
+  --sa-sidebar-hover: #1a1a3e;
+  --sa-sidebar-active-bg: rgba(108, 99, 255, 0.15);
+  --sa-sidebar-active-border: #6C63FF;
+  --sa-sidebar-text: #9a9ab8;
+  --sa-sidebar-text-hover: #e8e8f0;
+  --sa-sidebar-text-active: #ffffff;
+  --sa-sidebar-border: #2a2a4e;
+  --sa-sidebar-logo-text: #e8e8f0;
+  --sa-sidebar-group-bg: rgba(255, 255, 255, 0.02);
+
+  width: 280px;
+  min-height: 100vh;
+  background: var(--sa-sidebar-bg);
+  border-right: 1px solid var(--sa-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1050;
+  transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sa-sidebar.collapsed {
+  width: 80px;
+}
+
+.sa-sidebar.collapsed .sa-sidebar-logo {
+  padding: 0.5rem;
+}
+
+.sa-sidebar-logo {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--sa-sidebar-border);
+  position: relative;
+}
+
+.sa-logo-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.sa-logo-img {
+  display: block;
+  max-width: 80%;
+  height: auto;
+}
+
+.sa-close-btn--mobile {
+  flex-shrink: 0;
+  margin-left: 0.75rem;
+}
+
+.sa-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--sa-sidebar-border);
+  background: transparent;
+  color: var(--sa-sidebar-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 150ms ease;
+}
+
+.sa-close-btn:hover {
+  background: var(--sa-sidebar-hover);
+  color: var(--sa-sidebar-text-hover);
+}
+
+.sa-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.75rem 0 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.sa-sidebar-nav::-webkit-scrollbar {
+  width: 3px;
+}
+
+.sa-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.sa-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.6rem 1.25rem;
+  margin: 0 0.5rem;
+  color: var(--sa-sidebar-text);
+  text-decoration: none;
+  border-radius: 10px;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  position: relative;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.sa-nav-link:hover {
+  background: var(--sa-sidebar-hover);
+  color: var(--sa-sidebar-text-hover);
+}
+
+.sa-nav-link.active {
+  background: var(--sa-sidebar-active-bg);
+  color: var(--sa-sidebar-text-active);
+  font-weight: 600;
+}
+
+.sa-nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sa-sidebar-active-border);
+  box-shadow: 0 0 8px rgba(108, 99, 255, 0.4);
+}
+
+.sa-nav-group {
+  margin: 0.15rem 0;
+}
+
+.sa-nav-group-btn {
+  width: calc(100% - 1rem);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.6rem 1.25rem;
+  margin: 0 0.5rem;
+  color: var(--sa-sidebar-text);
+  background: none;
+  border: none;
+  border-radius: 10px;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  font-family: var(--font-family);
+  position: relative;
+  white-space: nowrap;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.sa-nav-group-btn:hover {
+  background: var(--sa-sidebar-hover);
+  color: var(--sa-sidebar-text-hover);
+}
+
+.sa-nav-group-btn.group-active {
+  color: var(--sa-sidebar-text-hover);
+  font-weight: 600;
+}
+
+.sa-nav-group-btn.expanded {
+  background: var(--sa-sidebar-group-bg);
+  color: var(--sa-sidebar-text-hover);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sa-nav-chevron {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  transition: transform 200ms ease;
+  color: var(--sa-sidebar-text);
+  flex-shrink: 0;
+}
+
+.sa-nav-icon {
+  font-size: 1.3rem;
+  min-width: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sa-sub-icon {
+  font-size: 1.1rem;
+  min-width: 0;
+  width: auto;
+}
+
+.sa-nav-submenu {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  margin-left: 0.5rem;
+}
+
+.sa-nav-submenu.open {
+  max-height: 800px;
+}
+
+.sa-nav-sub-link {
+  padding: 0.5rem 1.25rem 0.5rem 2.8rem;
+  margin: 0 0.5rem 0 1.8rem;
+  font-size: 0.9rem;
+  border-left: 1px solid var(--sa-sidebar-border);
+  border-radius: 0 8px 8px 0;
+  position: relative;
+}
+
+.sa-nav-sub-link:hover {
+  background: var(--sa-sidebar-hover);
+  color: var(--sa-sidebar-text-hover);
+}
+
+.sa-nav-sub-link.active {
+  background: var(--sa-sidebar-active-bg);
+  color: var(--sa-sidebar-text-active);
+}
+
+.sa-nav-sub-link.active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sa-sidebar-active-border);
+  box-shadow: 0 0 8px rgba(108, 99, 255, 0.4);
+}
+
+.sa-nav-sub-link .sa-nav-icon {
+  font-size: 1rem;
+}
+
+.sa-nav-tooltip {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1a1a3e;
+  color: #e8e8f0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 150ms ease;
+  pointer-events: none;
+  z-index: 1060;
+  border: 1px solid var(--sa-sidebar-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.sa-nav-tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: var(--sa-sidebar-border);
+}
+
+.sa-nav-link:hover .sa-nav-tooltip,
+.sa-nav-group-btn:hover .sa-nav-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sa-sidebar.collapsed .sa-nav-link,
+.sa-sidebar.collapsed .sa-nav-group-btn {
+  padding: 0.6rem;
+  justify-content: center;
+  margin: 0.15rem 0.5rem;
+}
+
+.sa-sidebar.collapsed .sa-nav-link .sa-nav-label,
+.sa-sidebar.collapsed .sa-nav-group-btn .sa-nav-label {
+  display: none;
+}
+
+.sa-sidebar.collapsed .sa-nav-icon {
+  font-size: 1.4rem;
+  min-width: 0;
+}
+
+.sa-sidebar.collapsed .sa-nav-submenu {
+  display: none;
+}
+
+.sa-sidebar.collapsed .sa-nav-link.active::before {
+  left: -0.5rem;
+}
+
+.sa-sidebar-footer {
+  flex-shrink: 0;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--sa-sidebar-border);
+}
+
+.sa-sidebar.collapsed .sa-sidebar-footer .sa-nav-label {
+  display: none;
+}
+
+.sa-collapse-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.5rem 0.85rem;
+  color: var(--sa-sidebar-text);
+  background: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: var(--font-family);
+  transition: all 150ms ease;
+  justify-content: center;
+}
+
+.sa-collapse-toggle:hover {
+  background: var(--sa-sidebar-hover);
+  color: var(--sa-sidebar-text-hover);
+}
+
+/* ==========================================================
+   SUPER ADMIN STAT CARDS — Admin Panel Style
+   ========================================================== */
+
+.sa-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--border-radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.sa-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.sa-stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 0 2px 2px 0;
+}
+
+.sa-stat-primary::before { background: var(--primary); }
+.sa-stat-success::before { background: var(--secondary); }
+.sa-stat-warning::before { background: var(--warning); }
+.sa-stat-danger::before { background: var(--danger); }
+.sa-stat-info::before { background: var(--info); }
+
+.sa-stat-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.sa-stat-primary .sa-stat-icon {
+  background: rgba(108, 99, 255, 0.12);
+  color: var(--primary);
+}
+
+.sa-stat-success .sa-stat-icon {
+  background: rgba(0, 217, 166, 0.12);
+  color: var(--secondary);
+}
+
+.sa-stat-warning .sa-stat-icon {
+  background: rgba(255, 181, 69, 0.12);
+  color: var(--warning);
+}
+
+.sa-stat-danger .sa-stat-icon {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+}
+
+.sa-stat-info .sa-stat-icon {
+  background: rgba(23, 162, 184, 0.12);
+  color: var(--info);
+}
+
+.sa-stat-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sa-stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin-bottom: 2px;
+  letter-spacing: -0.02em;
+}
+
+.sa-stat-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 575.98px) {
+  .sa-stat-card {
+    padding: 1rem 1.1rem;
+    gap: 12px;
+  }
+  .sa-stat-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 1.2rem;
+  }
+  .sa-stat-value {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .sa-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 280px !important;
+    transform: translateX(-100%);
+    z-index: 1050;
+    transition: transform 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sa-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sa-sidebar-overlay {
+    display: block;
+  }
+
+  .sa-sidebar-overlay.open {
+    opacity: 1;
+  }
+
+  .sa-sidebar.collapsed {
+    width: 280px !important;
+  }
+}

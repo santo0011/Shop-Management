@@ -1,0 +1,960 @@
+/* ============================================
+   Premium Shop Details Drawer - Enterprise SaaS
+   ============================================ */
+
+/* Drawer Base */
+.shop-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1055;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.shop-drawer-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.shop-drawer {
+  position: fixed;
+  top: 0;
+  right: -480px;
+  width: 480px;
+  max-width: 100vw;
+  height: 100vh;
+  background: var(--bg-body);
+  z-index: 1060;
+  transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.12);
+}
+
+.shop-drawer.open {
+  right: 0;
+}
+
+/* Drawer Header */
+.shop-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  min-height: 68px;
+}
+
+.shop-drawer-header h5 {
+  font-weight: 700;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.shop-drawer-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1.2rem;
+}
+
+.shop-drawer-close:hover {
+  background: var(--glow-danger);
+  color: var(--danger);
+}
+
+/* Drawer Body - Scrollable */
+.shop-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  scroll-behavior: smooth;
+}
+
+.shop-drawer-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.shop-drawer-body::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 2px;
+}
+
+/* ==========================================
+   Section Cards
+   ========================================== */
+.shop-section-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  animation: shopSectionFadeIn 0.4s ease forwards;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.shop-section-card:nth-child(1) { animation-delay: 0s; }
+.shop-section-card:nth-child(2) { animation-delay: 0.08s; }
+.shop-section-card:nth-child(3) { animation-delay: 0.16s; }
+.shop-section-card:nth-child(4) { animation-delay: 0.24s; }
+.shop-section-card:nth-child(5) { animation-delay: 0.32s; }
+
+@keyframes shopSectionFadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shop-section-header {
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-primary);
+}
+
+.shop-section-content {
+  padding: 1.25rem;
+}
+
+/* ==========================================
+   Profile Header / Shop Overview
+   ========================================== */
+.shop-profile-header {
+  background: linear-gradient(135deg, rgba(108, 99, 255, 0.1), rgba(0, 217, 166, 0.06));
+  border-radius: 16px;
+  padding: 1.75rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.shop-profile-header::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -20%;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(108, 99, 255, 0.06);
+  pointer-events: none;
+}
+
+.shop-profile-header::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: -15%;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: rgba(0, 217, 166, 0.05);
+  pointer-events: none;
+}
+
+.shop-avatar-large {
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  background: var(--gradient-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 auto 1rem;
+  box-shadow: 0 6px 20px rgba(108, 99, 255, 0.3);
+  position: relative;
+  z-index: 1;
+}
+
+.shop-name-large {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.shop-owner-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  position: relative;
+  z-index: 1;
+}
+
+.shop-badges {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.shop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.3rem 0.85rem;
+  border-radius: 50px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.shop-badge-active {
+  background: rgba(0, 217, 166, 0.12);
+  color: var(--secondary);
+}
+
+.shop-badge-inactive {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+}
+
+.shop-badge-subscribed {
+  background: rgba(108, 99, 255, 0.12);
+  color: var(--primary);
+}
+
+.shop-badge-trial {
+  background: rgba(255, 181, 69, 0.12);
+  color: var(--warning);
+}
+
+.shop-badge-expired {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+}
+
+/* Info Rows */
+.shop-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.6rem 0;
+}
+
+.shop-info-row + .shop-info-row {
+  border-top: 1px solid var(--border-light);
+}
+
+.shop-info-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.shop-info-icon-primary {
+  background: rgba(108, 99, 255, 0.08);
+  color: var(--primary);
+}
+
+.shop-info-icon-secondary {
+  background: rgba(0, 217, 166, 0.08);
+  color: var(--secondary);
+}
+
+.shop-info-icon-warning {
+  background: rgba(255, 181, 69, 0.08);
+  color: var(--warning);
+}
+
+.shop-info-icon-info {
+  background: rgba(23, 162, 184, 0.08);
+  color: var(--info);
+}
+
+.shop-info-icon-muted {
+  background: var(--bg-input);
+  color: var(--text-muted);
+}
+
+.shop-info-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 1px;
+}
+
+.shop-info-value {
+  font-weight: 600;
+  font-size: 0.85rem;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ==========================================
+   Subscription Card (Highlighted)
+   ========================================== */
+.subscription-highlight-card {
+  background: linear-gradient(135deg, rgba(108, 99, 255, 0.08), rgba(0, 217, 166, 0.04));
+  border: 1.5px solid rgba(108, 99, 255, 0.2);
+  border-radius: 16px;
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.subscription-highlight-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -30%;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: rgba(108, 99, 255, 0.04);
+  pointer-events: none;
+}
+
+.subscription-plan-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subscription-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(108, 99, 255, 0.08);
+}
+
+.subscription-detail-row:last-child {
+  border-bottom: none;
+}
+
+.subscription-detail-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.subscription-detail-value {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.subscription-remaining-days {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.25rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.subscription-remaining-high {
+  background: rgba(0, 217, 166, 0.12);
+  color: var(--secondary);
+}
+
+.subscription-remaining-medium {
+  background: rgba(255, 181, 69, 0.12);
+  color: var(--warning);
+}
+
+.subscription-remaining-low {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+}
+
+.subscription-queued-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(108, 99, 255, 0.1);
+  color: var(--primary);
+}
+
+/* ==========================================
+   Subscription History Timeline
+   ========================================== */
+.sub-history-timeline {
+  position: relative;
+}
+
+.sub-history-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--border-color);
+  border-radius: 1px;
+}
+
+.sub-history-item {
+  position: relative;
+  padding-left: 28px;
+  padding-bottom: 1rem;
+}
+
+.sub-history-item:last-child {
+  padding-bottom: 0;
+}
+
+.sub-history-dot {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid;
+  background: var(--bg-card);
+  z-index: 1;
+}
+
+.sub-history-dot-active {
+  border-color: var(--secondary);
+}
+
+.sub-history-dot-expired {
+  border-color: var(--text-muted);
+}
+
+.sub-history-dot-cancelled {
+  border-color: var(--danger);
+}
+
+.sub-history-dot-queued {
+  border-color: var(--primary);
+}
+
+.sub-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.sub-history-plan {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.sub-history-status {
+  flex-shrink: 0;
+}
+
+.sub-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.sub-history-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ==========================================
+   KPI Stats Grid
+   ========================================== */
+.shop-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+.shop-stat-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem 0.85rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.shop-stat-card:hover {
+  border-color: rgba(108, 99, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(108, 99, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.shop-stat-icon {
+  font-size: 1.3rem;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.shop-stat-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.shop-stat-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ==========================================
+   Activity Timeline
+   ========================================== */
+.activity-timeline {
+  position: relative;
+}
+
+.activity-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--border-color);
+  border-radius: 1px;
+}
+
+.activity-item {
+  position: relative;
+  padding-left: 28px;
+  padding-bottom: 1rem;
+}
+
+.activity-item:last-child {
+  padding-bottom: 0;
+}
+
+.activity-dot {
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5rem;
+  color: #fff;
+  z-index: 1;
+}
+
+.activity-dot-primary {
+  background: var(--primary);
+}
+
+.activity-dot-success {
+  background: var(--secondary);
+}
+
+.activity-dot-danger {
+  background: var(--danger);
+}
+
+.activity-dot-warning {
+  background: var(--warning);
+}
+
+.activity-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.activity-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.activity-details {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ==========================================
+   Skeleton Loading
+   ========================================== */
+@keyframes shopShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shop-skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shopShimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* ==========================================
+   Empty State
+   ========================================== */
+.shop-empty-state {
+  text-align: center;
+  padding: 1.5rem 0;
+  color: var(--text-muted);
+}
+
+.shop-empty-state-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.4;
+}
+
+.shop-empty-state-text {
+  font-size: 0.82rem;
+}
+
+/* ==========================================
+   Badge Colors for History
+   ========================================== */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.2rem 0.65rem;
+  border-radius: 50px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.status-badge-active {
+  background: rgba(0, 217, 166, 0.12);
+  color: var(--secondary);
+}
+
+.status-badge-expired {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+}
+
+.status-badge-cancelled {
+  background: rgba(255, 107, 107, 0.08);
+  color: var(--danger);
+  opacity: 0.7;
+}
+
+.status-badge-queued {
+  background: rgba(108, 99, 255, 0.12);
+  color: var(--primary);
+}
+
+/* ==========================================
+   Sale View Drawer — Invoice Header Card
+   ========================================== */
+.sale-header-card {
+  margin-bottom: 1.25rem;
+  border-radius: var(--border-radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.sale-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(135deg, #6C63FF, #5A52D5);
+  position: relative;
+}
+
+.sale-header-top::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(135deg, transparent 0%, rgba(0,217,166,0.15) 100%);
+  pointer-events: none;
+}
+
+.sale-header-top-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.sale-header-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(4px);
+}
+
+.sale-header-icon svg {
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.sale-header-invoice {
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  font-family: var(--font-mono);
+  display: block;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.sale-header-date {
+  color: rgba(255,255,255,0.75);
+  font-size: 0.68rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sale-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+
+/* Details row — 3 equal columns */
+.sale-header-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: var(--bg-card);
+}
+
+.sale-header-detail {
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sale-header-detail + .sale-header-detail {
+  border-left: 1px solid var(--border-light);
+}
+
+.sale-header-detail-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.sale-header-detail-icon--shop {
+  background: rgba(108,99,255,0.1);
+  color: var(--primary);
+}
+
+.sale-header-detail-icon--customer {
+  background: rgba(0,217,166,0.1);
+  color: #00D9A6;
+}
+
+.sale-header-detail-icon--payment {
+  background: rgba(255,181,69,0.1);
+  color: #F39C12;
+}
+
+.sale-header-detail-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.sale-header-detail-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.sale-header-detail-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sale-header-detail-sub {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 1px;
+}
+
+.sale-header-detail-sub .state-badge {
+  font-size: 0.6rem;
+  color: #6C63FF;
+  background: rgba(108,99,255,0.08);
+  padding: 0 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.sale-header-pay-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 1px;
+}
+
+.sale-header-paid {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #2ecc71;
+}
+
+.sale-header-due {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #FF6B6B;
+}
+
+@media (max-width: 767.98px) {
+  .sale-header-details {
+    grid-template-columns: 1fr;
+  }
+
+  .sale-header-detail + .sale-header-detail {
+    border-left: none;
+    border-top: 1px solid var(--border-light);
+  }
+}
+
+/* ==========================================
+   Mobile Responsive
+   ========================================== */
+@media (max-width: 575.98px) {
+  .shop-drawer {
+    width: 100vw;
+    right: -100vw;
+  }
+
+  .shop-drawer-header {
+    padding: 1rem 1.25rem;
+    min-height: 60px;
+  }
+
+  .shop-drawer-body {
+    padding: 1rem 1.25rem;
+  }
+
+  .shop-profile-header {
+    padding: 1.5rem 1rem;
+  }
+
+  .shop-avatar-large {
+    width: 64px;
+    height: 64px;
+    font-size: 1.5rem;
+    border-radius: 16px;
+  }
+
+  .shop-name-large {
+    font-size: 1.1rem;
+  }
+
+  .shop-stats-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .shop-stat-card {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .shop-stat-value {
+    font-size: 1.05rem;
+  }
+
+  .shop-section-content {
+    padding: 1rem;
+  }
+
+  .subscription-highlight-card {
+    padding: 1rem;
+  }
+
+  .sub-history-meta {
+    flex-direction: column;
+    gap: 2px;
+  }
+}

@@ -28,6 +28,17 @@ const supplierSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  state: {
+    type: String,
+    required: [true, 'State is required'],
+    trim: true,
+    default: 'West Bengal',
+  },
+  gstNumber: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   shop: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shop',

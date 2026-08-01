@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { updateLanguage } from './redux/slices/authSlice';
 import { setTheme } from './redux/slices/themeSlice';
 import { getSavedLanguage, saveLanguage } from './utils/i18n';
+import api from './services/api';
 
 // Layout
 import AdminLayout from './components/layout/AdminLayout';
@@ -28,6 +29,7 @@ import Sales from './pages/admin/Sales';
 import CustomerLedgerPage from './pages/admin/CustomerLedgerPage';
 import POS from './pages/admin/POS';
 import Reports from './pages/admin/Reports';
+import GstReport from './pages/admin/GstReport';
 import Subscription from './pages/admin/Subscription';
 import Settings from './pages/admin/Settings';
 
@@ -35,30 +37,83 @@ import Settings from './pages/admin/Settings';
 import SuperDashboard from './pages/super-admin/Dashboard';
 import ManageShops from './pages/super-admin/ManageShops';
 import ManagePlans from './pages/super-admin/ManagePlans';
-import Transactions from './pages/super-admin/Transactions';
 import SuperAdminSettings from './pages/super-admin/Settings';
+import BusinessTypes from './pages/super-admin/BusinessTypes';
+import CategoriesLibrary from './pages/super-admin/CategoriesLibrary';
+import ActiveSubscriptions from './pages/super-admin/ActiveSubscriptions';
+import Subscriptions from './pages/super-admin/Subscriptions';
+import SubscriptionHistory from './pages/super-admin/SubscriptionHistory';
+import ExpiringSoon from './pages/super-admin/ExpiringSoon';
+import Payments from './pages/super-admin/Payments';
+import RevenueReports from './pages/super-admin/RevenueReports';
+import BusinessReports from './pages/super-admin/BusinessReports';
+import GlobalSettings from './pages/super-admin/GlobalSettings';
+import BackupRestore from './pages/super-admin/BackupRestore';
+import ActivityLogs from './pages/super-admin/ActivityLogs';
+import MyProfile from './pages/super-admin/MyProfile';
+import ChangePassword from './pages/super-admin/ChangePassword';
 
-// Common
-import LoadingOverlay from './components/common/LoadingOverlay';
+import { showToast } from './utils/toast';
 
 const PrivateRoute = ({ children, role }) => {
   const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
-
-  if (loading) {
-    return null; // LoadingOverlay handles this globally via API calls
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (role && user?.role !== role) {
-    const redirectPath = user?.role === 'super_admin' ? '/super-admin' : '/';
-    return <Navigate to={redirectPath} replace />;
+    return <Navigate to={user?.role === 'super_admin' ? '/super-admin' : '/'} replace />;
   }
-
   return children;
 };
+
+/**
+ * SubscriptionGuard - checks subscription ONCE on mount.
+ * If locked → redirect to /subscription (except if already on /subscription).
+ * Super Admin passes through.
+ */
+function SubscriptionGuard() {
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const loc = useLocation();
+  const [check, setCheck] = useState({ done: false, locked: false });
+  const isSubPage = loc.pathname === '/subscription';
+
+  useEffect(() => {
+    let dead = false;
+    async function run() {
+      if (!isAuthenticated || !user) {
+        if (!dead) setCheck({ done: true, locked: false });
+        return;
+      }
+      if (user.role === 'super_admin') {
+        if (!dead) setCheck({ done: true, locked: false });
+        return;
+      }
+      // /subscription route is always allowed
+      if (isSubPage) {
+        if (!dead) setCheck({ done: true, locked: false });
+        return;
+      }
+      try {
+        const { data } = await api.get('/subscription/status', { _skipLoading: true });
+        if (!dead) {
+          // Locked if:
+          // 1. isExpired is true (backend's authoritative check), OR
+          // 2. subscriptionStatus is NOT active and NOT trial
+          const locked = data.isExpired === true || 
+            (data.subscriptionStatus !== 'active' && data.subscriptionStatus !== 'trial');
+          setCheck({ done: true, locked });
+        }
+      } catch {
+        if (!dead) setCheck({ done: true, locked: false });
+      }
+    }
+    run();
+    return () => { dead = true; };
+  }, [isAuthenticated, user, isSubPage]);
+
+  if (!check.done) return null;
+  if (check.locked && !isSubPage) return <Navigate to="/subscription" replace />;
+  return <AdminLayout />;
+}
 
 function App() {
   const dispatch = useDispatch();
@@ -67,46 +122,24 @@ function App() {
   const { i18n } = useTranslation();
 
   useEffect(() => {
-    try {
-      document.documentElement.setAttribute('data-theme', mode);
-    } catch (err) {
-      console.error('Failed to set theme:', err);
-    }
+    try { document.documentElement.setAttribute('data-theme', mode); } catch {}
   }, [mode]);
 
-  // Initialize language from persistent storage on mount, independent of user object
   useEffect(() => {
     const savedLang = getSavedLanguage();
-    if (savedLang && savedLang !== i18n.language) {
-      i18n.changeLanguage(savedLang).catch(err => {
-        console.error('Failed to change language:', err);
-      });
-    }
+    if (savedLang && savedLang !== i18n.language) i18n.changeLanguage(savedLang).catch(() => {});
   }, [i18n]);
 
-  // When user logs in, do NOT override the language from user object.
-  // The language preference is stored independently in localStorage.
-  // If the user object has a language but no preference is saved yet,
-  // store it so it persists.
   useEffect(() => {
-    if (user?.language && !getSavedLanguage()) {
-      saveLanguage(user.language);
-    }
+    if (user?.language && !getSavedLanguage()) saveLanguage(user.language);
   }, [user?.language]);
 
-  // Listen for language changes from any component and persist them
   useEffect(() => {
-    const handleLanguageChanged = (lng) => {
-      saveLanguage(lng);
-      dispatch(updateLanguage(lng));
-    };
-    i18n.on('languageChanged', handleLanguageChanged);
-    return () => {
-      i18n.off('languageChanged', handleLanguageChanged);
-    };
+    const h = (lng) => { saveLanguage(lng); dispatch(updateLanguage(lng)); };
+    i18n.on('languageChanged', h);
+    return () => i18n.off('languageChanged', h);
   }, [i18n, dispatch]);
 
-  // Compute redirect paths based on auth state
   const loginRedirect = useMemo(() => {
     if (!isAuthenticated) return null;
     return user?.role === 'super_admin' ? '/super-admin' : '/';
@@ -119,45 +152,35 @@ function App() {
 
   return (
     <Router>
-      <LoadingOverlay />
       <Routes>
-        {/* Auth Routes */}
-        <Route 
-          path="/login" 
-          element={
-            isAuthenticated && loginRedirect 
-              ? <Navigate to={loginRedirect} replace /> 
-              : <Login />
-          } 
-        />
+        <Route path="/login" element={isAuthenticated && loginRedirect ? <Navigate to={loginRedirect} replace /> : <Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-        {/* Super Admin Routes */}
-        <Route 
-          path="/super-admin" 
-          element={
-            <PrivateRoute role="super_admin">
-              <SuperAdminLayout />
-            </PrivateRoute>
-          }
-        >
+        {/* Super Admin - never restricted */}
+        <Route path="/super-admin" element={<PrivateRoute role="super_admin"><SuperAdminLayout /></PrivateRoute>}>
           <Route index element={<SuperDashboard />} />
           <Route path="shops" element={<ManageShops />} />
+          <Route path="business-types" element={<BusinessTypes />} />
+          <Route path="categories-library" element={<CategoriesLibrary />} />
           <Route path="plans" element={<ManagePlans />} />
-          <Route path="transactions" element={<Transactions />} />
+          <Route path="active-subscriptions" element={<ActiveSubscriptions />} />
+          <Route path="subscriptions" element={<Subscriptions />} />
+          <Route path="subscription-history" element={<SubscriptionHistory />} />
+          <Route path="expiring-soon" element={<ExpiringSoon />} />
+          <Route path="payments" element={<Payments />} />
+          <Route path="revenue-reports" element={<RevenueReports />} />
+          <Route path="business-reports" element={<BusinessReports />} />
+          <Route path="global-settings" element={<GlobalSettings />} />
+          <Route path="backup-restore" element={<BackupRestore />} />
+          <Route path="activity-logs" element={<ActivityLogs />} />
+          <Route path="my-profile" element={<MyProfile />} />
+          <Route path="change-password" element={<ChangePassword />} />
           <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
 
-        {/* Admin Routes */}
-        <Route 
-          path="/" 
-          element={
-            <PrivateRoute>
-              <AdminLayout />
-            </PrivateRoute>
-          }
-        >
+        {/* Admin routes with subscription check */}
+        <Route path="/" element={<PrivateRoute><SubscriptionGuard /></PrivateRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="pos" element={<POS />} />
@@ -171,11 +194,11 @@ function App() {
           <Route path="purchases" element={<Purchases />} />
           <Route path="sales" element={<Sales />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="gst-report" element={<GstReport />} />
           <Route path="subscription" element={<Subscription />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 
-        {/* Fallback */}
         <Route path="*" element={<Navigate to={defaultRedirect} replace />} />
       </Routes>
     </Router>

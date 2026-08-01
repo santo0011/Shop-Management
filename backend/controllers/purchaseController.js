@@ -1,6 +1,9 @@
+const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Product = require('../models/Product');
 const Supplier = require('../models/Supplier');
+const Shop = require('../models/Shop');
+const { calculateItemTotals, calculateInvoiceGst } = require('../utils/gstCalculation');
 
 const getPurchases = async (req, res) => {
   try {
@@ -13,7 +16,7 @@ const getPurchases = async (req, res) => {
     if (startDate && endDate) {
       query.purchaseDate = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
-    if (supplier) query.supplier = supplier;
+    if (supplier) query.supplier = new mongoose.Types.ObjectId(supplier);
     if (status) query.paymentStatus = status;
     if (search) {
       const matchingSuppliers = await Supplier.find({
@@ -28,15 +31,38 @@ const getPurchases = async (req, res) => {
       ];
     }
 
-    const purchases = await Purchase.find(query)
-      .populate('supplier', 'name phone')
-      .populate('items.product', 'name nameBn')
-      .sort({ purchaseDate: -1 })
-      .skip(skip)
-      .limit(limit);
+    const [purchases, total, statsAgg] = await Promise.all([
+      Purchase.find(query)
+        .populate('supplier', 'name phone state dueAmount')
+        .populate('items.product', 'name nameBn')
+        .sort({ purchaseDate: -1 })
+        .skip(skip)
+        .limit(limit),
+      Purchase.countDocuments(query),
+      Purchase.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: '$totalAmount' },
+            totalPaid: { $sum: '$paidAmount' },
+            totalDue: { $sum: '$dueAmount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
 
-    const total = await Purchase.countDocuments(query);
-    res.json({ purchases, page, pages: Math.ceil(total / limit), total });
+    const stats = statsAgg[0]
+      ? {
+          totalPurchases: statsAgg[0].count,
+          totalAmount: statsAgg[0].totalAmount,
+          totalPaid: statsAgg[0].totalPaid,
+          totalDue: statsAgg[0].totalDue,
+        }
+      : { totalPurchases: 0, totalAmount: 0, totalPaid: 0, totalDue: 0 };
+
+    res.json({ purchases, page, pages: Math.ceil(total / limit), total, stats });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -45,8 +71,9 @@ const getPurchases = async (req, res) => {
 const getPurchase = async (req, res) => {
   try {
     const purchase = await Purchase.findOne({ _id: req.params.id, shop: req.user.shop })
-      .populate('supplier', 'name phone address dueAmount')
-      .populate('items.product', 'name nameBn sku unit');
+      .populate('supplier', 'name phone address state dueAmount')
+      .populate('items.product', 'name nameBn sku unit')
+      .populate('returns.processedBy', 'name');
     if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
     res.json(purchase);
   } catch (error) {
@@ -61,9 +88,66 @@ const generatePurchaseNo = async (shopId) => {
   return `PUR-${dateStr}-${String(count + 1).padStart(4, '0')}`;
 };
 
+// Walk a supplier's other unpaid purchases oldest-first and apply an
+// explicit, user-chosen amount against them (FIFO) — separate from whatever
+// the user pays toward the current purchase itself, so the two never bleed
+// into each other. Always computes the "previous due at creation" snapshot
+// from the same query (so it can never disagree with what the loop acted on);
+// only actually mutates those older purchases when `includePreviousDue` is
+// true AND a positive amount was actually requested.
+// Uses atomic $inc updates (not read-modify-save) so two purchases created for
+// the same supplier back-to-back can't lose each other's write — this codebase
+// has no DB transactions anywhere, so this is the cheap safety net for that.
+const allocatePreviousDue = async (shopId, supplierId, previousDuePaymentAmount, includePreviousDue) => {
+  const unpaidPurchases = await Purchase.find({
+    shop: shopId, supplier: supplierId, dueAmount: { $gt: 0.001 },
+  }).sort({ purchaseDate: 1, createdAt: 1 });
+
+  const previousDueAmountAtCreation = Math.round(
+    unpaidPurchases.reduce((sum, p) => sum + p.dueAmount, 0) * 100
+  ) / 100;
+
+  // Never allocate more than the supplier's actual outstanding due, no
+  // matter what the client sends.
+  let remainingPayment = includePreviousDue
+    ? Math.min(Math.max(0, Number(previousDuePaymentAmount) || 0), previousDueAmountAtCreation)
+    : 0;
+  const previousDueAllocations = [];
+
+  if (includePreviousDue) {
+    for (const old of unpaidPurchases) {
+      if (remainingPayment <= 0) break;
+      const applied = Math.round(Math.min(old.dueAmount, remainingPayment) * 100) / 100;
+      if (applied <= 0) continue;
+
+      const updatedOld = await Purchase.findByIdAndUpdate(
+        old._id,
+        { $inc: { paidAmount: applied, dueAmount: -applied } },
+        { new: true }
+      );
+      updatedOld.paymentStatus = updatedOld.dueAmount <= 0.001 ? 'paid' : 'partial';
+      await updatedOld.save();
+
+      previousDueAllocations.push({ purchase: old._id, purchaseNo: old.purchaseNo, amountApplied: applied });
+      remainingPayment = Math.round((remainingPayment - applied) * 100) / 100;
+    }
+  }
+
+  const appliedToPreviousDue = Math.round(
+    previousDueAllocations.reduce((sum, a) => sum + a.amountApplied, 0) * 100
+  ) / 100;
+
+  return {
+    previousDueAmountAtCreation,
+    previousDueAllocations,
+    previousDueIncluded: previousDueAllocations.length > 0,
+    appliedToPreviousDue,
+  };
+};
+
 const createPurchase = async (req, res) => {
   try {
-    const { supplier, supplierInvoiceNo, purchaseDate, items, subtotal, discount, tax, shipping, totalAmount, paidAmount, paymentMethod, notes } = req.body;
+    const { supplier, supplierInvoiceNo, purchaseDate, items, subtotal, discount, shipping, totalAmount, paidAmount, previousDuePaymentAmount, paymentMethod, notes, includePreviousDue, invoiceImage } = req.body;
 
     // A supplier invoice number only needs to be unique for that supplier —
     // the same number from two different suppliers is not a conflict.
@@ -74,30 +158,113 @@ const createPurchase = async (req, res) => {
       }
     }
 
+    // Get business state from shop settings
+    const shop = await Shop.findById(req.user.shop);
+    const businessState = shop?.settings?.businessState || 'West Bengal';
+
+    // Get supplier state
+    const supplierData = await Supplier.findById(supplier);
+    const supplierState = supplierData?.state || '';
+
+    // The Add Purchase drawer applies GST once at invoice level (from
+    // Settings) and never sends a per-item gstRate/tax — so that must be
+    // the fallback here, not 0, or every purchase is stored with zero GST.
+    const gstEnabled = shop?.settings?.gstEnabled !== false;
+    const defaultGstRate = gstEnabled ? (shop?.settings?.defaultGstRate ?? 18) : 0;
+
     const purchaseNo = await generatePurchaseNo(req.user.shop);
 
-    const purchase = await Purchase.create({
+    // Calculate GST for each line item and the invoice
+    const calculatedItems = (items || []).map(item => {
+      const gstRate = Number(item.gstRate) || Number(item.tax) || defaultGstRate;
+      const lineGst = calculateItemTotals(
+        item.quantity,
+        item.purchasePrice,
+        item.discount || 0,
+        gstRate,
+        businessState,
+        supplierState
+      );
+      return {
+        product: item.product,
+        batchNumber: item.batchNumber || '',
+        expiryDate: item.expiryDate || undefined,
+        quantity: Number(item.quantity) || 1,
+        unit: item.unit || 'piece',
+        purchasePrice: Number(item.purchasePrice) || 0,
+        sellingPrice: Number(item.sellingPrice) || 0,
+        discount: Number(item.discount) || 0,
+        gstRate,
+        cgst: lineGst.cgst,
+        sgst: lineGst.sgst,
+        igst: lineGst.igst,
+        taxableAmount: lineGst.taxableAmount,
+        gstAmount: lineGst.gstAmount,
+        total: lineGst.total,
+      };
+    });
+
+    const calculatedSubtotal = calculatedItems.reduce((sum, item) => sum + item.taxableAmount + Number(item.discount > 0 ? item.taxableAmount * item.discount / (100 - item.discount) : 0), 0);
+    const calcDiscountTotal = calculatedItems.reduce((sum, item) => sum + (item.taxableAmount * item.discount / (100 - item.discount || 1)), 0);
+    const calcTaxableAmount = calculatedItems.reduce((sum, item) => sum + item.taxableAmount, 0);
+    const calcGstAmount = calculatedItems.reduce((sum, item) => sum + item.gstAmount, 0);
+    const calcCgst = calculatedItems.reduce((sum, item) => sum + item.cgst, 0);
+    const calcSgst = calculatedItems.reduce((sum, item) => sum + item.sgst, 0);
+    const calcIgst = calculatedItems.reduce((sum, item) => sum + item.igst, 0);
+    const calcTotalAmount = calculatedItems.reduce((sum, item) => sum + item.total, 0);
+
+    // The user now explicitly splits payment into two amounts: how much goes
+    // toward the supplier's older unpaid invoices (FIFO, oldest first — only
+    // when includePreviousDue is true) and how much goes toward this purchase
+    // itself. Neither figure is inferred from the other. Both are capped
+    // defensively so a direct API call can't push anything negative.
+    const allocation = await allocatePreviousDue(req.user.shop, supplier, previousDuePaymentAmount || 0, !!includePreviousDue);
+    const currentPurchasePaid = Math.min(Math.max(0, Number(paidAmount) || 0), calcTotalAmount);
+
+    const purchaseData = {
       shop: req.user.shop,
       supplier,
       purchaseNo,
       supplierInvoiceNo: supplierInvoiceNo || '',
       purchaseDate: purchaseDate || Date.now(),
-      items,
-      subtotal,
-      discount: discount || 0,
-      tax: tax || 0,
+      items: calculatedItems,
+      subtotal: calculatedSubtotal,
+      discount: calcDiscountTotal,
+      gstRate: (items[0]?.gstRate || items[0]?.tax || 0),
+      cgst: calcCgst,
+      sgst: calcSgst,
+      igst: calcIgst,
+      taxableAmount: calcTaxableAmount,
+      gstAmount: calcGstAmount,
       shipping: shipping || 0,
-      totalAmount,
-      paidAmount: paidAmount || 0,
-      dueAmount: totalAmount - (paidAmount || 0),
-      paymentStatus: paidAmount >= totalAmount ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid',
+      totalAmount: calcTotalAmount,
+      paidAmount: currentPurchasePaid,
+      dueAmount: calcTotalAmount - currentPurchasePaid,
+      paymentStatus: currentPurchasePaid >= calcTotalAmount ? 'paid' : currentPurchasePaid > 0 ? 'partial' : 'unpaid',
+      previousDueIncluded: allocation.previousDueIncluded,
+      previousDueAmountAtCreation: allocation.previousDueAmountAtCreation,
+      previousDueAllocations: allocation.previousDueAllocations,
       paymentMethod: paymentMethod || 'cash',
       notes,
+      invoiceImage: invoiceImage || '',
       createdBy: req.user._id,
-    });
+    };
+
+    // Record the initial payment in the payment history
+    if (currentPurchasePaid > 0) {
+      purchaseData.payments = [{
+        amount: currentPurchasePaid,
+        paymentMethod: paymentMethod || 'cash',
+        notes: notes || '',
+        paidBy: req.user._id,
+        paidAt: new Date(),
+      }];
+    }
+
+    const purchase = await Purchase.create(purchaseData);
 
     // Sync each product's stock and latest pricing/batch info
-    for (const item of items) {
+    for (const item of calculatedItems) {
       const productUpdate = {
         $inc: { stock: item.quantity },
         purchasePrice: item.purchasePrice,
@@ -108,10 +275,14 @@ const createPurchase = async (req, res) => {
       await Product.findByIdAndUpdate(item.product, productUpdate);
     }
 
-    // Update supplier due
-    const dueAmount = totalAmount - (paidAmount || 0);
+    // Update supplier due. Total cash actually received this transaction is
+    // the sum of both explicit amounts — what went toward this purchase
+    // (currentPurchasePaid) and what went toward clearing older invoices
+    // (allocation.appliedToPreviousDue, already capped to real available due).
+    const totalCashReceived = Math.round((currentPurchasePaid + allocation.appliedToPreviousDue) * 100) / 100;
+    const dueAmount = calcTotalAmount - totalCashReceived;
     await Supplier.findByIdAndUpdate(supplier, {
-      $inc: { totalPurchases: totalAmount, totalPaid: paidAmount || 0, dueAmount: dueAmount },
+      $inc: { totalPurchases: calcTotalAmount, totalPaid: totalCashReceived, dueAmount: dueAmount },
     });
 
     res.status(201).json(purchase);
@@ -132,8 +303,19 @@ const updatePurchasePayment = async (req, res) => {
     const purchase = await Purchase.findOne({ _id: req.params.id, shop: req.user.shop });
     if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
 
-    const { paidAmount, paymentMethod } = req.body;
+    const { paidAmount, paymentMethod, notes } = req.body;
     const additionalPaid = paidAmount - purchase.paidAmount;
+
+    if (additionalPaid > 0) {
+      // Push a payment record for history
+      purchase.payments.push({
+        amount: additionalPaid,
+        paymentMethod: paymentMethod || purchase.paymentMethod,
+        notes: notes || '',
+        paidBy: req.user._id,
+        paidAt: new Date(),
+      });
+    }
 
     purchase.paidAmount = paidAmount;
     purchase.dueAmount = purchase.totalAmount - paidAmount;
@@ -152,4 +334,154 @@ const updatePurchasePayment = async (req, res) => {
   }
 };
 
-module.exports = { getPurchases, getPurchase, createPurchase, updatePurchasePayment };
+// Replace or clear the invoice photo on an existing purchase. Does not touch
+// any amount/due/stock fields — purely an image edit.
+const updatePurchaseInvoiceImage = async (req, res) => {
+  try {
+    const purchase = await Purchase.findOne({ _id: req.params.id, shop: req.user.shop });
+    if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
+
+    purchase.invoiceImage = req.body.invoiceImage || '';
+    await purchase.save();
+
+    res.json(purchase);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Return one or more purchased line items back to the supplier. Mirrors
+// Sale processReturn but inverted: stock leaves (goods physically go back),
+// and it's what the shop owes the supplier that shrinks, not a customer
+// refund. Each call appends one return "event" — items can be returned
+// across multiple calls as long as the cumulative returnedQty per line
+// never exceeds what was originally purchased.
+const processPurchaseReturn = async (req, res) => {
+  try {
+    const purchase = await Purchase.findOne({ _id: req.params.id, shop: req.user.shop });
+    if (!purchase) return res.status(404).json({ message: 'Purchase not found' });
+
+    const { items, reason } = req.body;
+    if (!items || items.length === 0) {
+      return res.status(400).json({ message: 'At least one item is required for return' });
+    }
+
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+    let totalReturnValue = 0;
+    let sumTaxable = 0, sumCgst = 0, sumSgst = 0, sumIgst = 0, sumGst = 0;
+    const returnItems = [];
+
+    for (const ret of items) {
+      const purchaseItem = purchase.items.find((i) => i.product.toString() === ret.productId);
+      if (!purchaseItem) {
+        return res.status(400).json({ message: `Product ${ret.productId} not found in this purchase` });
+      }
+
+      const alreadyReturned = purchaseItem.returnedQty || 0;
+      const maxReturnable = purchaseItem.quantity - alreadyReturned;
+
+      if (!Number.isFinite(ret.quantity) || ret.quantity <= 0 || ret.quantity > maxReturnable) {
+        return res.status(400).json({
+          message: `Cannot return ${ret.quantity} of "${ret.productName || ret.productId}". Max returnable: ${maxReturnable}`,
+        });
+      }
+
+      // Prorate from what's still remaining on this line (already net of any
+      // earlier partial returns), so sequential returns stay accurate and the
+      // refund reflects the item's actual discount+GST-inclusive value —
+      // not just its raw purchasePrice. This is exactly the per-unit value
+      // calculateItemTotals (utils/gstCalculation.js) produced at creation.
+      const unitTaxable = maxReturnable > 0 ? (purchaseItem.taxableAmount || 0) / maxReturnable : 0;
+      const unitCgst = maxReturnable > 0 ? (purchaseItem.cgst || 0) / maxReturnable : 0;
+      const unitSgst = maxReturnable > 0 ? (purchaseItem.sgst || 0) / maxReturnable : 0;
+      const unitIgst = maxReturnable > 0 ? (purchaseItem.igst || 0) / maxReturnable : 0;
+      const unitGst = maxReturnable > 0 ? (purchaseItem.gstAmount || 0) / maxReturnable : 0;
+      const unitTotal = maxReturnable > 0 ? (purchaseItem.total || 0) / maxReturnable : 0;
+
+      const returnTaxable = round2(unitTaxable * ret.quantity);
+      const returnCgst = round2(unitCgst * ret.quantity);
+      const returnSgst = round2(unitSgst * ret.quantity);
+      const returnIgst = round2(unitIgst * ret.quantity);
+      const returnGst = round2(unitGst * ret.quantity);
+      const returnVal = round2(unitTotal * ret.quantity);
+
+      purchaseItem.returnedQty = alreadyReturned + ret.quantity;
+      purchaseItem.taxableAmount = Math.max(0, round2((purchaseItem.taxableAmount || 0) - returnTaxable));
+      purchaseItem.cgst = Math.max(0, round2((purchaseItem.cgst || 0) - returnCgst));
+      purchaseItem.sgst = Math.max(0, round2((purchaseItem.sgst || 0) - returnSgst));
+      purchaseItem.igst = Math.max(0, round2((purchaseItem.igst || 0) - returnIgst));
+      purchaseItem.gstAmount = Math.max(0, round2((purchaseItem.gstAmount || 0) - returnGst));
+      purchaseItem.total = Math.max(0, round2((purchaseItem.total || 0) - returnVal));
+
+      // Goods physically leave stock on a purchase return — opposite of a
+      // sale return, where returned goods re-enter stock.
+      await Product.findByIdAndUpdate(ret.productId, { $inc: { stock: -ret.quantity } });
+
+      totalReturnValue += returnVal;
+      sumTaxable += returnTaxable;
+      sumCgst += returnCgst;
+      sumSgst += returnSgst;
+      sumIgst += returnIgst;
+      sumGst += returnGst;
+
+      returnItems.push({
+        product: ret.productId,
+        productName: ret.productName || '',
+        quantity: ret.quantity,
+        returnValue: returnVal,
+        reason: ret.reason || reason || '',
+      });
+    }
+
+    const prevTotalAmount = purchase.totalAmount || 0;
+    const prevPaidAmount = purchase.paidAmount || 0;
+    const prevDueAmount = purchase.dueAmount || 0;
+
+    purchase.taxableAmount = Math.max(0, round2((purchase.taxableAmount || 0) - sumTaxable));
+    purchase.cgst = Math.max(0, round2((purchase.cgst || 0) - sumCgst));
+    purchase.sgst = Math.max(0, round2((purchase.sgst || 0) - sumSgst));
+    purchase.igst = Math.max(0, round2((purchase.igst || 0) - sumIgst));
+    purchase.gstAmount = Math.max(0, round2((purchase.gstAmount || 0) - sumGst));
+    purchase.totalAmount = Math.max(0, round2((purchase.totalAmount || 0) - totalReturnValue));
+    purchase.paidAmount = Math.max(0, round2((purchase.paidAmount || 0) - totalReturnValue));
+    purchase.dueAmount = Math.max(0, round2(purchase.totalAmount - purchase.paidAmount));
+
+    if (purchase.dueAmount === 0 && purchase.paidAmount > 0) {
+      purchase.paymentStatus = 'paid';
+    } else if (purchase.paidAmount > 0) {
+      purchase.paymentStatus = 'partial';
+    } else {
+      purchase.paymentStatus = 'unpaid';
+    }
+
+    purchase.returns.push({
+      items: returnItems,
+      totalReturnValue,
+      reason: reason || '',
+      processedBy: req.user._id,
+      returnDate: new Date(),
+    });
+
+    await purchase.save();
+
+    await Supplier.findByIdAndUpdate(purchase.supplier, {
+      $inc: {
+        totalPurchases: purchase.totalAmount - prevTotalAmount,
+        totalPaid: purchase.paidAmount - prevPaidAmount,
+        dueAmount: purchase.dueAmount - prevDueAmount,
+      },
+    });
+
+    const updatedPurchase = await Purchase.findById(purchase._id)
+      .populate('supplier', 'name phone address state dueAmount')
+      .populate('items.product', 'name nameBn sku unit')
+      .populate('returns.processedBy', 'name');
+
+    res.json(updatedPurchase);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getPurchases, getPurchase, createPurchase, updatePurchasePayment, updatePurchaseInvoiceImage, processPurchaseReturn, allocatePreviousDue };

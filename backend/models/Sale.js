@@ -9,7 +9,7 @@ const saleItemSchema = new mongoose.Schema({
   quantity: {
     type: Number,
     required: true,
-    min: 1,
+    min: 0.001,
   },
   returnedQty: {
     type: Number,
@@ -19,6 +19,16 @@ const saleItemSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  enteredQuantity: {
+    type: Number,
+  },
+  enteredUnit: {
+    type: String,
+  },
+  extraCharge: {
+    type: Number,
+    default: 0,
+  },
   price: {
     type: Number,
     required: true,
@@ -27,7 +37,27 @@ const saleItemSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
+    type: Number,
+    default: 0,
+  },
+  cgst: {
+    type: Number,
+    default: 0,
+  },
+  sgst: {
+    type: Number,
+    default: 0,
+  },
+  igst: {
+    type: Number,
+    default: 0,
+  },
+  taxableAmount: {
+    type: Number,
+    default: 0,
+  },
+  gstAmount: {
     type: Number,
     default: 0,
   },
@@ -113,7 +143,27 @@ const saleSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
+    type: Number,
+    default: 0,
+  },
+  cgst: {
+    type: Number,
+    default: 0,
+  },
+  sgst: {
+    type: Number,
+    default: 0,
+  },
+  igst: {
+    type: Number,
+    default: 0,
+  },
+  taxableAmount: {
+    type: Number,
+    default: 0,
+  },
+  gstAmount: {
     type: Number,
     default: 0,
   },
@@ -136,7 +186,7 @@ const saleSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'upi', 'mobile_banking', 'due'],
+    enum: ['cash', 'bank_transfer', 'upi', 'mobile_banking', 'card', 'cheque', 'other'],
     default: 'cash',
   },
   posType: {
@@ -158,6 +208,14 @@ const saleSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  editCount: {
+    type: Number,
+    default: 0,
   },
   returns: [returnEntrySchema],
 }, {

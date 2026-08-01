@@ -2,6 +2,19 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Purchase = require('../models/Purchase');
 const Sale = require('../models/Sale');
+const Shop = require('../models/Shop');
+const { GLOBAL_UNIT_KEYS } = require('../config/businessTypes');
+
+// A product's unit must be one of the global catalog units or one of the
+// shop's own custom units — replaces the old fixed Mongoose enum so shops
+// can add units (e.g. "Sq. Feet") without a schema migration.
+const isAllowedUnit = async (shopId, unit) => {
+  if (!unit) return true;
+  if (GLOBAL_UNIT_KEYS.includes(unit)) return true;
+  const shop = await Shop.findById(shopId).select('settings.customUnits');
+  const customKeys = (shop?.settings?.customUnits || []).map((u) => u.key);
+  return customKeys.includes(unit);
+};
 
 const getProducts = async (req, res) => {
   try {
@@ -62,6 +75,10 @@ const createProduct = async (req, res) => {
   try {
     req.body.shop = req.user.shop;
 
+    if (req.body.unit && !(await isAllowedUnit(req.user.shop, req.body.unit))) {
+      return res.status(400).json({ message: 'Invalid unit selected for this shop.' });
+    }
+
     // Check for duplicate name within shop
     const existingName = await Product.findOne({ name: req.body.name, shop: req.user.shop });
     if (existingName) {
@@ -92,6 +109,10 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
+    if (req.body.unit && !(await isAllowedUnit(req.user.shop, req.body.unit))) {
+      return res.status(400).json({ message: 'Invalid unit selected for this shop.' });
+    }
+
     // Check for duplicate name (excluding current record)
     if (req.body.name) {
       const existingName = await Product.findOne({
@@ -163,6 +184,42 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// @desc    Delete multiple products at once. Products referenced by any
+//          purchase or sale are skipped (never partially/force-deleted) —
+//          the remaining, unused ones are still deleted in the same request.
+// @route   POST /api/products/bulk-delete
+const bulkDeleteProducts = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No products selected.' });
+    }
+
+    // Only ever touch products that actually belong to this shop.
+    const products = await Product.find({ _id: { $in: ids }, shop: req.user.shop }).select('_id name');
+    const productIds = products.map((p) => p._id);
+
+    const [usedInPurchases, usedInSales] = await Promise.all([
+      Purchase.distinct('items.product', { 'items.product': { $in: productIds }, shop: req.user.shop }),
+      Sale.distinct('items.product', { 'items.product': { $in: productIds }, shop: req.user.shop }),
+    ]);
+    const usedSet = new Set([...usedInPurchases, ...usedInSales].map((id) => id.toString()));
+
+    const deletableIds = products.filter((p) => !usedSet.has(p._id.toString())).map((p) => p._id);
+    const blockedNames = products.filter((p) => usedSet.has(p._id.toString())).map((p) => p.name);
+
+    let deletedCount = 0;
+    if (deletableIds.length > 0) {
+      const result = await Product.deleteMany({ _id: { $in: deletableIds }, shop: req.user.shop });
+      deletedCount = result.deletedCount;
+    }
+
+    res.json({ deletedCount, blockedCount: blockedNames.length, blockedNames });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const adjustStock = async (req, res) => {
   try {
     const { quantity, type, reason } = req.body;
@@ -187,7 +244,7 @@ const adjustStock = async (req, res) => {
 
 const searchProducts = async (req, res) => {
   try {
-    const { q, category } = req.query;
+    const { q, category, page: pageParam, limit: limitParam, excludeIds } = req.query;
     let query = { shop: req.user.shop, isActive: true };
 
     if (q) {
@@ -199,10 +256,31 @@ const searchProducts = async (req, res) => {
       ];
     }
     if (category) query.category = category;
+    if (excludeIds) {
+      const ids = excludeIds.split(',').map((id) => id.trim()).filter(Boolean);
+      if (ids.length > 0) query._id = { $nin: ids };
+    }
+
+    // Paginated mode — opt-in via ?page=/&limit=, used by the POS category
+    // browser's infinite scroll (10 at a time). Existing callers (global
+    // quick search, category preload) that pass neither keep getting the
+    // bare-array response they already rely on.
+    if (pageParam || limitParam) {
+      const page = parseInt(pageParam) || 1;
+      const limit = parseInt(limitParam) || 20;
+      const skip = (page - 1) * limit;
+
+      const [products, total] = await Promise.all([
+        Product.find(query).populate('category', 'name nameBn').sort({ name: 1 }).skip(skip).limit(limit),
+        Product.countDocuments(query),
+      ]);
+
+      return res.json({ products, page, hasMore: skip + products.length < total, total });
+    }
 
     const products = await Product.find(query)
       .populate('category', 'name nameBn')
-      .limit(20);
+      .limit(q ? 100 : 20);
 
     res.json(products);
   } catch (error) {
@@ -210,4 +288,4 @@ const searchProducts = async (req, res) => {
   }
 };
 
-module.exports = { getProducts, getProduct, createProduct, updateProduct, deleteProduct, adjustStock, searchProducts };
+module.exports = { getProducts, getProduct, createProduct, updateProduct, deleteProduct, bulkDeleteProducts, adjustStock, searchProducts };

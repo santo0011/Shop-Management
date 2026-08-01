@@ -4,19 +4,33 @@ import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import SupplierDetailsDrawer from './SupplierDetailsDrawer';
+import ConfirmModal from '../../../components/common/ConfirmModal';
 import Pagination from '../../../components/common/Pagination';
+import BulkImportProgressModal from '../../../components/common/BulkImportProgressModal';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
   BiError, BiMessageSquare, BiRefresh, BiInfoCircle,
-  BiPhone, BiEnvelope, BiMapPin, BiBuilding, BiDollar,
+  BiPhone, BiMapPin, BiBuilding, BiDollar,
   BiCalendar, BiUser, BiShow
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
+import { showToast } from '../../../utils/toast';
 
-const emptyForm = { name: '', nameBn: '', company: '', email: '', phone: '', address: '' };
-const REQUIRED_FIELDS = ['name', 'phone'];
-const IMPORT_TEMPLATE_COLS = ['name', 'phone', 'email', 'address', 'company', 'nameBn'];
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
+
+const emptyForm = { name: '', nameBn: '', company: '', email: '', phone: '', address: '', state: 'West Bengal' };
+const REQUIRED_FIELDS = ['name', 'phone', 'state'];
+const IMPORT_TEMPLATE_COLS = ['name', 'phone', 'email', 'state', 'address', 'company', 'nameBn'];
 
 const validateField = (name, value, t) => {
   switch (name) {
@@ -44,6 +58,7 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
       email: editing.email || '',
       phone: editing.phone || '',
       address: editing.address || '',
+      state: editing.state || 'West Bengal',
     } : emptyForm);
   }, [open, editing]);
 
@@ -158,6 +173,21 @@ const SupplierDrawer = ({ open, onClose, onSuccess, editing, t }) => {
                   <input {...field('address')} placeholder={t('suppliersPage.form.addressPlaceholder')} />
                 </div>
               </div>
+              {/* State dropdown */}
+              <div>
+                <label className="form-label" style={labelStyle}>State <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <select
+                  className={`form-control ${errors.state ? 'is-invalid' : ''}`}
+                  value={form.state}
+                  onChange={(e) => handleChange('state', e.target.value)}
+                  style={inputStyle}
+                >
+                  {INDIAN_STATES.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+                {errors.state && <div className="invalid-feedback-premium" style={errorStyle}>{errors.state}</div>}
+              </div>
             </div>
           </form>
         </div>
@@ -183,6 +213,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   const [existingSuppliers, setExistingSuppliers] = useState([]);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importElapsedMs, setImportElapsedMs] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
@@ -202,6 +235,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     setDuplicates({});
     setShowPreview(false);
     setImportResult(null);
+    setImportProgress({ current: 0, total: 0, success: 0, failed: 0 });
+    setShowImportModal(false);
+    setImportElapsedMs(0);
     setActiveTab('excel');
   };
 
@@ -265,6 +301,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
             acc[key.toLowerCase().trim()] = row[key];
             return acc;
           }, {});
+          const stateVal = (keys.state || keys['state'] || '').trim();
           return {
             name: keys.name || keys['supplier name'] || keys['supplier_name'] || '',
             phone: String(keys.phone || keys['phone number'] || keys['phone_number'] || keys.mobile || ''),
@@ -272,6 +309,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
             address: keys.address || keys['address'] || '',
             company: keys.company || keys['company name'] || keys['company_name'] || '',
             nameBn: keys.namebn || keys['name_bn'] || keys['bangla name'] || keys['bangla_name'] || '',
+            state: stateVal || 'West Bengal',
             previousDue: parseFloat(keys.previousdue || keys['previous due'] || keys['previous_due'] || keys.due || 0) || 0,
           };
         });
@@ -290,8 +328,8 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   // ─── Download Sample Template ───────────────────────────────────────────
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
-      { name: 'ABC Traders', phone: '01711111111', email: 'abc@gmail.com', address: 'Dhaka', company: 'ABC Group', nameBn: 'এবিসি ট্রেডার্স' },
-      { name: 'XYZ Foods', phone: '01822222222', email: 'xyz@gmail.com', address: 'Kolkata', company: 'XYZ Ltd', nameBn: 'এক্সওয়াইজেড ফুডস' },
+      { name: 'ABC Traders', phone: '01711111111', email: 'abc@gmail.com', state: 'West Bengal', address: 'Kolkata', company: 'ABC Group', nameBn: 'এবিসি ট্রেডার্স' },
+      { name: 'XYZ Foods', phone: '01822222222', email: 'xyz@gmail.com', state: 'West Bengal', address: 'Kolkata', company: 'XYZ Ltd', nameBn: 'এক্সওয়াইজেড ফুডস' },
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Suppliers');
@@ -312,14 +350,16 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                     line.includes('|') ? line.split('|') :
                     line.split(',');
       const cleanParts = parts.map(p => p.trim());
+      const stateVal = cleanParts[3] || '';
       return {
         name: cleanParts[0] || '',
         phone: cleanParts[1] || '',
         email: cleanParts[2] || '',
-        address: cleanParts[3] || '',
-        previousDue: parseFloat(cleanParts[4]) || 0,
-        company: cleanParts[5] || '',
-        nameBn: cleanParts[6] || '',
+        state: stateVal || 'West Bengal',
+        address: cleanParts[4] || '',
+        previousDue: parseFloat(cleanParts[5]) || 0,
+        company: cleanParts[6] || '',
+        nameBn: cleanParts[7] || '',
       };
     });
 
@@ -357,6 +397,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
   // ─── Import All ─────────────────────────────────────────────────────────
   const handleImport = async () => {
+    // Prevent a second import from starting while one is already running.
+    if (importing) return;
+
     const validRows = parsedRows.filter((row, idx) => {
       if (errors[idx] && errors[idx].length > 0) return false;
       if (skipDuplicates && duplicates[idx]) return false;
@@ -368,13 +411,17 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       return;
     }
 
+    const startedAt = Date.now();
     setImporting(true);
+    setShowImportModal(true);
+    setImportProgress({ current: 0, total: validRows.length, success: 0, failed: 0 });
     let imported = 0;
     let updated = 0;
     let failed = 0;
     const failedDetails = [];
 
-    for (const row of validRows) {
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
       try {
         // Check if duplicate (update existing)
         const existing = existingSuppliers.find(s =>
@@ -388,23 +435,27 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           email: row.email || '',
           phone: row.phone,
           address: row.address || '',
+          state: row.state || 'West Bengal',
         };
 
         if (existing && !skipDuplicates) {
           // Update existing
-          await api.put(`/suppliers/${existing._id}`, payload);
+          await api.put(`/suppliers/${existing._id}`, payload, { _skipLoading: true });
           updated++;
         } else {
           // Create new
-          await api.post('/suppliers', payload);
+          await api.post('/suppliers', payload, { _skipLoading: true });
           imported++;
         }
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       } catch (err) {
         failed++;
         failedDetails.push(`${row.name}: ${err.response?.data?.message || err.message}`);
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       }
     }
 
+    setImportElapsedMs(Date.now() - startedAt);
     setImportResult({ total: parsedRows.length, imported, updated, failed, failedDetails });
     setImporting(false);
     onSuccess();
@@ -481,7 +532,7 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
                   />
                   <div className="bulk-import-format-info">
                     <BiInfoCircle />
-                    <small>{t('suppliersPage.bulkImport.formatInfo')}</small>
+                    <small>{t('suppliersPage.bulkImport.formatInfo') || 'Supported columns: Name, Phone, Email, State, Address, Company, Name (BN)'}</small>
                   </div>
                 </div>
               </div>
@@ -693,18 +744,138 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           </div>
         </div>
       </div>
+
+      <BulkImportProgressModal
+        open={showImportModal}
+        phase={importing ? 'importing' : 'done'}
+        label={t('suppliersPage.bulkImportButton') || 'Suppliers'}
+        current={importProgress.current}
+        total={importProgress.total}
+        success={importProgress.success}
+        failed={importProgress.failed}
+        elapsedMs={importElapsedMs}
+        onDismiss={() => setShowImportModal(false)}
+      />
     </>
   );
+};
+
+// A plain checkbox that also reflects a third "some, but not all" state —
+// React has no `indeterminate` JSX prop, so it's set imperatively on the DOM node.
+const SelectAllCheckbox = ({ checked, indeterminate, onChange, ...rest }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} {...rest} />;
 };
 
 // Fixed page size for the Suppliers list — server-side pagination via ?page=&limit=.
 const SUPPLIERS_PER_PAGE = 10;
 
+// ─── Skeleton Loading ────────────────────────────────────────────────────────
+const SuppliersSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{
+          height: 36, width: 130,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 36, width: 140,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+
+    {/* Filter Bar */}
+    <div style={{ marginBottom: '1rem' }}>
+      <div style={{
+        height: 36, width: 280,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Table skeleton */}
+    <div className="table-container desktop-table" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+      <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <div key={i} style={{
+            flex: 1, height: 12,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </div>
+      {[1, 2, 3, 4, 5].map((r) => (
+        <div key={r} style={{
+          display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+            <div key={c} style={{
+              flex: 1, height: 10,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Table Inline Skeleton ─────────────────────────────────────────────────────
+const TableSkeletonRows = () => (
+  <>
+    {[1, 2, 3, 4, 5].map((r) => (
+      <tr key={r} style={{ opacity: 0.5 }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+          <td key={c} style={{ padding: '0.75rem 1rem' }}>
+            <div style={{
+              height: 10, width: c === 1 ? 24 : c === 5 ? '45%' : c === 6 ? '40%' : '35%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>
+);
+
 // ─── Main Suppliers Page ─────────────────────────────────────────────────────
 const Suppliers = () => {
   const { t } = useTranslation();
   const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -716,6 +887,9 @@ const Suppliers = () => {
   const [editing, setEditing] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [viewDetailsId, setViewDetailsId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -728,10 +902,18 @@ const Suppliers = () => {
     setPage(1);
   }, [debouncedSearch]);
 
+  // Selection is page-scoped — navigating away from a page (or re-searching)
+  // clears it, so nothing gets silently selected out of view.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedSearch]);
+
   const fetchSuppliers = useCallback(async () => {
-    const silent = !isFirstLoad.current;
-    // Always skip global loading overlay — this page uses its own table loader
-    if (silent) setSearching(true); else setLoading(true);
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       const { data } = await api.get(
         `/suppliers?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${SUPPLIERS_PER_PAGE}`,
@@ -749,8 +931,10 @@ const Suppliers = () => {
     } catch (err) {
       console.error(err);
     } finally {
-      if (silent) setSearching(false); else setLoading(false);
-      isFirstLoad.current = false;
+      setInitialLoading(false);
+      setRefreshing(false);
+      setSearching(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
   }, [debouncedSearch, page]);
 
@@ -779,6 +963,66 @@ const Suppliers = () => {
     }
   };
 
+  // ─── Multi-select & Bulk Delete ─────────────────────────────────────────
+  const isSelected = (id) => selectedIds.has(id);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allOnPageSelected = suppliers.length > 0 && suppliers.every((s) => selectedIds.has(s._id));
+  const someOnPageSelected = suppliers.some((s) => selectedIds.has(s._id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allOnPageSelected) return new Set();
+      const next = new Set(prev);
+      suppliers.forEach((s) => next.add(s._id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { data } = await api.post('/suppliers/bulk-delete', { ids });
+      setBulkConfirmOpen(false);
+      setSelectedIds(new Set());
+
+      if (data.blockedCount > 0) {
+        const lines = [];
+        if (data.deletedCount > 0) lines.push(`✅ ${t('suppliersPage.bulkDeleteSuccessLine', { count: data.deletedCount })}`);
+        lines.push(`⚠️ ${t('suppliersPage.bulkDeleteBlockedLine', { count: data.blockedCount })}`);
+        Swal.fire({
+          icon: data.deletedCount > 0 ? 'warning' : 'error',
+          title: t('suppliersPage.bulkDeleteSummaryTitle'),
+          html: `<div style="text-align:left; font-size:0.9rem; line-height:1.8;">${lines.map((l) => `<div>${l}</div>`).join('')}</div>`,
+          confirmButtonColor: '#6C63FF',
+        });
+      } else {
+        showToast.success(t('suppliersPage.bulkDeleteSuccessLine', { count: data.deletedCount }));
+      }
+
+      // Step back a page if this emptied the current page beyond page 1.
+      if (ids.length >= suppliers.length && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchSuppliers();
+      }
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('suppliersPage.bulkDeleteFailed'));
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  if (initialLoading) return <SuppliersSkeletonLoader />;
+
   return (
     <div>
       {/* Page Header */}
@@ -789,7 +1033,7 @@ const Suppliers = () => {
             {t('suppliersPage.subtitle')}
           </p>
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 flex-wrap suppliers-header-actions">
           <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
             <BiUpload /> {t('suppliersPage.bulkImportButton')}
           </button>
@@ -800,74 +1044,130 @@ const Suppliers = () => {
       </div>
 
       {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input
-            className="form-control"
-            placeholder={t('suppliersPage.searchPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="list-filters-card">
+        <div className="list-filter-field list-search-field">
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input
+              className="form-control list-filter-input"
+              placeholder={t('suppliersPage.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
+      {/* ─── Bulk Action Toolbar ─────────────────────────────────────────
+          Sticky so it stays reachable while scrolling a long list; only
+          rendered once at least one supplier is selected. */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-select-toolbar">
+          <span className="bulk-select-toolbar__count">
+            {t('suppliersPage.suppliersSelected', { count: selectedIds.size })}
+          </span>
+          <div className="bulk-select-toolbar__actions">
+            <button
+              type="button"
+              className="btn-premium btn-premium-secondary"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <BiX /> {t('suppliersPage.clearSelection')}
+            </button>
+            <button
+              type="button"
+              className="btn-premium btn-premium-danger"
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              <BiTrash /> {t('suppliersPage.deleteSelected')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only Select All bar (no table header on mobile cards) */}
+      <div className="bulk-select-mobile-bar">
+        <label className="bulk-select-checkbox">
+          <SelectAllCheckbox
+            checked={allOnPageSelected}
+            indeterminate={someOnPageSelected && !allOnPageSelected}
+            onChange={toggleSelectAll}
+            disabled={suppliers.length === 0}
+          />
+          <span className="bulk-select-checkmark" />
+          <span>{t('suppliersPage.selectAllSuppliers')}</span>
+        </label>
+      </div>
+
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
-      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
-        <div className="table-responsive">
-          <table className="table-custom mb-0">
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
+        <div className="sales-table-scroll">
+          <table className="sales-table">
             <thead>
               <tr>
+                <th style={{ width: '44px' }}>
+                  <label className="bulk-select-checkbox" title={t('suppliersPage.selectAllSuppliers')}>
+                    <SelectAllCheckbox
+                      checked={allOnPageSelected}
+                      indeterminate={someOnPageSelected && !allOnPageSelected}
+                      onChange={toggleSelectAll}
+                      disabled={suppliers.length === 0}
+                    />
+                    <span className="bulk-select-checkmark" />
+                  </label>
+                </th>
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('auth.name')}</th>
                 <th>{t('auth.phone')}</th>
-                <th>{t('auth.email')}</th>
+                <th>State</th>
+                <th>{t('sale.paidAmount')}</th>
                 <th>{t('common.due')}</th>
-                <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                <th style={{ width: '110px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                  </td>
-                </tr>
+              {refreshing ? (
+                <TableSkeletonRows />
+              ) : searching ? (
+                <tr><td colSpan={8}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : suppliers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>🤝</div>
-                    {t('empty.noSuppliers')}
-                  </td>
-                </tr>
+                <tr><td colSpan={8}><div className="sales-empty-state"><span className="sales-empty-icon">🤝</span><p>{t('empty.noSuppliers')}</p></div></td></tr>
               ) : suppliers.map((supplier, idx) => (
-                <tr key={supplier._id}>
+                <tr key={supplier._id} className={`${idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'} ${isSelected(supplier._id) ? 'bulk-select-row--selected' : ''}`}>
+                  <td>
+                    <label className="bulk-select-checkbox" title={t('suppliersPage.selectSupplier')}>
+                      <input type="checkbox" checked={isSelected(supplier._id)} onChange={() => toggleSelect(supplier._id)} />
+                      <span className="bulk-select-checkmark" />
+                    </label>
+                  </td>
                   <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                     {(page - 1) * SUPPLIERS_PER_PAGE + idx + 1}
                   </td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{supplier.name}</div>
-                    {supplier.nameBn && <small style={{ color: 'var(--text-muted)' }}>{supplier.nameBn}</small>}
+                    <div className="sales-customer-badge">
+                      <BiBuilding size={14} />
+                      <span>{supplier.name}</span>
+                    </div>
+                    {supplier.nameBn && <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: 2, fontSize: '0.7rem' }}>{supplier.nameBn}</small>}
                   </td>
-                  <td>{supplier.phone}</td>
-                  <td>{supplier.email || '-'}</td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{supplier.phone}</td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{supplier.state || 'West Bengal'}</td>
+                  <td><span className="sales-amount" style={{ color: 'var(--secondary)', fontWeight: 600 }}>₹{Number(supplier.totalPaid || 0).toFixed(2)}</span></td>
                   <td>
-                    <span style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : {}}>
-                      ₹{supplier.dueAmount || 0}
+                    <span className="sales-amount" style={supplier.dueAmount > 0 ? { color: 'var(--danger)', fontWeight: 700 } : { color: 'var(--text-secondary)' }}>
+                      ₹{Number(supplier.dueAmount || 0).toFixed(2)}
                     </span>
                   </td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => setViewDetailsId(supplier._id)}>
-                        <BiShow />
-                      </button>
-                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(supplier)}>
-                        <BiEdit />
-                      </button>
-                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(supplier._id)}>
-                        <BiTrash />
-                      </button>
-                    </div>
+                  <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                    <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')} onClick={() => setViewDetailsId(supplier._id)}>
+                      <BiShow />
+                    </button>
+                    <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} title={t('common.edit')} onClick={() => handleEdit(supplier)}>
+                      <BiEdit />
+                    </button>
+                    <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} title={t('common.delete')} onClick={() => setDeleteConfirm(supplier._id)}>
+                      <BiTrash />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -877,9 +1177,13 @@ const Suppliers = () => {
       </div>
 
       {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
-      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
-        {loading ? (
+      <div className={`mobile-cards ${searching || refreshing ? 'is-refreshing' : ''}`}>
+        {refreshing ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+          </div>
+        ) : searching ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
             <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : suppliers.length === 0 ? (
@@ -890,6 +1194,13 @@ const Suppliers = () => {
         ) : suppliers.map((supplier) => (
           <ExpandableCard
             key={supplier._id}
+            className={isSelected(supplier._id) ? 'bulk-select-mobile-row--selected' : ''}
+            checkbox={
+              <label className="bulk-select-checkbox bulk-select-checkbox--mobile">
+                <input type="checkbox" checked={isSelected(supplier._id)} onChange={() => toggleSelect(supplier._id)} />
+                <span className="bulk-select-checkmark" />
+              </label>
+            }
             compact={
               <>
                 <div className="expandable-card__compact-row">
@@ -901,12 +1212,6 @@ const Suppliers = () => {
                     <BiPhone />
                     <strong>{supplier.phone}</strong>
                   </span>
-                  {supplier.email && (
-                    <span className="expandable-card__meta-item">
-                      <BiEnvelope />
-                      <span>{supplier.email}</span>
-                    </span>
-                  )}
                 </div>
               </>
             }
@@ -931,6 +1236,11 @@ const Suppliers = () => {
                   <span className="expandable-card__row-label">{t('suppliersPage.form.address')}</span>
                   <span className="expandable-card__row-dots" />
                   <span className="expandable-card__row-value">{supplier.address || '-'}</span>
+                </div>
+                <div className="expandable-card__row">
+                  <span className="expandable-card__row-label">State</span>
+                  <span className="expandable-card__row-dots" />
+                  <span className="expandable-card__row-value">{supplier.state || 'West Bengal'}</span>
                 </div>
                 <div className="expandable-card__row">
                   <span className="expandable-card__row-label">{t('suppliersPage.dueAmount')}</span>
@@ -1022,6 +1332,18 @@ const Suppliers = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmModal
+        open={bulkConfirmOpen}
+        onClose={() => !bulkDeleting && setBulkConfirmOpen(false)}
+        onConfirm={handleBulkDelete}
+        title={t('suppliersPage.bulkDeleteTitle')}
+        message={t('suppliersPage.bulkDeleteConfirm')}
+        confirmText={bulkDeleting ? t('common.deleting') : t('common.delete')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+      />
     </div>
   );
 };

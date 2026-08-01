@@ -38,8 +38,8 @@ const productSchema = new mongoose.Schema({
   },
   unit: {
     type: String,
-    enum: ['kg', 'gram', 'liter', 'ml', 'piece', 'packet', 'box', 'carton'],
     default: 'piece',
+    trim: true,
   },
   purchasePrice: {
     type: Number,
@@ -59,7 +59,7 @@ const productSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
     type: Number,
     default: 0,
   },
@@ -93,6 +93,14 @@ const productSchema = new mongoose.Schema({
   expiryDate: {
     type: Date,
   },
+  size: { type: String, trim: true },
+  color: { type: String, trim: true },
+  brand: { type: String, trim: true },
+  serialNumber: { type: String, trim: true },
+  warranty: { type: String, trim: true },
+  modelNumber: { type: String, trim: true },
+  length: { type: Number },
+  width: { type: Number },
   isActive: {
     type: Boolean,
     default: true,
@@ -100,6 +108,10 @@ const productSchema = new mongoose.Schema({
   trackStock: {
     type: Boolean,
     default: true,
+  },
+  allowCustomQuantity: {
+    type: Boolean,
+    default: false,
   },
 }, {
   timestamps: true,

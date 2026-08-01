@@ -10,6 +10,24 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './index.css';
 
+// Global fix: scrolling the mouse wheel / touchpad while a type="number"
+// input is focused (Paid Amount, Discount, Stock, VAT, Quantity, etc.)
+// would otherwise silently increment/decrement its value. Delegating one
+// listener here — rather than fixing every input on every page — covers
+// every numeric field in the app, including ones added later. Blurring
+// the input (instead of calling preventDefault) stops the value change
+// without blocking normal page/container scrolling; typing and arrow-key
+// stepping are untouched since neither goes through the wheel event.
+document.addEventListener(
+  'wheel',
+  (e) => {
+    if (e.target instanceof HTMLInputElement && e.target.type === 'number') {
+      e.target.blur();
+    }
+  },
+  { passive: true }
+);
+
 const AppLoader = () => {
   const [theme, setTheme] = useState(() => {
     try {

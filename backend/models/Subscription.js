@@ -21,7 +21,7 @@ const subscriptionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'expired', 'cancelled'],
+    enum: ['active', 'queued', 'expired', 'cancelled', 'inactive', 'trial'],
     default: 'active',
   },
   amount: {
@@ -50,9 +50,42 @@ const subscriptionSchema = new mongoose.Schema({
   },
   notes: {
     type: String,
+    default: '',
   },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  previousSubscription: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subscription',
+  },
+  nextSubscription: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subscription',
+  },
+  cancelledAt: Date,
+  cancellationReason: String,
+  activatedAt: Date,
+  timeline: [
+    {
+      event: String,
+      timestamp: Date,
+      details: String,
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    },
+  ],
 }, {
   timestamps: true,
 });
+
+// Indexes for dashboard and frequent queries
+subscriptionSchema.index({ status: 1, endDate: 1 });
+subscriptionSchema.index({ status: 1, createdAt: 1 });
+subscriptionSchema.index({ plan: 1 });
+subscriptionSchema.index({ shop: 1, status: 1 });
+subscriptionSchema.index({ endDate: 1 });
+subscriptionSchema.index({ createdAt: -1 });
+subscriptionSchema.index({ status: 1, endDate: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);

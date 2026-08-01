@@ -8,7 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 // ─── Helpers ───────────────────────────────────────────────────
-const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
+const formatCurrency = (val) => `₹${Number(val || 0).toFixed(2)}`;
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const formatDateTime = (d) =>
@@ -17,15 +17,15 @@ const formatDateTime = (d) =>
 // ─── Summary Card (no icon) ────────────────────────────────────
 const SummaryCard = ({ label, value, color }) => {
   const colorMap = {
-    primary: { text: 'var(--primary)' },
-    success: { text: '#00D9A6' },
-    warning: { text: 'var(--warning)' },
-    danger: { text: 'var(--danger)' },
+    primary: { text: 'var(--primary)', accent: 'var(--primary)' },
+    success: { text: '#00D9A6', accent: '#00D9A6' },
+    warning: { text: 'var(--warning)', accent: 'var(--warning)' },
+    danger: { text: 'var(--danger)', accent: 'var(--danger)' },
   };
   const colors = colorMap[color] || colorMap.primary;
 
   return (
-    <div className="supplier-summary-card">
+    <div className="supplier-summary-card" style={{ '--summary-accent': colors.accent }}>
       <div className="supplier-summary-info">
         <span className="supplier-summary-value" style={{ color: colors.text }}>{value}</span>
         <span className="supplier-summary-label">{label}</span>
@@ -184,6 +184,7 @@ const SupplierDetailsDrawer = ({ open, supplierId, onClose, t }) => {
                   <InfoRow icon={BiPhone} label={t('auth.phone') || 'Phone'} value={supplier.phone} />
                   <InfoRow icon={BiEnvelope} label={t('auth.email') || 'Email'} value={supplier.email} />
                   <InfoRow icon={BiMapPin} label={t('suppliersPage.form.address') || 'Address'} value={supplier.address} />
+                  <InfoRow icon={BiMapPin} label="State" value={supplier.state || 'West Bengal'} />
                   <InfoRow icon={BiHash} label={t('suppliersPage.gstVat') || 'GST/VAT Number'} value={supplier.gstNumber || supplier.vatNumber || '—'} />
                   <InfoRow
                     icon={BiCheckCircle}

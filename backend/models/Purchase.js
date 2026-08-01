@@ -35,13 +35,81 @@ const purchaseItemSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
+    type: Number,
+    default: 0,
+  },
+  cgst: {
+    type: Number,
+    default: 0,
+  },
+  sgst: {
+    type: Number,
+    default: 0,
+  },
+  igst: {
+    type: Number,
+    default: 0,
+  },
+  taxableAmount: {
+    type: Number,
+    default: 0,
+  },
+  gstAmount: {
     type: Number,
     default: 0,
   },
   total: {
     type: Number,
     required: true,
+  },
+  // Cumulative quantity of this line item returned to the supplier so far.
+  returnedQty: {
+    type: Number,
+    default: 0,
+  },
+});
+
+const returnItemSchema = new mongoose.Schema({
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+  },
+  productName: {
+    type: String,
+    default: '',
+  },
+  quantity: {
+    type: Number,
+    required: true,
+  },
+  returnValue: {
+    type: Number,
+    default: 0,
+  },
+  reason: {
+    type: String,
+    default: '',
+  },
+});
+
+const returnEntrySchema = new mongoose.Schema({
+  items: [returnItemSchema],
+  totalReturnValue: {
+    type: Number,
+    default: 0,
+  },
+  reason: {
+    type: String,
+    default: '',
+  },
+  processedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  returnDate: {
+    type: Date,
+    default: Date.now,
   },
 });
 
@@ -78,7 +146,27 @@ const purchaseSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tax: {
+  gstRate: {
+    type: Number,
+    default: 0,
+  },
+  cgst: {
+    type: Number,
+    default: 0,
+  },
+  sgst: {
+    type: Number,
+    default: 0,
+  },
+  igst: {
+    type: Number,
+    default: 0,
+  },
+  taxableAmount: {
+    type: Number,
+    default: 0,
+  },
+  gstAmount: {
     type: Number,
     default: 0,
   },
@@ -105,16 +193,71 @@ const purchaseSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'bank_transfer', 'mobile_banking', 'due'],
+    enum: ['cash', 'bank_transfer', 'upi', 'mobile_banking', 'card', 'cheque', 'other'],
     default: 'cash',
   },
   notes: {
     type: String,
   },
+  // Photo/scan of the supplier's paper invoice, stored as a data URI
+  // (this app has no file-storage/upload infra — see Purchase controller).
+  invoiceImage: {
+    type: String,
+    default: '',
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  // Snapshot of the supplier's outstanding due immediately before this
+  // purchase was created, and (if the user opted in) how this purchase's
+  // payment was applied against those older invoices, oldest first.
+  // NOTE: there is currently no DELETE endpoint for purchases. If one is
+  // added, it must reverse these allocations (or refuse to delete a
+  // purchase that appears here as source or target) — otherwise
+  // Supplier.dueAmount and these records will silently desync.
+  previousDueIncluded: {
+    type: Boolean,
+    default: false,
+  },
+  previousDueAmountAtCreation: {
+    type: Number,
+    default: 0,
+  },
+  previousDueAllocations: [{
+    _id: false,
+    purchase: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Purchase',
+    },
+    purchaseNo: String,
+    amountApplied: Number,
+  }],
+  // Products returned to the supplier after this purchase, oldest first.
+  // Mirrors Sale.returns but inverted: stock leaves (not re-enters) on a
+  // purchase return, and it reduces what the shop owes the supplier rather
+  // than what's refunded to a customer. NOTE: does not interact with
+  // previousDueAllocations above — a return adjusts this purchase's own
+  // totals only, it does not retroactively undo FIFO allocations already
+  // applied to/from other purchases.
+  // Individual payment records against this purchase, oldest first.
+  // Each time a payment is made (via PUT /purchases/:id/payment), a new
+  // record is pushed here. The aggregate paidAmount/dueAmount fields are
+  // kept in sync as the source of truth for fast queries; this array is
+  // purely for the Payment History display.
+  payments: [{
+    _id: false,
+    amount: { type: Number, required: true },
+    paymentMethod: {
+      type: String,
+      enum: ['cash', 'bank_transfer', 'upi', 'mobile_banking', 'card', 'cheque', 'other'],
+      default: 'cash',
+    },
+    notes: { type: String, default: '' },
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    paidAt: { type: Date, default: Date.now },
+  }],
+  returns: [returnEntrySchema],
 }, {
   timestamps: true,
 });
@@ -122,9 +265,6 @@ const purchaseSchema = new mongoose.Schema({
 // ─── Indexes for performance ──────────────────────────────────
 purchaseSchema.index({ shop: 1, purchaseDate: -1 });
 purchaseSchema.index({ shop: 1, purchaseNo: 1 }, { unique: true });
-// A supplier invoice number only needs to be unique per supplier, and is
-// optional — the partial filter excludes purchases that left it blank so
-// empty strings never collide with each other.
 purchaseSchema.index(
   { shop: 1, supplier: 1, supplierInvoiceNo: 1 },
   { unique: true, partialFilterExpression: { supplierInvoiceNo: { $ne: '' } } }

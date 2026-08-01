@@ -1,11 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { toggleTheme } from '../../redux/slices/themeSlice';
 import { updateLanguage } from '../../redux/slices/authSlice';
 import api from '../../services/api';
-import { BiMenu, BiSun, BiMoon, BiUser, BiGlobe, BiLogOut, BiBell } from 'react-icons/bi';
+import { BiMenu, BiSun, BiMoon, BiUser, BiGlobe, BiLogOut, BiBell, BiCheckDouble } from 'react-icons/bi';
 import GlobalSearch from '../common/GlobalSearch';
+import NotificationDropdown from '../common/NotificationDropdown';
 import Swal from 'sweetalert2';
 import { showToast } from '../../utils/toast';
 
@@ -124,6 +126,9 @@ const Header = ({ onToggleSidebar }) => {
           {mode === 'light' ? <BiMoon /> : <BiSun />}
         </button>
 
+        {/* Notifications */}
+        <NotificationDropdown />
+
         {/* User Profile */}
         <div className="dropdown-premium" ref={profileRef}>
           <button
@@ -136,14 +141,12 @@ const Header = ({ onToggleSidebar }) => {
             </div>
             <div className="d-none d-md-block text-start">
               <div className="user-name">{user?.name || t('common.user')}</div>
-              <div className="user-email">{user?.email || ''}</div>
             </div>
           </button>
           {profileOpen && (
             <div className="dropdown-menu-premium">
               <div className="px-3 py-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{user?.name}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{user?.email}</div>
               </div>
               <div className="dropdown-divider-premium" />
               <button className="dropdown-item-premium" onClick={handleLogout} style={{ color: 'var(--danger)' }}>

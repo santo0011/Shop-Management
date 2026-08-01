@@ -5,10 +5,12 @@ import {
   BiX, BiPackage, BiDollar, BiCube, BiCategory,
   BiBarcode, BiCalendar, BiTime, BiInfoCircle,
   BiCheckCircle, BiHash, BiTag, BiBook, BiTrendingUp, BiTrendingDown,
+  BiPurchaseTag, BiPalette, BiBadgeCheck, BiRuler,
 } from 'react-icons/bi';
+import useBusinessConfig from '../../../hooks/useBusinessConfig';
 
 // ─── Helpers ───────────────────────────────────────────────────
-const formatCurrency = (val) => `₹${(val || 0).toFixed(2)}`;
+const formatCurrency = (val) => `₹${Number(val || 0).toFixed(2)}`;
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const formatDateTime = (d) =>
@@ -31,6 +33,7 @@ const ProductDetailsDrawer = ({ open, productId, onClose, t, i18n }) => {
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const navigate = useNavigate();
+  const { modules } = useBusinessConfig();
 
   const isBn = i18n?.language === 'bn';
 
@@ -260,6 +263,30 @@ const ProductDetailsDrawer = ({ open, productId, onClose, t, i18n }) => {
                   {product.tax > 0 && (
                     <InfoRow icon={BiTag} label={t('sale.tax') || 'Tax / VAT'} value={`${product.tax}%`} />
                   )}
+                  {modules.batch && product.batchNumber && (
+                    <InfoRow icon={BiHash} label={t('product.batchNumber') || 'Batch Number'} value={product.batchNumber} />
+                  )}
+                  {modules.brand && product.brand && (
+                    <InfoRow icon={BiPurchaseTag} label={t('product.brand') || 'Brand'} value={product.brand} />
+                  )}
+                  {modules.size && product.size && (
+                    <InfoRow icon={BiRuler} label={t('product.size') || 'Size'} value={product.size} />
+                  )}
+                  {modules.color && product.color && (
+                    <InfoRow icon={BiPalette} label={t('product.color') || 'Color'} value={product.color} />
+                  )}
+                  {modules.serialNumber && product.serialNumber && (
+                    <InfoRow icon={BiHash} label={t('product.serialNumber') || 'Serial Number'} value={product.serialNumber} />
+                  )}
+                  {modules.modelNumber && product.modelNumber && (
+                    <InfoRow icon={BiTag} label={t('product.modelNumber') || 'Model Number'} value={product.modelNumber} />
+                  )}
+                  {modules.warranty && product.warranty && (
+                    <InfoRow icon={BiBadgeCheck} label={t('product.warranty') || 'Warranty'} value={product.warranty} />
+                  )}
+                  {modules.dimensions && (product.length || product.width) && (
+                    <InfoRow icon={BiRuler} label={`${t('product.length') || 'Length'} / ${t('product.width') || 'Width'}`} value={`${product.length || '-'} / ${product.width || '-'}`} />
+                  )}
                   {displayDescription && (
                     <InfoRow icon={BiInfoCircle} label={t('common.description') || 'Description'} value={displayDescription} />
                   )}
@@ -273,6 +300,11 @@ const ProductDetailsDrawer = ({ open, productId, onClose, t, i18n }) => {
                   <InfoRow icon={BiDollar} label={t('product.purchasePrice') || 'Purchase Price'} value={formatCurrency(product.purchasePrice || 0)} />
                   <InfoRow icon={BiDollar} label={t('product.sellingPrice') || 'Selling Price'} value={formatCurrency(product.sellingPrice || 0)} />
                   <InfoRow icon={BiTrendingUp} label={t('productsPage.profitMargin') || 'Profit Margin'} value={`${profitMargin}%`} />
+                  <InfoRow
+                    icon={BiCheckCircle}
+                    label={t('product.allowCustomQuantity') || 'Allow Custom Quantity'}
+                    value={product.allowCustomQuantity ? (t('common.yes') || 'Yes') : (t('common.no') || 'No')}
+                  />
                   <InfoRow icon={BiCube} label={t('product.stock') || 'Current Stock'} value={`${currentStock} ${product.unit || ''}`} />
                   <InfoRow icon={BiCube} label={t('product.minStock') || 'Min Stock'} value={minStock} />
                   <InfoRow icon={BiCube} label={t('productsPage.stockValue') || 'Stock Value'} value={formatCurrency(summary?.stockValue || 0)} />

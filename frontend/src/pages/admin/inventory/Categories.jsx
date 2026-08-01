@@ -4,12 +4,14 @@ import api from '../../../services/api';
 import Swal from 'sweetalert2';
 import ExpandableCard from '../../../components/common/ExpandableCard';
 import CategoryDetailsDrawer from './CategoryDetailsDrawer';
+import ConfirmModal from '../../../components/common/ConfirmModal';
 import Pagination from '../../../components/common/Pagination';
+import BulkImportProgressModal from '../../../components/common/BulkImportProgressModal';
 import {
   BiSearch, BiPlus, BiEdit, BiTrash, BiX, BiCheck, BiShow,
   BiUpload, BiDownload, BiFile, BiPaste, BiTable,
   BiError, BiRefresh, BiInfoCircle, BiCategory,
-  BiCalendar, BiMessageSquare, BiCheckCircle
+  BiCalendar, BiMessageSquare, BiCheckCircle,
 } from 'react-icons/bi';
 import * as XLSX from 'xlsx';
 import { showToast } from '../../../utils/toast';
@@ -153,6 +155,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
   const [existingCategories, setExistingCategories] = useState([]);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importElapsedMs, setImportElapsedMs] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
@@ -170,6 +175,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
     setDuplicates({});
     setShowPreview(false);
     setImportResult(null);
+    setImportProgress({ current: 0, total: 0, success: 0, failed: 0 });
+    setShowImportModal(false);
+    setImportElapsedMs(0);
     setActiveTab('excel');
   };
 
@@ -297,6 +305,9 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
 
   // ─── Import All ─────────────────────────────────────────────────────────
   const handleImport = async () => {
+    // Prevent a second import from starting while one is already running.
+    if (importing) return;
+
     const validRows = parsedRows.filter((row, idx) => {
       if (errors[idx] && errors[idx].length > 0) return false;
       if (skipDuplicates && duplicates[idx]) return false;
@@ -308,13 +319,17 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
       return;
     }
 
+    const startedAt = Date.now();
     setImporting(true);
+    setShowImportModal(true);
+    setImportProgress({ current: 0, total: validRows.length, success: 0, failed: 0 });
     let imported = 0;
     let updated = 0;
     let failed = 0;
     const failedDetails = [];
 
-    for (const row of validRows) {
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
       try {
         const existing = existingCategories.find(s =>
           s.name?.toLowerCase() === row.name?.trim()?.toLowerCase()
@@ -326,18 +341,21 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
         };
 
         if (existing && !skipDuplicates) {
-          await api.put(`/categories/${existing._id}`, payload);
+          await api.put(`/categories/${existing._id}`, payload, { _skipLoading: true });
           updated++;
         } else {
-          await api.post('/categories', payload);
+          await api.post('/categories', payload, { _skipLoading: true });
           imported++;
         }
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       } catch (err) {
         failed++;
         failedDetails.push(`${row.name}: ${err.response?.data?.message || err.message}`);
+        setImportProgress({ current: i + 1, total: validRows.length, success: imported + updated, failed });
       }
     }
 
+    setImportElapsedMs(Date.now() - startedAt);
     setImportResult({ total: parsedRows.length, imported, updated, failed, failedDetails });
     setImporting(false);
     onSuccess();
@@ -619,18 +637,144 @@ const BulkImportDrawer = ({ open, onClose, onSuccess, t }) => {
           </div>
         </div>
       </div>
+
+      <BulkImportProgressModal
+        open={showImportModal}
+        phase={importing ? 'importing' : 'done'}
+        label={t('categoriesPage.bulkImportButton') || 'Categories'}
+        current={importProgress.current}
+        total={importProgress.total}
+        success={importProgress.success}
+        failed={importProgress.failed}
+        elapsedMs={importElapsedMs}
+        onDismiss={() => setShowImportModal(false)}
+      />
     </>
   );
+};
+
+// A plain checkbox that also reflects a third "some, but not all" state —
+// React has no `indeterminate` JSX prop, so it's set imperatively on the DOM node.
+const SelectAllCheckbox = ({ checked, indeterminate, onChange, ...rest }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} {...rest} />;
 };
 
 // Fixed page size for the Categories list — server-side pagination via ?page=&limit=.
 const CATEGORIES_PER_PAGE = 10;
 
+// ─── Skeleton Loading ────────────────────────────────────────────────────────
+const CategoriesSkeletonLoader = () => (
+  <div>
+    <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+    {/* Page Header */}
+    <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <div style={{ flex: 1 }}>
+        <div style={{
+          height: 28, width: '25%', marginBottom: 8,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 14, width: '18%',
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 6,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{
+          height: 36, width: 110,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 36, width: 110,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+        <div style={{
+          height: 36, width: 130,
+          background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+          backgroundSize: '200% 100%', borderRadius: 8,
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      </div>
+    </div>
+
+    {/* Filter Bar */}
+    <div style={{ marginBottom: '1rem' }}>
+      <div style={{
+        height: 36, width: 280,
+        background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+        backgroundSize: '200% 100%', borderRadius: 8,
+        animation: 'shimmer 1.5s infinite',
+      }} />
+    </div>
+
+    {/* Table skeleton */}
+    <div className="table-container desktop-table" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden', background: 'var(--bg-card)' }}>
+      <div style={{ display: 'flex', padding: '0.85rem 1rem', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', gap: '1rem' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} style={{
+            flex: 1, height: 12,
+            background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+            backgroundSize: '200% 100%', borderRadius: 4,
+            animation: 'shimmer 1.5s infinite',
+          }} />
+        ))}
+      </div>
+      {[1, 2, 3, 4, 5].map((r) => (
+        <div key={r} style={{
+          display: 'flex', padding: '0.75rem 1rem', gap: '1rem',
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          {[1, 2, 3, 4, 5].map((c) => (
+            <div key={c} style={{
+              flex: 1, height: 10,
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Table Inline Skeleton ─────────────────────────────────────────────────────
+const TableSkeletonRows = () => (
+  <>
+    {[1, 2, 3, 4, 5].map((r) => (
+      <tr key={r} style={{ opacity: 0.5 }}>
+        {[1, 2, 3, 4, 5].map((c) => (
+          <td key={c} style={{ padding: '0.75rem 1rem' }}>
+            <div style={{
+              height: 10, width: c === 1 ? 24 : c === 3 ? '45%' : '35%',
+              background: 'linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%)',
+              backgroundSize: '200% 100%', borderRadius: 4,
+              animation: 'shimmer 1.5s infinite',
+            }} />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>
+);
+
 // ─── Main Categories Page ────────────────────────────────────────────────────
 const Categories = () => {
   const { t } = useTranslation();
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -643,6 +787,10 @@ const Categories = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [viewDrawerOpen, setViewDrawerOpen] = useState(false);
   const [viewCategoryId, setViewCategoryId] = useState(null);
+  const [restoringDefaults, setRestoringDefaults] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const isFirstLoad = useRef(true);
 
   useEffect(() => {
@@ -655,10 +803,18 @@ const Categories = () => {
     setPage(1);
   }, [debouncedSearch]);
 
+  // Selection is page-scoped — navigating away from a page (or re-searching)
+  // clears it, so nothing gets silently selected out of view.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedSearch]);
+
   const fetchCategories = useCallback(async () => {
-    const silent = !isFirstLoad.current;
-    // Always skip global loading overlay — this page uses its own table loader
-    if (silent) setSearching(true); else setLoading(true);
+    if (isFirstLoad.current) {
+      setInitialLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       const { data } = await api.get(
         `/categories?search=${encodeURIComponent(debouncedSearch)}&page=${page}&limit=${CATEGORIES_PER_PAGE}`,
@@ -676,8 +832,10 @@ const Categories = () => {
     } catch (err) {
       console.error(err);
     } finally {
-      if (silent) setSearching(false); else setLoading(false);
-      isFirstLoad.current = false;
+      setInitialLoading(false);
+      setRefreshing(false);
+      setSearching(false);
+      if (isFirstLoad.current) isFirstLoad.current = false;
     }
   }, [debouncedSearch, page]);
 
@@ -688,6 +846,25 @@ const Categories = () => {
   const handleEdit = (category) => {
     setEditing(category);
     setDrawerOpen(true);
+  };
+
+  // Additive-only — adds any of this shop's business-type default categories
+  // that don't already exist by name; never touches existing ones.
+  const handleRestoreDefaults = async () => {
+    setRestoringDefaults(true);
+    try {
+      const { data } = await api.post('/shops/seed-categories', {}, { _skipLoading: true });
+      if (data.created > 0) {
+        showToast.success(t('categoriesPage.restoreDefaultsSuccess', { count: data.created }));
+        fetchCategories();
+      } else {
+        showToast.success(t('categoriesPage.restoreDefaultsNoneNeeded'));
+      }
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('categoriesPage.restoreDefaultsFailed'));
+    } finally {
+      setRestoringDefaults(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -709,6 +886,66 @@ const Categories = () => {
     }
   };
 
+  // ─── Multi-select & Bulk Delete ─────────────────────────────────────────
+  const isSelected = (id) => selectedIds.has(id);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allOnPageSelected = categories.length > 0 && categories.every((c) => selectedIds.has(c._id));
+  const someOnPageSelected = categories.some((c) => selectedIds.has(c._id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (allOnPageSelected) return new Set();
+      const next = new Set(prev);
+      categories.forEach((c) => next.add(c._id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { data } = await api.post('/categories/bulk-delete', { ids });
+      setBulkConfirmOpen(false);
+      setSelectedIds(new Set());
+
+      if (data.blockedCount > 0) {
+        const lines = [];
+        if (data.deletedCount > 0) lines.push(`✅ ${t('categoriesPage.bulkDeleteSuccessLine', { count: data.deletedCount })}`);
+        lines.push(`⚠️ ${t('categoriesPage.bulkDeleteBlockedLine', { count: data.blockedCount })}`);
+        Swal.fire({
+          icon: data.deletedCount > 0 ? 'warning' : 'error',
+          title: t('categoriesPage.bulkDeleteSummaryTitle'),
+          html: `<div style="text-align:left; font-size:0.9rem; line-height:1.8;">${lines.map((l) => `<div>${l}</div>`).join('')}</div>`,
+          confirmButtonColor: '#6C63FF',
+        });
+      } else {
+        showToast.success(t('categoriesPage.bulkDeleteSuccessLine', { count: data.deletedCount }));
+      }
+
+      // Step back a page if this emptied the current page beyond page 1.
+      if (ids.length >= categories.length && page > 1) {
+        setPage(page - 1);
+      } else {
+        fetchCategories();
+      }
+    } catch (err) {
+      showToast.error(err.response?.data?.message || t('categoriesPage.bulkDeleteFailed'));
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  if (initialLoading) return <CategoriesSkeletonLoader />;
+
   return (
     <div>
       {/* Page Header */}
@@ -719,7 +956,10 @@ const Categories = () => {
             {t('categoriesPage.subtitle')}
           </p>
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 flex-wrap">
+          <button className="btn-premium btn-premium-secondary" onClick={handleRestoreDefaults} disabled={restoringDefaults} data-tooltip={t('categoriesPage.restoreDefaultsHint')}>
+            {restoringDefaults ? <span className="spinner-border spinner-border-sm" /> : <BiRefresh />} {t('categoriesPage.restoreDefaultsButton')}
+          </button>
           <button className="btn-premium btn-premium-secondary" onClick={() => { setBulkImportOpen(true); }}>
             <BiUpload /> {t('categoriesPage.bulkImportButton')}
           </button>
@@ -730,65 +970,119 @@ const Categories = () => {
       </div>
 
       {/* Search */}
-      <div className="mb-3" style={{ maxWidth: '400px' }}>
-        <div className="search-box">
-          <BiSearch className="search-icon" />
-          <input
-            className="form-control"
-            placeholder={t('categoriesPage.searchPlaceholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="list-filters-card">
+        <div className="list-filter-field list-search-field">
+          <div className="search-box">
+            <BiSearch className="search-icon" />
+            <input
+              className="form-control list-filter-input"
+              placeholder={t('categoriesPage.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
+      {/* ─── Bulk Action Toolbar ─────────────────────────────────────────
+          Sticky so it stays reachable while scrolling a long list; only
+          rendered once at least one category is selected. */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-select-toolbar">
+          <span className="bulk-select-toolbar__count">
+            {t('categoriesPage.categoriesSelected', { count: selectedIds.size })}
+          </span>
+          <div className="bulk-select-toolbar__actions">
+            <button
+              type="button"
+              className="btn-premium btn-premium-secondary"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <BiX /> {t('categoriesPage.clearSelection')}
+            </button>
+            <button
+              type="button"
+              className="btn-premium btn-premium-danger"
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              <BiTrash /> {t('categoriesPage.deleteSelected')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only Select All bar (no table header on mobile cards) */}
+      <div className="bulk-select-mobile-bar">
+        <label className="bulk-select-checkbox">
+          <SelectAllCheckbox
+            checked={allOnPageSelected}
+            indeterminate={someOnPageSelected && !allOnPageSelected}
+            onChange={toggleSelectAll}
+            disabled={categories.length === 0}
+          />
+          <span className="bulk-select-checkmark" />
+          <span>{t('categoriesPage.selectAllCategories')}</span>
+        </label>
+      </div>
+
       {/* ─── Desktop Table ─────────────────────────────────────────────── */}
-      <div className={`table-container desktop-table ${searching ? 'is-refreshing' : ''}`}>
-        <div className="table-responsive">
-          <table className="table-custom mb-0">
+      <div className={`sales-table-container table-container desktop-table ${searching || refreshing ? 'is-refreshing' : 'content-visible'}`} style={{ overflow: 'visible' }}>
+        <div className="sales-table-scroll">
+          <table className="sales-table">
             <thead>
               <tr>
+                <th style={{ width: '44px' }}>
+                  <label className="bulk-select-checkbox" title={t('categoriesPage.selectAllCategories')}>
+                    <SelectAllCheckbox
+                      checked={allOnPageSelected}
+                      indeterminate={someOnPageSelected && !allOnPageSelected}
+                      onChange={toggleSelectAll}
+                      disabled={categories.length === 0}
+                    />
+                    <span className="bulk-select-checkmark" />
+                  </label>
+                </th>
                 <th style={{ width: '56px' }}>{t('common.sl')}</th>
                 <th>{t('product.productName')} (EN)</th>
                 <th>{t('product.productName')} (BN)</th>
-                <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                <th style={{ width: '110px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
-                  </td>
-                </tr>
+              {refreshing ? (
+                <TableSkeletonRows />
+              ) : searching ? (
+                <tr><td colSpan={5}><div className="sales-empty-state"><div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}</div></td></tr>
               ) : categories.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
-                    {t('categoriesPage.noCategoriesFound')}
-                  </td>
-                </tr>
+                <tr><td colSpan={5}><div className="sales-empty-state"><span className="sales-empty-icon">📂</span><p>{t('categoriesPage.noCategoriesFound')}</p></div></td></tr>
               ) : categories.map((category, idx) => (
-                <tr key={category._id}>
+                <tr key={category._id} className={`${idx % 2 === 0 ? 'sales-row-even' : 'sales-row-odd'} ${isSelected(category._id) ? 'bulk-select-row--selected' : ''}`}>
+                  <td>
+                    <label className="bulk-select-checkbox" title={t('categoriesPage.selectCategory')}>
+                      <input type="checkbox" checked={isSelected(category._id)} onChange={() => toggleSelect(category._id)} />
+                      <span className="bulk-select-checkmark" />
+                    </label>
+                  </td>
                   <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                     {(page - 1) * CATEGORIES_PER_PAGE + idx + 1}
                   </td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{category.name}</div>
-                  </td>
-                  <td>{category.nameBn || '-'}</td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <button className="btn-action btn-action-view" data-tooltip={t('common.view')} onClick={() => { setViewCategoryId(category._id); setViewDrawerOpen(true); }}>
-                        <BiShow />
-                      </button>
-                      <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} onClick={() => handleEdit(category)}>
-                        <BiEdit />
-                      </button>
-                      <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} onClick={() => setDeleteConfirm(category._id)}>
-                        <BiTrash />
-                      </button>
+                    <div className="sales-customer-badge">
+                      <BiCategory size={14} />
+                      <span>{category.name}</span>
                     </div>
+                  </td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{category.nameBn || '-'}</td>
+                  <td className="sales-actions-cell" style={{ width: '120px', whiteSpace: 'nowrap' }}>
+                    <button className="btn-action btn-action-view" data-tooltip={t('common.view')} title={t('common.view')} onClick={() => { setViewCategoryId(category._id); setViewDrawerOpen(true); }}>
+                      <BiShow />
+                    </button>
+                    <button className="btn-action btn-action-edit" data-tooltip={t('common.edit')} title={t('common.edit')} onClick={() => handleEdit(category)}>
+                      <BiEdit />
+                    </button>
+                    <button className="btn-action btn-action-delete" data-tooltip={t('common.delete')} title={t('common.delete')} onClick={() => setDeleteConfirm(category._id)}>
+                      <BiTrash />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -798,10 +1092,14 @@ const Categories = () => {
       </div>
 
       {/* ─── Mobile Cards ──────────────────────────────────────────────── */}
-      <div className={`mobile-cards ${searching ? 'is-refreshing' : ''}`}>
-        {loading ? (
+      <div className={`mobile-cards ${searching || refreshing ? 'is-refreshing' : ''}`}>
+        {refreshing ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
-            <div className="spinner-border spinner-border-sm me-2" /> Loading...
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
+          </div>
+        ) : searching ? (
+          <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
+            <div className="spinner-border spinner-border-sm me-2" /> {t('common.loading')}
           </div>
         ) : categories.length === 0 ? (
           <div className="text-center py-5" style={{ color: 'var(--text-muted)' }}>
@@ -811,6 +1109,13 @@ const Categories = () => {
         ) : categories.map((category) => (
           <ExpandableCard
             key={category._id}
+            className={isSelected(category._id) ? 'bulk-select-mobile-row--selected' : ''}
+            checkbox={
+              <label className="bulk-select-checkbox bulk-select-checkbox--mobile">
+                <input type="checkbox" checked={isSelected(category._id)} onChange={() => toggleSelect(category._id)} />
+                <span className="bulk-select-checkmark" />
+              </label>
+            }
             compact={
               <>
                 <div className="expandable-card__compact-row">
@@ -932,6 +1237,18 @@ const Categories = () => {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmModal
+        open={bulkConfirmOpen}
+        onClose={() => !bulkDeleting && setBulkConfirmOpen(false)}
+        onConfirm={handleBulkDelete}
+        title={t('categoriesPage.bulkDeleteTitle')}
+        message={t('categoriesPage.bulkDeleteConfirm')}
+        confirmText={bulkDeleting ? t('common.deleting') : t('common.delete')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+      />
     </div>
   );
 };
