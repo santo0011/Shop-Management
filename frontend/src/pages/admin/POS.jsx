@@ -289,6 +289,22 @@ const getRoundOffOptions = (grandTotal) => {
   return valid.length > 0 ? valid : [options[0]];
 };
 
+// ─── Compact Checkout Progress Tracker (standalone row) ─────
+const CheckoutProgressTracker = ({ steps }) => {
+  return (
+    <div className="pos-grand-total-progress">
+      <div className="pos-grand-total-progress-steps">
+        {steps.map((step) => (
+          <div key={step.key} className={`pos-grand-total-progress-step ${step.complete ? 'completed' : 'pending'}`}>
+            {step.complete ? <BiCheck className="pos-grand-total-progress-icon" /> : <BiX className="pos-grand-total-progress-icon" />}
+            <span className="pos-grand-total-progress-label">{step.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const POS = () => {
   const { t, i18n } = useTranslation();
   const isBn = i18n.language === 'bn';
@@ -311,6 +327,7 @@ const POS = () => {
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [selectedCustomerData, setSelectedCustomerData] = useState(null);
+  const [isWalkInSelected, setIsWalkInSelected] = useState(false);
   const [previousDue, setPreviousDue] = useState(null);
   const [loadingPreviousDue, setLoadingPreviousDue] = useState(false);
   const [includePreviousDue, setIncludePreviousDue] = useState(false);
@@ -375,6 +392,7 @@ const POS = () => {
       setCustomers(prev => [...prev, data]);
       setCustomer(data._id);
       setSelectedCustomerData(data);
+      setIsWalkInSelected(false);
       setShowAddCustomer(false);
       setAddCustomerForm({ name: '', phone: '', address: '', state: '' });
       showToast.success(t('posPage.customer.addSuccess'));
@@ -569,7 +587,7 @@ const POS = () => {
     setCustomQtyModal(null);
   }, [customQtyModal]);
 
-  const resetCartFieldsForNextSale = () => { setCart([]); setPaidAmount(''); setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setDiscountValue(''); setDiscountMode('percent'); setCustomerNote(''); setPaymentMethod(getLastPayment()); setSelectedRoundOff(null); };
+  const resetCartFieldsForNextSale = () => { setCart([]); setPaidAmount(''); setCustomer(''); setSelectedCustomerData(null); setIsWalkInSelected(false); setCustomerSearch(''); setDiscountValue(''); setDiscountMode('percent'); setCustomerNote(''); setPaymentMethod(getLastPayment()); setSelectedRoundOff(null); };
   const clearCart = () => { resetCartFieldsForNextSale(); setLastSale(null); };
 
   // ─── GST Calculation ─────────────────────────────────────────
@@ -762,6 +780,15 @@ const POS = () => {
   const showMobileList = mobileListProducts.length > 0;
   const sortedCategories = [...categories].sort((a, b) => (categorySalesRank[b._id] || 0) - (categorySalesRank[a._id] || 0));
 
+  // ─── Checkout Progress Tracker Steps ────────────────────────
+  const checkoutSteps = [
+    { key: 'customer', label: t('posPage.progress.customer'), complete: !!customer || isWalkInSelected },
+    { key: 'payment', label: t('posPage.progress.payment'), complete: !!paymentMethod },
+    { key: 'discount', label: t('posPage.progress.discount'), complete: discountValue !== '' },
+    { key: 'paid', label: t('posPage.progress.paid'), complete: paidAmount !== '' },
+    { key: 'roundOff', label: t('posPage.progress.roundOff'), complete: selectedRoundOff !== null },
+  ];
+
   if (initialLoad) return <POSSkeletonLoader />;
 
   return (
@@ -794,14 +821,14 @@ const POS = () => {
               <BiUser className="pos-customer-search-icon" />
               <input ref={customerSearchRef} className="pos-customer-search-input" placeholder={t('posPage.customer.searchPlaceholder')} value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} onFocus={() => setCustomerDropdownOpen(true)} />
               {customerSearch && <button className="pos-customer-search-clear" onClick={() => { setCustomerSearch(''); setCustomerDropdownOpen(true); }}><BiX /></button>}
-              {customer ? <button className="pos-customer-search-clear" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); }} title={t('posPage.customer.clear')}><BiTrash /></button> : <button className="pos-customer-btn-walkin" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setCustomerDropdownOpen(false); }} title={t('posPage.customer.walkInCustomer')}>{t('posPage.customer.walkIn')}</button>}
+              {customer ? <button className="pos-customer-search-clear" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setIsWalkInSelected(false); setCustomerSearch(''); }} title={t('posPage.customer.clear')}><BiTrash /></button> : <button className="pos-customer-btn-walkin" onClick={() => { setCustomer(''); setSelectedCustomerData(null); setIsWalkInSelected(true); setCustomerSearch(''); setCustomerDropdownOpen(false); }} title={t('posPage.customer.walkInCustomer')}>{t('posPage.customer.walkIn')}</button>}
             </div>
             {customerDropdownOpen && (
               <div className="pos-customer-dropdown-modern">
                 <div className="pos-customer-dropdown-header"><span>{t('posPage.customer.customersCount', { count: customers.length })}</span><button className="pos-customer-add-btn" onClick={() => setShowAddCustomer(true)} title={t('posPage.customer.add')}><BiPlus /> {t('posPage.customer.add')}</button></div>
                 <div className="pos-customer-dropdown-list">
-                  <div className={`pos-customer-option ${!customer ? 'active' : ''}`} onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); setCustomerDropdownOpen(false); }}><div className="pos-customer-option-avatar walkin"><BiUser size={16} /></div><div className="pos-customer-option-info"><span className="pos-customer-option-name">{t('posPage.customer.walkInCustomer')}</span><span className="pos-customer-option-phone">{t('posPage.customer.noAccountNeeded')}</span></div></div>
-                  {customers.filter(c => !customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.phone?.includes(customerSearch)).slice(0, 20).map(c => { const isSelected = customer === c._id; const due = c.dueAmount || 0; return (<div key={c._id} className={`pos-customer-option ${isSelected ? 'active' : ''}`} onClick={() => { setCustomer(c._id); setSelectedCustomerData(c); setCustomerSearch(''); setCustomerDropdownOpen(false); }}><div className="pos-customer-option-avatar" style={{ background: isSelected ? 'var(--primary)' : 'var(--bg-input)' }}>{c.name?.charAt(0)?.toUpperCase() || <BiUser size={16} />}</div><div className="pos-customer-option-info"><span className="pos-customer-option-name">{c.name}</span><span className="pos-customer-option-phone">{c.phone || t('posPage.customer.noPhone')}</span></div>{due > 0 && <span className="pos-customer-option-due">₹{Number(due).toFixed(2)}</span>}</div>); })}
+                  <div className={`pos-customer-option ${!customer && isWalkInSelected ? 'active' : ''}`} onClick={() => { setCustomer(''); setSelectedCustomerData(null); setIsWalkInSelected(true); setCustomerSearch(''); setCustomerDropdownOpen(false); }}><div className="pos-customer-option-avatar walkin"><BiUser size={16} /></div><div className="pos-customer-option-info"><span className="pos-customer-option-name">{t('posPage.customer.walkInCustomer')}</span><span className="pos-customer-option-phone">{t('posPage.customer.noAccountNeeded')}</span></div></div>
+                  {customers.filter(c => !customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.phone?.includes(customerSearch)).slice(0, 20).map(c => { const isSelected = customer === c._id; const due = c.dueAmount || 0; return (<div key={c._id} className={`pos-customer-option ${isSelected ? 'active' : ''}`} onClick={() => { setCustomer(c._id); setSelectedCustomerData(c); setIsWalkInSelected(false); setCustomerSearch(''); setCustomerDropdownOpen(false); }}><div className="pos-customer-option-avatar" style={{ background: isSelected ? 'var(--primary)' : 'var(--bg-input)' }}>{c.name?.charAt(0)?.toUpperCase() || <BiUser size={16} />}</div><div className="pos-customer-option-info"><span className="pos-customer-option-name">{c.name}</span><span className="pos-customer-option-phone">{c.phone || t('posPage.customer.noPhone')}</span></div>{due > 0 && <span className="pos-customer-option-due">₹{Number(due).toFixed(2)}</span>}</div>); })}
                 </div>
               </div>
             )}
@@ -822,7 +849,7 @@ const POS = () => {
               </div>
               <div style={{fontSize:'0.75rem',color:'var(--text-secondary)'}}>{selectedCustomerData.phone || t('posPage.customer.noPhone')}</div>
             </div>
-            <button style={{position:'absolute',top:'4px',right:'4px',width:'22px',height:'22px',borderRadius:'50%',border:'none',background:'var(--bg-input)',color:'var(--text-muted)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}} onClick={() => { setCustomer(''); setSelectedCustomerData(null); setCustomerSearch(''); }}><BiX size={14} /></button>
+            <button style={{position:'absolute',top:'4px',right:'4px',width:'22px',height:'22px',borderRadius:'50%',border:'none',background:'var(--bg-input)',color:'var(--text-muted)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}} onClick={() => { setCustomer(''); setSelectedCustomerData(null); setIsWalkInSelected(false); setCustomerSearch(''); }}><BiX size={14} /></button>
           </div>
         )}
 
@@ -903,6 +930,8 @@ const POS = () => {
 
           {dueAmount > 0 && (<div className="pos-due-alert"><BiErrorCircle size={16} /><span>{t('posPage.totals.dueAmount')} ₹{dueAmount.toFixed(2)}</span></div>)}
 
+          <CheckoutProgressTracker steps={checkoutSteps} />
+
           <div className="pos-summary-section">
             <div className="pos-summary-cards" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'4px',marginBottom:'4px'}}>
               <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'4px 2px',borderRadius:'var(--border-radius-sm)',background:'var(--bg-input)',border:'1px solid var(--border-color)',minHeight:'36px'}}>
@@ -932,7 +961,12 @@ const POS = () => {
                 <span style={{fontSize:'0.72rem',fontWeight:700,color:totalDiscount > 0 ? '#FF6B6B' : 'var(--text-muted)'}}>{totalDiscount > 0 ? `-₹${totalDiscount.toFixed(2)}` : '₹0.00'}</span>
               </div>
             </div>
-            <div className="pos-grand-total"><span>{includePreviousDue && hasPreviousDue ? t('posPage.previousDue.totalPayable') : t('posPage.totals.payable')}</span><span className="pos-grand-total-amount">₹{(includePreviousDue && hasPreviousDue ? totalPayable : payableAmount).toFixed(2)}</span></div>
+            <div className="pos-grand-total">
+              <div className="pos-grand-total-row">
+                <span>{includePreviousDue && hasPreviousDue ? t('posPage.previousDue.totalPayable') : t('posPage.totals.payable')}</span>
+                <span className="pos-grand-total-amount">₹{(includePreviousDue && hasPreviousDue ? totalPayable : payableAmount).toFixed(2)}</span>
+              </div>
+            </div>
           </div>
 
           <div className="pos-action-buttons">

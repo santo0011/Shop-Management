@@ -695,6 +695,15 @@
       "phonePlaceholder": "ফোন নম্বর",
       "addressLabel": "ঠিকানা",
       "addressPlaceholder": "ঠিকানা (ঐচ্ছিক)"
+    },
+    "progress": {
+      "customer": "ক্রেতা",
+      "payment": "পেমেন্ট",
+      "discount": "ছাড়",
+      "paid": "পরিশোধ",
+      "roundOff": "রাউন্ড অফ",
+      "finalPayable": "চূড়ান্ত প্রদেয়",
+      "checkoutProgress": "চেকআউট অগ্রগতি"
     }
   },
   "productsPage": {

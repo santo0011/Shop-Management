@@ -699,6 +699,15 @@
       "phonePlaceholder": "Phone number",
       "addressLabel": "Address",
       "addressPlaceholder": "Address (optional)"
+    },
+    "progress": {
+      "customer": "Customer",
+      "payment": "Payment",
+      "discount": "Discount",
+      "paid": "Paid",
+      "roundOff": "Round Off",
+      "finalPayable": "Final Payable",
+      "checkoutProgress": "Checkout Progress"
     }
   },
   "productsPage": {

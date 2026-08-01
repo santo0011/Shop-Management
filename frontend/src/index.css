@@ -3258,6 +3258,130 @@ select:-webkit-autofill {
   background: var(--bg-primary);
 }
 
+/* ─── Compact Checkout Progress Tracker (standalone row) ─── */
+.pos-grand-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 12px;
+  background: var(--gradient-primary);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 6px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.pos-grand-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.pos-grand-total-progress {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  margin-bottom: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-sm);
+  min-height: 20px;
+}
+
+.pos-grand-total-progress-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pos-grand-total-progress-steps::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.pos-grand-total-progress-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 0 2px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.pos-grand-total-progress-step.completed {
+  color: #2ecc71;
+}
+
+.pos-grand-total-progress-step.pending {
+  color: var(--text-muted);
+}
+
+.pos-grand-total-progress-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.pos-grand-total-progress-step.completed .pos-grand-total-progress-icon {
+  color: #2ecc71;
+}
+
+.pos-grand-total-progress-step.pending .pos-grand-total-progress-icon {
+  color: var(--text-muted);
+}
+
+.pos-grand-total-progress-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+
+@media (max-width: 575.98px) {
+  .pos-grand-total-progress {
+    padding: 1px 5px;
+    gap: 3px;
+    min-height: 18px;
+    overflow-x: hidden;
+  }
+
+  .pos-grand-total-progress-steps {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pos-grand-total-progress-step {
+    font-size: 0.66rem;
+    padding: 0 1px;
+    gap: 2px;
+  }
+
+  .pos-grand-total-progress-icon {
+    font-size: 0.82rem;
+  }
+
+  .pos-grand-total-progress-label {
+    font-size: 0.64rem;
+    font-weight: 700;
+  }
+}
+
 /* ─── Summary Cards ─────────────────────────────────────── */
 .pos-summary-section {
   margin-top: auto;
@@ -3351,20 +3475,7 @@ select:-webkit-autofill {
   color: var(--text-muted);
 }
 
-/* ─── Grand Total ───────────────────────────────────────── */
-.pos-grand-total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 7px 12px;
-  background: var(--gradient-primary);
-  border-radius: var(--border-radius-sm);
-  margin-bottom: 6px;
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.82rem;
-}
-
+/* ─── Grand Total Amount ────────────────────────────────── */
 .pos-grand-total-amount {
   font-size: 1.1rem;
   font-weight: 800;
