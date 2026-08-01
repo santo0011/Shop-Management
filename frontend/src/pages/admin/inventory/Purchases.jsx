@@ -2455,8 +2455,12 @@ const Purchases = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [supplierFilter, setSupplierFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
-  const [datePreset, setDatePreset] = useState('today');
-  const [startDate, setStartDate] = useState(() => toDateInputValue(new Date()));
+  const [datePreset, setDatePreset] = useState('30d');
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return toDateInputValue(d);
+  });
   const [endDate, setEndDate] = useState(() => toDateInputValue(new Date()));
   const isFirstLoad = useRef(true);
 
